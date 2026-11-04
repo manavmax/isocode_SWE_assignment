@@ -3,19 +3,19 @@ import { MAX_UPLOAD_BYTES, validateAsOf, validateUploadFile } from './uploadMeta
 import type { UploadFile } from './uploadMeta.js';
 
 describe('validateAsOf', () => {
+  const expectOk = (result: ReturnType<typeof validateAsOf>): string => {
+    if (!result.ok) throw new Error(`expected ok, got ${result.error}`);
+    return result.asOf;
+  };
+
   it('defaults to today in IST when the field is missing or blank', () => {
-    const { ok, asOf } = validateAsOf(undefined);
-    expect(ok).toBe(true);
+    const asOf = expectOk(validateAsOf(undefined));
     expect(asOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    const blank = validateAsOf('  ');
-    expect(blank.ok).toBe(true);
-    if (blank.ok) {
-      expect(blank.asOf).toBe(asOf);
-    }
+    expect(expectOk(validateAsOf('  '))).toBe(asOf);
   });
 
   it('accepts a well-formed real calendar date', () => {
-    expect(validateAsOf('2026-11-04')).toEqual({ ok: true, asOf: '2026-11-04' });
+    expect(expectOk(validateAsOf('2026-11-04'))).toBe('2026-11-04');
   });
 
   it('rejects non ISO-shaped dates', () => {
