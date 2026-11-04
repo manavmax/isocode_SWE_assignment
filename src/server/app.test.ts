@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { app } from './app';
+import { app } from './app.js';
 
 describe('GET /api/health', () => {
   afterEach(() => {
