@@ -1,0 +1,15 @@
+node_modules/
+dist/
+dist-*/
+.vercel/
+coverage/
+.pnpm-store/
+
+.env
+.env.local
+.env.*.local
+!.env.example
+
+*.tsbuildinfo
+*.log
+.DS_Store
