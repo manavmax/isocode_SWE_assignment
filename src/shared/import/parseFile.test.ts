@@ -50,13 +50,21 @@ describe('parseCsv', () => {
     expect(report.rows[2]!.promiseNote).toBeNull();
   });
 
-  it('aborts bad_rows.csv on error rate over 20 percent', () => {
+  it('accepts bad_rows.csv partially: 4 error rows under the 20 percent abort', () => {
     const report = fromFile('data/bad_rows.csv');
-    expect(report.totalRows).toBe(6);
+    expect(report.totalRows).toBe(46);
     expect(report.dropped).toBe(4);
+    expect(report.imported).toBe(42);
+    expect(report.abort).toBeNull();
+  });
+
+  it('aborts abort_rows.csv on error rate over 20 percent', () => {
+    const report = fromFile('data/abort_rows.csv');
+    expect(report.totalRows).toBe(5);
+    expect(report.dropped).toBe(3);
     expect(report.imported).toBe(2);
-    expect(report.abort).not.toBeNull();
     expect(report.abort?.code).toBe('error_rate');
+    expect(report.abort?.message).toContain('60%');
   });
 
   it('flags the bad_rows fixtures exactly: duplicates, three amounts, sci mobile', () => {
