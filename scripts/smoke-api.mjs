@@ -18,27 +18,39 @@ await esbuild.build({
 
 delete process.env.DATABASE_URL;
 
-const entryUrl = pathToFileURL(path.join(outdir, 'api', '[[...route]].js')).href;
-const entryModule = await import(entryUrl);
-if (typeof entryModule.default !== 'function') {
-  throw new Error('smoke: catch-all entry did not export a callable handler');
+try {
+  const entryModule = await import(pathToFileURL(path.join(outdir, 'api', '[[...route]].js')).href);
+
+  failNow(typeof entryModule.default === 'function', 'default export is a bare function; Vercel ignores returns there and hangs. Use the documented { fetch } object (or named method exports)');
+  failNow(entryModule.default === null || typeof entryModule.default !== 'object', 'default export must be the documented { fetch } object');
+  failNow(typeof entryModule.default.fetch !== 'function', 'default export must expose a callable fetch handler');
+
+  const handler = entryModule.default.fetch;
+  const response = await withTimeout(handler(new Request('http://localhost/api/health')), 5000);
+  const body = await response.json();
+
+  failNow(response.status !== 503, `expected 503, got ${response.status}`);
+  failNow(body?.status !== 'degraded', `expected status degraded, got ${JSON.stringify(body)}`);
+  failNow(body?.db !== 'error', `expected db error, got ${body.db}`);
+  failNow(typeof body?.time !== 'string' || body.time.length === 0, 'expected ISO time string');
+
+  console.log('smoke-api: plain-Node ESM load + { fetch } function shape + degraded health OK');
+} catch (err) {
+  failNow(true, err?.message);
 }
 
-const appModule = await import(pathToFileURL(path.join(outdir, 'src', 'server', 'app.js')).href);
-const response = await appModule.app.request('/api/health');
-const body = await response.json();
+function failNow(failed, message) {
+  if (!failed) return;
+  console.error(`smoke-api FAILED: ${message}`);
+  rmSync(outdir, { recursive: true, force: true });
+  process.exit(1);
+}
 
-assert(response.status === 503, `expected 503, got ${response.status}`);
-assert(body.status === 'degraded', `expected status degraded, got ${body.status}`);
-assert(body.db === 'error', `expected db error, got ${body.db}`);
-assert(typeof body.time === 'string' && body.time.length > 0, 'expected ISO time string');
-
-console.log('smoke-api: plain-Node ESM load + degraded health OK');
-
-function assert(condition, message) {
-  if (!condition) {
-    console.error(`smoke-api FAILED: ${message}`);
-    rmSync(outdir, { recursive: true, force: true });
-    process.exit(1);
-  }
+function withTimeout(promise, ms) {
+  let timer;
+  const limit = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`/api/health did not respond within ${ms} ms (hang)`)), ms);
+  });
+  timer.unref();
+  return Promise.race([promise, limit]).finally(() => clearTimeout(timer));
 }
