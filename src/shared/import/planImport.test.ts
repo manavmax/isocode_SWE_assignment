@@ -40,11 +40,30 @@ function plan(rows: ImportLoan[], previous: PrevEntry[] = [], input?: Partial<Pa
 }
 
 describe('planImport', () => {
-  it('tags first-seen loans above 30 dpd as late_discovery', () => {
+  it('first-ever import: a loan at 41 dpd is NOT flagged late_discovery (A20)', () => {
     const report = plan([loan({ loanId: 'LN-1', dpd: 41 })]);
     expect(report.newLoans).toHaveLength(1);
+    expect(report.newLoans[0]!.lateDiscovery).toBe(false);
+    expect(report.counts.lateDiscovery).toBe(0);
+    expect(report.warnings.some((w) => w.code === 'late_discovery')).toBe(false);
+  });
+
+  it('with previous snapshot: loan first seen at 35 dpd IS flagged late_discovery (A20)', () => {
+    const prev = [['LN-0', { dpd: 5, overdueAmount: 0, outstanding: 0, status: 'overdue' }]] as PrevEntry[];
+    const report = plan([loan({ loanId: 'LN-1', dpd: 35 }), loan({ loanId: 'LN-0', dpd: 5 })], prev);
+    expect(report.abort).toBeNull();
     expect(report.newLoans[0]!.lateDiscovery).toBe(true);
     expect(report.counts.lateDiscovery).toBe(1);
+    const w = report.warnings.find((w) => w.code === 'late_discovery');
+    expect(w?.message).toContain('35');
+    expect(w?.message).toContain('LN-1');
+  });
+
+  it('with previous snapshot: loan first seen at 30 dpd is NOT flagged (boundary)', () => {
+    const prev = [['LN-0', { dpd: 5, overdueAmount: 0, outstanding: 0, status: 'overdue' }]] as PrevEntry[];
+    const report = plan([loan({ loanId: 'LN-1', dpd: 30 }), loan({ loanId: 'LN-0', dpd: 5 })], prev);
+    expect(report.abort).toBeNull();
+    expect(report.counts.lateDiscovery).toBe(0);
   });
 
   it('does not tag first-seen loans at or below 30 dpd', () => {

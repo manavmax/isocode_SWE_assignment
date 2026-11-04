@@ -121,12 +121,12 @@ export function planImport(input: PlanInput): ImportPlan {
       continuing.push({ loan: row, previousDpd: previousLoan.dpd, kind: continuingKind(row, previousLoan) });
       continue;
     }
-    const lateDiscovery = row.dpd > 30;
+    const lateDiscovery = input.previousCount > 0 && row.dpd > 30;
     if (lateDiscovery) {
       warnings.push({
         loanId: row.loanId,
         code: 'late_discovery',
-        message: `loan ${row.loanId} first seen above 30 dpd, tagged late_discovery`
+        message: `loan ${row.loanId} first seen at ${row.dpd} dpd (above 30), tagged late_discovery`
       });
     }
     const territoryOfficerId = input.territory.length > 0 ? territoryOfficerFor(input.territory, row) : null;
