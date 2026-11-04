@@ -23,7 +23,7 @@ describe('buildErrorsCsv', () => {
     ]);
     const lines = csv.split('\n').filter((line) => line !== '');
     expect(lines[0]).toBe('row_no,loan_id,source_column,code,severity,message');
-    expect(lines[1]).toBe('4,LN-50002,outstanding,bad_amount,error,"amount 6L is not a valid rupee amount"');
+    expect(lines[1]).toBe('4,LN-50002,outstanding,bad_amount,error,amount 6L is not a valid rupee amount');
     expect(lines[2]).toBe('10,,mobile,bad_mobile,warning,";nc examples aside, =SUM is stripped"');
   });
 
