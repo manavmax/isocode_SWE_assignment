@@ -34,4 +34,13 @@ export async function withTx<T>(fn: (tx: PooledTx) => T | Promise<T>): Promise<T
   return getPooledDb().transaction(async (tx) => fn(tx));
 }
 
+export async function closePool(): Promise<void> {
+  if (pool) {
+    const closing = pool;
+    pool = null;
+    pooledDb = null;
+    await closing.end();
+  }
+}
+
 export type { PooledTx };
