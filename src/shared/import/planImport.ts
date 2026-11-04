@@ -40,7 +40,7 @@ export interface PlannedGone {
 export interface PlanWarning {
   rowNo?: number;
   loanId?: string;
-  code: 'pincode_not_in_territory' | 'late_discovery';
+  code: string;
   message: string;
 }
 
@@ -108,15 +108,12 @@ export function planImport(input: PlanInput): ImportPlan {
 
   const newLoans: PlannedNew[] = [];
   const continuing: PlannedContinuing[] = [];
-  const warnings: PlanWarning[] = input.warnings.map((issue) => {
-    const mappedRow = issue.rowNo !== undefined ? input.rows[issue.rowNo - 2] : undefined;
-    return {
-      rowNo: issue.rowNo,
-      loanId: mappedRow?.loanId,
-      code: 'pincode_not_in_territory' as const,
-      message: issue.message
-    };
-  });
+  const warnings: PlanWarning[] = input.warnings.map((issue) => ({
+    rowNo: issue.rowNo,
+    loanId: issue.loanId,
+    code: issue.code,
+    message: issue.message
+  }));
 
   for (const row of input.rows) {
     const previousLoan = input.previous.get(row.loanId);

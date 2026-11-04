@@ -136,6 +136,17 @@ describe('planImport', () => {
     expect(report.newLoans[0]!.territoryOfficerId).toBeNull();
   });
 
+  it('carries parse-warning code and loan id through to plan warnings', () => {
+    const report = plan([loan({ loanId: 'LN-19', dpd: 10 })], [], {
+      warnings: [
+        { rowNo: 4, loanId: 'LN-19', column: 'mobile', code: 'bad_mobile', message: 'mobile 9.87E+9 is not 10 digits starting 6-9' }
+      ]
+    });
+    expect(report.warnings).toEqual([
+      { rowNo: 4, loanId: 'LN-19', code: 'bad_mobile', message: 'mobile 9.87E+9 is not 10 digits starting 6-9' }
+    ]);
+  });
+
   it('matches exact pincode-locality territory before generic pincode rows', () => {
     const report = plan([loan({ loanId: 'LN-14', dpd: 10, pincode: '452001', locality: 'Bhawarkua' })], [], { territory: TERRITORY });
     expect(report.warnings).toEqual([]);

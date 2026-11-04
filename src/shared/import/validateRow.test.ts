@@ -151,4 +151,21 @@ describe('validateRow', () => {
     );
     expect(result.errors[0]!.rowNo).toBe(7);
   });
+
+  it('carries the loan id on issues from dropped rows so errors.csv can name the loan', () => {
+    const badAmount = validate({ 'LOAN ID': 'LN-17', BORROWER: 'Q', POS: '6L', DPD: '5', 'PIN CODE': '452001', BRANCH: 'Ujjain' }, 9);
+    expect(badAmount.status).toBe('dropped');
+    expect(badAmount.errors.every((error) => error.loanId === 'LN-17')).toBe(true);
+
+    const seen = new Set<string>();
+    validate({ 'LOAN ID': 'LN-18', BORROWER: 'R', POS: '500', DPD: '5', 'PIN CODE': '452001', BRANCH: 'Ujjain' }, 2, seen);
+    const duplicate = validate({ 'LOAN ID': 'LN-18', BORROWER: 'R', POS: '500', DPD: '5', 'PIN CODE': '452001', BRANCH: 'Ujjain' }, 3, seen);
+    expect(duplicate.errors.find((error) => error.code === 'duplicate_loan_id')?.loanId).toBe('LN-18');
+  });
+
+  it('leaves loanId undefined on issues from rows with no loan id cell', () => {
+    const result = validate({ BORROWER: 'S', POS: '500', DPD: '5', 'PIN CODE': '452001', BRANCH: 'Ujjain' });
+    expect(result.errors.map((error) => error.code)).toEqual(['required_cell_missing']);
+    expect(result.errors.map((error) => error.loanId)).toEqual([undefined]);
+  });
 });

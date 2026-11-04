@@ -4,6 +4,7 @@ import { toPaise } from './money.js';
 
 export interface RowIssue {
   rowNo: number;
+  loanId?: string;
   column: string;
   code: string;
   message: string;
@@ -148,6 +149,10 @@ export function validateRow(
   const npa = dpd !== null && dpd > 90;
   const status: RowValidation['status'] =
     errors.length > 0 ? 'dropped' : dpd === 0 ? 'skipped' : 'ok';
+
+  for (const item of [...errors, ...warnings]) {
+    item.loanId = loanId;
+  }
 
   const promiseRaw = cell('promise_date');
   const promise = promiseRaw === undefined ? undefined : parsePromiseCell(promiseRaw);
