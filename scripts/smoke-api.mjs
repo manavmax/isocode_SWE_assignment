@@ -1,10 +1,17 @@
-import { rmSync } from 'node:fs';
+import { rmSync, readdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import esbuild from 'esbuild';
 
 const outdir = path.resolve('.tmp-smoke');
-const entries = ['api/[[...route]].ts', 'src/server/app.ts', 'src/server/db.ts'];
+
+function tsEntries(dir) {
+  return readdirSync(dir, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts'))
+    .map((entry) => path.join(entry.parentPath ?? entry.path, entry.name));
+}
+
+const entries = [...tsEntries('api'), ...tsEntries('src/server'), ...tsEntries('src/shared')];
 
 rmSync(outdir, { recursive: true, force: true });
 
