@@ -14,9 +14,9 @@
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit",
     "check:api": "node scripts/smoke-api.mjs",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "node --env-file=.env ./node_modules/.bin/drizzle-kit migrate",
-    "db:check": "node --env-file=.env ./node_modules/.bin/tsx scripts/db-check.ts",
+    "db:generate": "node node_modules/drizzle-kit/bin.cjs generate",
+    "db:migrate": "node --env-file=.env node_modules/drizzle-kit/bin.cjs migrate",
+    "db:check": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/db-check.ts",
     "prepare": "simple-git-hooks"
   },
   "dependencies": {

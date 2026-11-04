@@ -45,8 +45,12 @@ try {
   failUnless(hasPostgresTrigger, 'trigger contact_event_append_only is not installed');
   console.log('db-check: trigger contact_event_append_only present');
 
-  await expectRejected('update contact_event set outcome = $$tampered$$ where id = $1', 'UPDATE');
-  await expectRejected('delete from contact_event where id = $1', 'DELETE');
+failUnless((await cascadeCount()) === 0, 'a foreign key cascades deletes into contact_event');
+console.log('db-check: no foreign key cascade deletes into contact_event');
+
+await expectRejected('update contact_event set outcome = $$tampered$$ where id = $1', 'UPDATE');
+await expectRejected('delete from contact_event where id = $1', 'DELETE');
+
 
   console.log('db-check: UPDATE and DELETE on contact_event both rejected inside rolled-back transactions');
   console.log('db-check OK');
@@ -54,29 +58,48 @@ try {
   await pool.end();
 }
 
+async function cascadeCount() {
+  const result = await db.execute<{ fk: string; delete_rule: string }>(
+    sql`select conname as fk, confdeltype::text as delete_rule
+        from pg_constraint
+        where confrelid = 'contact_event'::regclass`
+  );
+  return result.rows.filter((row) => row.delete_rule === 'c').length;
+}
+
 async function expectRejected(statement: string, targetOp: 'UPDATE' | 'DELETE') {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     await client.query(
-      `insert into contact_event (id, loan_id, kind, attempted_at_device, device_tz_offset_minutes, attempted_at_ist, within_window, rule_set)
-       values ($1, $2, 'VISIT', '2026-01-01 06:00:00+00', 0, '2026-01-01 06:00:00+00', true, 'RBC2025_para100')`,
-      [PROBE_ID, '__dbcheck_probe_loan__']
+      `insert into branch (id, code, name) values (gen_random_uuid(), '__DBCHECK__', '__dbcheck probe branch') returning id`
+    ).then((result) =>
+      client.query(
+        `insert into loan (loan_id, borrower_name, branch_id, outstanding, overdue_amount, dpd, bucket)
+         values ('__dbcheck_probe_loan__', '__dbcheck probe loan__', $1, 0, 0, 0, '0')`,
+        [(result.rows[0] as { id: string }).id]
+      )
+    ).then(() =>
+      client.query(
+        `insert into contact_event (id, loan_id, kind, attempted_at_device, device_tz_offset_minutes, attempted_at_ist, within_window, rule_set)
+         values ($1, $2, 'CALL', '2026-01-01 06:00:00+00', 0, '2026-01-01 06:00:00+00', true, 'RBC2025_para100')`,
+        [PROBE_ID, '__dbcheck_probe_loan__']
+      )
+    ).then(() =>
+      client.query(statement, [PROBE_ID])
+    ).then(
+      () => failUnless(false, `${targetOp} on contact_event was not rejected`),
+      (err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        failUnless(
+          message.includes('append-only') && message.includes(targetOp),
+          `${targetOp} failed for the wrong reason: ${message}`
+        );
+        console.log(`db-check: ${targetOp} rejected with trigger error (inside probe transaction)`);
+      }
     );
-    try {
-      await client.query(statement, [PROBE_ID]);
-      failUnless(false, `${targetOp} on contact_event was not rejected`);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      failUnless(
-        message.includes('append-only') && message.includes(targetOp),
-        `${targetOp} failed for the wrong reason: ${message}`
-      );
-      console.log(`db-check: ${targetOp} rejected with trigger error (inside probe transaction)`);
-    } finally {
-      await client.query('ROLLBACK');
-    }
   } finally {
+    await client.query('ROLLBACK');
     client.release();
   }
 }
