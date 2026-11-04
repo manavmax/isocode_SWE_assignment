@@ -14,7 +14,7 @@ function fromFile(path: string) {
 }
 
 describe('parseCsv', () => {
-  it('_parses the three-loan brief sample end to end', () => {
+  it('parses the three-loan brief sample end to end', () => {
     const report = fromFile('data/sample_overdue.csv');
     expect(report.abort).toBeNull();
     expect(report.delimiter).toBe(',');
@@ -27,7 +27,7 @@ describe('parseCsv', () => {
     expect(report.warnings).toEqual([]);
   });
 
-  it('_type-casts the first brief loan with money in paise and promise annotation', () => {
+  it('type-casts the first brief loan with money in paise and promise annotation', () => {
     const report = fromFile('data/sample_overdue.csv');
     const first = report.rows[0]!;
     expect(first.loanId).toBe('LN-10293');
@@ -42,7 +42,7 @@ describe('parseCsv', () => {
     expect(first.npa).toBe(false);
   });
 
-  it('_reads dash as no promise and day-first date as promise', () => {
+  it('reads dash as no promise and day-first date as promise', () => {
     const report = fromFile('data/sample_overdue.csv');
     expect(report.rows[1]!.promiseDate).toBeNull();
     expect(report.rows[1]!.promiseNote).toBeNull();
@@ -50,7 +50,7 @@ describe('parseCsv', () => {
     expect(report.rows[2]!.promiseNote).toBeNull();
   });
 
-  it('_aborts bad_rows.csv on error rate over 20 percent', () => {
+  it('aborts bad_rows.csv on error rate over 20 percent', () => {
     const report = fromFile('data/bad_rows.csv');
     expect(report.totalRows).toBe(6);
     expect(report.dropped).toBe(4);
@@ -59,7 +59,7 @@ describe('parseCsv', () => {
     expect(report.abort?.code).toBe('error_rate');
   });
 
-  it('_flags the bad_rows fixtures exactly: duplicates, three amounts, sci mobile', () => {
+  it('flags the bad_rows fixtures exactly: duplicates, three amounts, sci mobile', () => {
     const report = fromFile('data/bad_rows.csv');
     const errorRowNos = [...new Set(report.errors.map((error) => error.rowNo))];
     expect(errorRowNos).toEqual([3, 4, 5, 6]);
@@ -72,13 +72,13 @@ describe('parseCsv', () => {
     expect(report.rows[1]?.outstanding).toBe(6600000);
   });
 
-  it('_aborts files with zero data rows', () => {
+  it('aborts files with zero data rows', () => {
     const report = fromText('Loan ID,Borrower,POS,DPD,Pin Code,Branch\n');
     expect(report.abort?.code).toBe('empty');
     expect(report.rows).toHaveLength(0);
   });
 
-  it('_aborts files missing required columns and suggests the nearest alias', () => {
+  it('aborts files missing required columns and suggests the nearest alias', () => {
     const report = fromText(
       'Loan ID,Borrower,Outstanding,DPD,Pincde,Brach\nLN-1,ABC Trading,500,12,452001,Ujjain'
     );
@@ -87,7 +87,7 @@ describe('parseCsv', () => {
     expect(report.rows).toHaveLength(0);
   });
 
-  it('_keeps the first of duplicate loan ids and counts the later row as dropped', () => {
+  it('keeps the first of duplicate loan ids and counts the later row as dropped', () => {
     const text = [
       'Loan ID,Borrower,POS,DPD,Pin Code,Branch',
       'LN-9,ABC Trading,500,12,452001,Ujjain',
@@ -102,7 +102,7 @@ describe('parseCsv', () => {
     expect(report.abort).toBeNull();
   });
 
-  it('_handles quoted semicolon rows with commas inside cells', () => {
+  it('handles quoted semicolon rows with commas inside cells', () => {
     const report = fromText(
       'Loan ID;Borrower;POS;DPD;Pin Code;Branch\nLN-11;"Khan, Farida";1,500;12;452001;Ujjain'
     );
@@ -112,7 +112,7 @@ describe('parseCsv', () => {
     expect(report.rows[0]!.outstanding).toBe(150000);
   });
 
-  it('_counts dpd 0 rows as skipped warnings and keeps abort null', () => {
+  it('counts dpd 0 rows as skipped warnings and keeps abort null', () => {
     const report = fromText(
       [
         'Loan ID,Borrower,POS,DPD,Pin Code,Branch',
