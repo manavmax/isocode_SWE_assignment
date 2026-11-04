@@ -17,7 +17,7 @@ export default tseslint.config(
     }
   },
   {
-    files: ['src/server/**', 'src/shared/**', 'api/**'],
+    files: ['src/server/**', 'src/shared/**', 'api/**', 'scripts/**'],
     rules: {
       'no-restricted-syntax': [
         'error',
