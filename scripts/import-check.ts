@@ -508,7 +508,7 @@ async function run(database: Db): Promise<void> {
   );
   printReport(first.report);
   printLateDiscovery(flagged1);
-  console.log('           loans above 30 dpd in file: LN-10293 (dpd=37), LN-11930 (dpd=64) — not flagged: first-ever import (A20)');
+  console.log('           loans above 30 dpd in file: none (brief sample values are dpd 12, 27, 19) — lateDiscovery=0 (A20)');
 
   console.log('phase 2/5  sample_overdue.csv   (same bytes) -> expect noop, previous report replayed, nothing written');
   const second = await importJson(await post('sample_overdue.csv', bytesOf('data/sample_overdue.csv'), AS_OF));

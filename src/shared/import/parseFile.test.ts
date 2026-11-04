@@ -27,27 +27,27 @@ describe('parseCsv', () => {
     expect(report.warnings).toEqual([]);
   });
 
-  it('type-casts the first brief loan with money in paise and promise annotation', () => {
+  it('type-casts the first brief loan with money in paise and the brief exact values', () => {
     const report = fromFile('data/sample_overdue.csv');
     const first = report.rows[0]!;
     expect(first.loanId).toBe('LN-10293');
     expect(first.outstanding).toBe(64000000);
-    expect(first.dpd).toBe(37);
+    expect(first.dpd).toBe(12);
     expect(first.pincode).toBe('457001');
     expect(first.branch).toBe('Ujjain');
     expect(first.businessName).toBe('Sharma Kirana');
-    expect(first.promiseDate).toBe('2026-10-31');
-    expect(first.promiseNote).toBe('(broken)');
-    expect(first.officer).toBe('Kapil Verma');
+    expect(first.promiseDate).toBe('2026-11-05');
+    expect(first.promiseNote).toBeNull();
+    expect(first.officer).toBe('Rahul Chouhan');
     expect(first.npa).toBe(false);
   });
 
-  it('reads dash as no promise and day-first date as promise', () => {
+  it('reads dash as no promise and the third loan as a broken promise', () => {
     const report = fromFile('data/sample_overdue.csv');
     expect(report.rows[1]!.promiseDate).toBeNull();
     expect(report.rows[1]!.promiseNote).toBeNull();
-    expect(report.rows[2]!.promiseDate).toBe('2026-11-05');
-    expect(report.rows[2]!.promiseNote).toBeNull();
+    expect(report.rows[2]!.promiseDate).toBe('2026-10-31');
+    expect(report.rows[2]!.promiseNote).toBe('(broken)');
   });
 
   it('accepts bad_rows.csv partially: 4 error rows under the 20 percent abort', () => {

@@ -38,19 +38,19 @@ describe('validateRow', () => {
       'LOAN ID': 'LN-10293',
       BORROWER: 'Ramesh Sharma',
       POS: 'Rs. 6,40,000/-',
-      DPD: '37',
+      DPD: '12',
       'PIN CODE': '452001',
       BRANCH: 'Ujjain',
-      'PROMISE DATE': '2026-10-31 (broken)'
+      'PROMISE DATE': '2026-11-05'
     });
     expect(result.status).toBe('ok');
     expect(result.errors).toEqual([]);
     expect(result.warnings).toEqual([]);
     expect(result.loan?.outstanding).toBe(64000000);
-    expect(result.loan?.dpd).toBe(37);
+    expect(result.loan?.dpd).toBe(12);
     expect(result.loan?.branch).toBe('Ujjain');
-    expect(result.loan?.promiseDate).toBe('2026-10-31');
-    expect(result.loan?.promiseNote).toBe('(broken)');
+    expect(result.loan?.promiseDate).toBe('2026-11-05');
+    expect(result.loan?.promiseNote).toBeNull();
   });
 
   it('keeps first duplicate loan_id and raises a duplicate error on later rows', () => {
