@@ -4,6 +4,7 @@ dist-*/
 .vercel/
 coverage/
 .pnpm-store/
+.tmp-smoke/
 
 .env
 .env.local
