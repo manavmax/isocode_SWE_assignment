@@ -1,7 +1,6 @@
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { getDb } from './db.js';
 import { importBatches, importRowErrors, loans, users } from './db/schema.js';
-import { parseBasicAuth, verifyPassword } from './auth.js';
 import { maskPhone } from '../shared/phone.js';
 import type { LoanStatus } from '../shared/types.js';
 
@@ -13,23 +12,6 @@ export interface Actor {
   /** The officer row this user acts as (field officers only; null for managers). */
   officerId: string | null;
   active: boolean;
-}
-
-export async function resolveActor(authorization: string | null | undefined): Promise<Actor | null> {
-  const creds = parseBasicAuth(authorization);
-  if (!creds) {
-    return null;
-  }
-  const db = getDb();
-  const found = await db.select().from(users).where(eq(users.username, creds.username)).limit(1);
-  const user = found[0];
-  if (!user || !user.active) {
-    return null;
-  }
-  if (!verifyPassword(user.passwordHash, creds.password)) {
-    return null;
-  }
-  return { userId: user.id, username: user.username, role: user.role, branchId: user.branchId, officerId: user.officerId ?? null, active: user.active };
 }
 
 export function isManager(actor: Actor | null | undefined): boolean {

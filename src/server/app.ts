@@ -4,7 +4,7 @@ import type { Context } from 'hono';
 import { applyImport } from './import/applyImport.js';
 import { validateAsOf, validateUploadFile } from './import/uploadMeta.js';
 import { buildErrorsCsv } from './errorsCsv.js';
-import { fetchBatchWithRowErrors, fetchLoanForActor, findLoginUser, isManager, listOfficerAssignments, probeDb, resolveActor } from './dal.js';
+import { fetchBatchWithRowErrors, fetchLoanForActor, findLoginUser, isManager, listOfficerAssignments, probeDb } from './dal.js';
 import { verifyPassword } from './auth.js';
 import {
   createSession,
@@ -28,12 +28,10 @@ app.get('/api/health', async (c) => {
   }
 });
 
-/** Cookie session first (the logged-in UI), then the unchanged Basic header
- * (manager CLI / smoke). Session lookups go through sessions.ts, never this
- * file — routes hold no data-access code (guard test). */
-async function resolveRequestActor(cookieToken: string | undefined, authorization: string | null | undefined) {
-  return (await resolveSessionActor(cookieToken)) ?? (await resolveActor(authorization));
-}
+/** Cookie sessions only — one auth mechanism, one attack surface. The Basic
+ * header path was scaffolding for import-check and retired with it: scripts
+ * now log in through POST /api/auth/login exactly like the UI does. A stray
+ * Authorization header is simply not an identity. */
 
 function clientIp(c: Context): string {
   const forwarded = c.req.header('x-forwarded-for');
@@ -146,7 +144,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 app.post('/api/import', async (c) => {
   try {
-    const actor = await resolveRequestActor(getCookie(c, SESSION_COOKIE), c.req.header('Authorization'));
+    const actor = await resolveSessionActor(getCookie(c, SESSION_COOKIE));
     if (!actor) {
       return c.json({ error: 'unauthorized' }, 401);
     }
@@ -192,7 +190,7 @@ app.post('/api/import', async (c) => {
 
 app.get('/api/import/:id/errors.csv', async (c) => {
   try {
-    const actor = await resolveRequestActor(getCookie(c, SESSION_COOKIE), c.req.header('Authorization'));
+    const actor = await resolveSessionActor(getCookie(c, SESSION_COOKIE));
     if (!actor) {
       return c.json({ error: 'unauthorized' }, 401);
     }

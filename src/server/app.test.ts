@@ -1,10 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { app } from './app.js';
 
-function basic(username: string, password: string): string {
-  return `Basic ${Buffer.from(`${username}:${password}`, 'utf8').toString('base64')}`;
-}
-
 describe('GET /api/health', () => {
   afterEach(() => {
     delete process.env.DATABASE_URL;
@@ -20,27 +16,27 @@ describe('GET /api/health', () => {
   });
 });
 
-describe('POST /api/import auth gate', () => {
+describe('POST /api/import auth gate (cookie sessions only — the Basic header is no longer an identity)', () => {
   afterEach(() => {
     delete process.env.DATABASE_URL;
   });
 
-  it('returns 401 when no basic credentials are present', async () => {
+  it('returns 401 with no session cookie', async () => {
     const res = await app.request('/api/import', { method: 'POST' });
     const body = (await res.json()) as { error: string };
     expect(res.status).toBe(401);
     expect(body.error).toBe('unauthorized');
   });
 
-  it('returns 401 for a malformed basic header', async () => {
-    const res = await app.request('/api/import', { method: 'POST', headers: { Authorization: 'Bearer abc' } });
+  it('returns 401 when only a stray Authorization header is present', async () => {
+    const res = await app.request('/api/import', { method: 'POST', headers: { Authorization: 'Basic aGVsbG8=' } });
     expect(res.status).toBe(401);
   });
 
-  it('reports degraded when credentials parse but the database is unavailable', async () => {
+  it('reports degraded when the session lookup cannot reach the database', async () => {
     const res = await app.request('/api/import', {
       method: 'POST',
-      headers: { Authorization: basic('mgr@example.com', 'pw') }
+      headers: { cookie: 'fc_session=some-token' }
     });
     const body = (await res.json()) as { status: string };
     expect(res.status).toBe(503);
@@ -48,21 +44,21 @@ describe('POST /api/import auth gate', () => {
   });
 });
 
-describe('GET /api/import/:id/errors.csv auth gate', () => {
+describe('GET /api/import/:id/errors.csv auth gate (cookie sessions only)', () => {
   afterEach(() => {
     delete process.env.DATABASE_URL;
   });
 
-  it('returns 401 when no basic credentials are present', async () => {
+  it('returns 401 with no session cookie', async () => {
     const res = await app.request('/api/import/00000000-0000-4000-8000-000000000001/errors.csv');
     const body = (await res.json()) as { error: string };
     expect(res.status).toBe(401);
     expect(body.error).toBe('unauthorized');
   });
 
-  it('reports degraded when credentials parse but the database is unavailable', async () => {
+  it('reports degraded when the session lookup cannot reach the database', async () => {
     const res = await app.request('/api/import/00000000-0000-4000-8000-000000000001/errors.csv', {
-      headers: { Authorization: basic('mgr@example.com', 'pw') }
+      headers: { cookie: 'fc_session=some-token' }
     });
     const body = (await res.json()) as { status: string };
     expect(res.status).toBe(503);

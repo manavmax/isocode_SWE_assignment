@@ -31,6 +31,7 @@ The PIN is a **documented demo credential for the synthetic demo** (assumption A
 - Cookie `fc_session`: HttpOnly, Secure, SameSite=Lax, `Path=/`, Max-Age 7 days; the cookie value is a random 32-byte base64url token whose sha256 is the only thing the database stores.
 - Sessions expire server-side after 7 days (checked at lookup, so an expired row cannot authenticate even if a cookie survives).
 - Login rate limit: 5 failed attempts per username + client IP within 15 minutes; the counter lives in the `login_attempt` table (`key`, `fail_count`, `window_start`), so it holds across serverless instances and invocation boundaries (A30, migration 0003). `Retry-After` on 429; a successful login deletes the row.
+- Cookie sessions are the only accepted API auth: `/api/import` and `errors.csv` resolve the `fc_session` cookie alone. The Basic header path (import-check scaffolding) was removed outright rather than NODE_ENV-gated — one mechanism, one attack surface; local scripts authenticate through `POST /api/auth/login` like the UI does.
 - Every auth failure (unknown user, inactive, demo account with the switch off, wrong PIN) answers the same generic `wrong username or PIN`.
 
 ## Data-access rules (SPEC 24, A32/A33)

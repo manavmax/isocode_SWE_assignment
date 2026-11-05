@@ -138,8 +138,19 @@ function variantBytes(): Uint8Array {
   return new TextEncoder().encode(raw.replace('"1,20,000",3,457001', '"1,20,000",4,457001'));
 }
 
-function basic(username: string, password: string): string {
-  return `Basic ${Buffer.from(`${username}:${password}`, 'utf8').toString('base64')}`;
+/** Logs a seeded user in through the real POST /api/auth/login (cookie
+ * session — the API no longer accepts Basic headers) and returns the
+ * fc_session cookie to pass as a `cookie` header on later requests. */
+async function loginCookie(username: string, password: string): Promise<string> {
+  const res = await app.request('/api/auth/login', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ username, pin: password })
+  });
+  failUnless(res.status === 200, `login for ${username}: expected 200, got ${res.status}`);
+  const cookie = (res.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
+  failUnless(cookie.startsWith('fc_session='), `login for ${username}: no session cookie set`);
+  return cookie;
 }
 
 function parseCsvLine(line: string): string[] {
@@ -422,17 +433,17 @@ async function run(database: Db): Promise<void> {
     ])
     .returning({ id: users.id });
   state.userIds = insertedUsers.map((u) => u.id);
-  const managerAuth = basic(MANAGER, PASSWORD);
-  const officerAuth = basic(OFFICER, PASSWORD);
+  const managerCookie = await loginCookie(MANAGER, PASSWORD);
+  const officerCookie = await loginCookie(OFFICER, PASSWORD);
 
   // --- helpers --------------------------------------------------------------
-  const post = async (filename: string, bytes: Uint8Array, asOf?: string, auth: string = managerAuth): Promise<Response> => {
+  const post = async (filename: string, bytes: Uint8Array, asOf?: string, auth: string = managerCookie): Promise<Response> => {
     const form = new FormData();
     form.append('file', new File([bytes], filename, { type: 'text/csv' }));
     if (asOf !== undefined) {
       form.append('as_of', asOf);
     }
-    return app.request('/api/import', { method: 'POST', body: form, headers: { Authorization: auth } });
+    return app.request('/api/import', { method: 'POST', body: form, headers: { cookie: auth } });
   };
   const importJson = async (res: Response): Promise<ImportJsonResult> => (await res.json()) as ImportJsonResult;
   const batchCount = async (): Promise<number> =>
@@ -496,7 +507,7 @@ async function run(database: Db): Promise<void> {
   failUnless((await app.request('/api/import', { method: 'POST' })).status === 401, 'expected 401 without credentials');
 
   console.log('probe   POST /api/import as a field officer -> expect 403 (manager only)');
-  const officerRes = await post('sample_overdue.csv', bytesOf('data/sample_overdue.csv'), AS_OF, officerAuth);
+  const officerRes = await post('sample_overdue.csv', bytesOf('data/sample_overdue.csv'), AS_OF, officerCookie);
   failUnless(officerRes.status === 403, `expected 403 for a field officer, got ${officerRes.status}`);
 
   console.log('probe   POST /api/import with as_of=2026-02-30 -> expect 400 (not a real calendar date)');
@@ -597,7 +608,7 @@ async function run(database: Db): Promise<void> {
   printLateDiscovery(flagged5);
 
   console.log('phase +    GET /api/import/:id/errors.csv -> expect csv with excel row numbers and loan ids');
-  const errorsRes = await app.request(`/api/import/${fifth.batchId}/errors.csv`, { headers: { Authorization: managerAuth } });
+  const errorsRes = await app.request(`/api/import/${fifth.batchId}/errors.csv`, { headers: { cookie: managerCookie } });
   failUnless(errorsRes.status === 200, `errors.csv: expected 200, got ${errorsRes.status}`);
   failUnless((errorsRes.headers.get('content-type') ?? '').includes('text/csv'), `errors.csv: expected text/csv, got ${errorsRes.headers.get('content-type')}`);
   const lines = (await errorsRes.text()).trimEnd().split('\n');
@@ -698,6 +709,13 @@ async function cleanup(database: Db): Promise<void> {
     ? await database.delete(users).where(inArray(users.id, state.userIds)).returning({ id: users.id })
     : [];
   failUnless(userRows.length === state.userIds.length, `cleanup: deleted ${userRows.length} app_user rows but tracked ${state.userIds.length}`);
+  // login_attempt: throttle keys are username|client-ip (A30). This run logs
+  // its users in through POST /api/auth/login, so drop any throttle rows
+  // keyed on them (normally zero: a successful login deletes its own row).
+  // session rows die with the users above via the FK cascade.
+  const attemptRows = await database.execute(
+    sql`delete from login_attempt where key = ${MANAGER + '|unknown'} or key = ${OFFICER + '|unknown'}`
+  );
 
   // branch: delete ONLY the ids this run inserted (tracked at insert time).
   // A seed branch that already existed is never in state.branchIds.
@@ -723,6 +741,7 @@ async function cleanup(database: Db): Promise<void> {
   console.log(
     `cleanup: import_row_error=${rowErrors.length} import_batch=${batchRows.length} loan_snapshot=${snapshotRows.length} ` +
       `assignment_log=${assignmentLogRows.length} loan deleted=${deletedLoans.length} loan restored=${state.preExistingLoans.length} ` +
-      `sentinel rows removed=${sentinelDeleted} audit_log=${auditRows.length} app_user=${userRows.length} branch=${branchRows.length}`
+      `sentinel rows removed=${sentinelDeleted} audit_log=${auditRows.length} app_user=${userRows.length} branch=${branchRows.length} ` +
+      `login_attempt=${attemptRows.rowCount ?? 0}`
   );
 }

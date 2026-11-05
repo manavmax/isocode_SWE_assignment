@@ -308,13 +308,14 @@ describe('POST /api/import through a cookie session', () => {
     expect((await res.json() as { error: string }).error).toBe('forbidden');
   });
 
-  it('a field officer via the unchanged basic-auth path also gets 403', async () => {
-    h.queue.push(fieldOfficerRow());
+  it('a stray Authorization header is not an auth mechanism: no cookie means 401 (Basic retired with import-check scaffolding)', async () => {
     const res = await app.request('/api/import', {
       method: 'POST',
       headers: { Authorization: `Basic ${Buffer.from('ss-officer:pin-7777', 'utf8').toString('base64')}` }
     });
-    expect(res.status).toBe(403);
-    expect((await res.json() as { error: string }).error).toBe('forbidden');
+    expect(res.status).toBe(401);
+    expect((await res.json() as { error: string }).error).toBe('unauthorized');
+    expect(h.queue).toHaveLength(0); // no cookie, no session lookup, no fallback path
+    expect(sessionWrites()).toHaveLength(0);
   });
 });
