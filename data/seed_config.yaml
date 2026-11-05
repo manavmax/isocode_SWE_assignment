@@ -1,0 +1,82 @@
+# Every rate, count and distribution the seed uses lives in this file (SPEC 14,
+# A34/A35). All data is synthetic (A1); the PIN is a documented demo credential
+# (A31). Run: `pnpm seed -- --seed 20261105 --as-of today`
+#
+# Syntax note (A34): this file uses a strict subset of YAML — # comments, one
+# level of `section:` nesting, `key: value` scalars and comma-separated inline
+# lists. The parser (scripts/seed/config.ts) rejects anything deeper, so a
+# malformed rate fails the run before anything is written.
+
+seed:
+  run_date: utc_today
+  require_yes_flag: true
+  require_demo_mode: true
+  reset_tables: contact_event,promise,message_outbox,payment,score_log,roll_cohort,assignment_log,import_row_error,import_batch,loan_snapshot,loan,session,login_attempt,app_user,officer_absence,officer,territory,branch
+
+people:
+  officer_count_indore: 4
+  officer_count_dewas: 2
+  officer_count_ujjain: 2
+  officer_count_ratlam: 1
+  manager_count: 3
+  officer_capacity_points: 50
+  demo_pin: "1234"
+
+territory:
+  indore_pincode_main: "452001"
+  indore_pincode_east: "452010"
+  indore_pincode_south: "452016"
+  indore_shared_locality: "Bhawarkua"
+  dewas_pincode: "455001"
+  dewas_localities: "Civil Lines,Aerodrome Road"
+  ujjain_pincode: "456001"
+  ujjain_localities: "Freeganj,Nanakheda"
+  ratlam_pincode: "457001"
+  unmapped_defect_pincode: "466001"
+
+loans:
+  total_end_active: 180
+  per_branch_indore: 90
+  per_branch_ujjain_branch: 55
+  per_branch_ujjain_city: 35
+  per_branch_ratlam: 20
+  per_branch_dewas: 35
+  segment_weights: "0.45,0.45,0.10"
+  ticket_median_rupees: 600000
+  ticket_ln_sigma: 0.6
+  ticket_min_rupees: 150000
+  ticket_max_rupees: 2500000
+  bounce_poisson_lambda: 0.9
+  bounce_cap: 6
+  vintage_min_months: 3
+  vintage_max_months: 35
+  product_manufacturer: "manufacturing"
+  product_trader: "trading"
+  product_service: "services"
+
+history:
+  window_days: 90
+  cohort_days_before_end: 30
+  skip_sundays: 1
+  cohort_min_n: 100
+  roll_target: "0.22"
+  cohort_count_indore: 68
+  cohort_count_ujjain_branch: 41
+  cohort_count_dewas: 27
+  roll_count_indore: 15
+  roll_count_ujjain_branch: 10
+  roll_count_dewas: 6
+  stayed_count_indore: 10
+  stayed_count_ujjain_branch: 8
+  stayed_count_dewas: 4
+  early_count_indore: 15
+  early_count_ujjain_branch: 11
+  early_count_dewas: 4
+  max_cures_per_day: 8
+  reentry_wait_min_days: 7
+  reentry_wait_max_days: 20
+
+defects:
+  missing_alt_mobile_rate: 0.08
+  missing_business_name_rate: 0.05
+  unmapped_pincode_rate: 0.03

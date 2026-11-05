@@ -14,3 +14,6 @@ coverage/
 *.tsbuildinfo
 *.log
 .DS_Store
+
+# seed writes daily CSVs here; they are generated input, never source
+data/generated/

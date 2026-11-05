@@ -19,6 +19,7 @@
     "db:check": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/db-check.ts",
     "demo:accounts": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/demo-accounts.ts",
     "import:check": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/import-check.ts",
+    "seed": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/seed/main.ts",
     "assign:check": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/assign-check.ts",
     "prepare": "simple-git-hooks"
   },
