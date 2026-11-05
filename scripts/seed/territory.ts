@@ -39,10 +39,10 @@ export function buildTerritoryRows(config: SeedConfig, officerIdFor: OfficerName
     { branchCode: 'DWS', pincode: config.territory.dewas_pincode, locality: config.territory.dewas_localities[0]!, officerName: 'Neha Solanki' },
     { branchCode: 'DWS', pincode: config.territory.dewas_pincode, locality: config.territory.dewas_localities[1]!, officerName: 'Murlidhar Garg' },
     // Ujjain: one๊ slice + generic.
-    { branchCode: 'UJJ', pincode: config.territory.ujjain_pincode, locality: config.territory.ujjain_localities[0]!, officerName: 'Trupti Girdhar' },
-    { branchCode: 'UJJ', pincode: config.territory.ujjain_pincode, locality: null, officerName: 'Arjun Verma' },
+    { branchCode: 'UJJAIN', pincode: config.territory.ujjain_pincode, locality: config.territory.ujjain_localities[0]!, officerName: 'Trupti Girdhar' },
+    { branchCode: 'UJJAIN', pincode: config.territory.ujjain_pincode, locality: null, officerName: 'Arjun Verma' },
     // Ratlam: single officer, whole pincode, UJJAIN branch row (A3).
-    { branchCode: 'UJJ', pincode: config.territory.ratlam_pincode, locality: null, officerName: 'Imran Qureshi' }
+    { branchCode: 'UJJAIN', pincode: config.territory.ratlam_pincode, locality: null, officerName: 'Imran Qureshi' }
   ];
   for (const row of rows) {
     if (!officerIdFor[row.officerName]) {

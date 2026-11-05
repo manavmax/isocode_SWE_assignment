@@ -22,7 +22,9 @@ export interface BranchSpec {
 export const BRANCHES: readonly BranchSpec[] = [
   { code: 'IDR', name: 'Indore' },
   { code: 'DWS', name: 'Dewas' },
-  { code: 'UJJ', name: 'Ujjain' }
+  // A31: the Ujjain branch row IS the demo branch (code UJJAIN, name
+  // 'Ujjain') — one row, so the importer's name->id map stays unambiguous.
+  { code: 'UJJAIN', name: 'Ujjain' }
 ];
 
 export interface OfficerSpec {
@@ -40,9 +42,9 @@ export const OFFICER_SPECS: readonly OfficerSpec[] = [
   { name: 'Shailja Yadav', username: 'shailja.yadav', branchCode: 'IDR', territoryTag: 'indore' },
   { name: 'Neha Solanki', username: 'neha.solanki', branchCode: 'DWS', territoryTag: 'dewas' },
   { name: 'Murlidhar Garg', username: 'murlidhar.garg', branchCode: 'DWS', territoryTag: 'dewas' },
-  { name: 'Arjun Verma', username: 'arjun.verma', branchCode: 'UJJ', territoryTag: 'ujjain' },
-  { name: 'Trupti Girdhar', username: 'trupti.girdhar', branchCode: 'UJJ', territoryTag: 'ujjain' },
-  { name: 'Imran Qureshi', username: 'imran.qureshi', branchCode: 'UJJ', territoryTag: 'ratlam' }
+  { name: 'Arjun Verma', username: 'arjun.verma', branchCode: 'UJJAIN', territoryTag: 'ujjain' },
+  { name: 'Trupti Girdhar', username: 'trupti.girdhar', branchCode: 'UJJAIN', territoryTag: 'ujjain' },
+  { name: 'Imran Qureshi', username: 'imran.qureshi', branchCode: 'UJJAIN', territoryTag: 'ratlam' }
 ];
 
 export interface ManagerSpec {
@@ -54,7 +56,7 @@ export interface ManagerSpec {
 export const MANAGER_SPECS: readonly ManagerSpec[] = [
   { name: 'Kavita Rathore', username: 'kavita.rathore', branchCode: 'IDR' },
   { name: 'Suresh Malviya', username: 'suresh.malviya', branchCode: 'DWS' },
-  { name: 'Pankaj Trivedi', username: 'pankaj.trivedi', branchCode: 'UJJ' }
+  { name: 'Pankaj Trivedi', username: 'pankaj.trivedi', branchCode: 'UJJAIN' }
 ];
 
 export function branchCodeForOfficer(officer: OfficerSpec): OfficerSpec['territoryTag'] {
