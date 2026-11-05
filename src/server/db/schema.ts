@@ -76,10 +76,25 @@ export const users = pgTable(
       .references(() => branches.id),
     officerId: uuid('officer_id')
       .references(() => officers.id),
-    active: boolean('active').notNull().default(true)
+    active: boolean('active').notNull().default(true),
+    // Demo logins (SPEC 1 demo-account chips) are seeded from DEMO_MODE=true
+    // and can only sign in while it is set: A31.
+    isDemo: boolean('is_demo').notNull().default(false)
   },
   (t) => [index('idx_app_user_branch').on(t.branchId, t.role)]
 );
+
+/** Server-side auth session (ADR-0005): the cookie carries the raw token; the
+ * DB stores only its sha256. One session row per login; 7-day expiry (A30). */
+export const sessions = pgTable('session', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull().unique(),
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull()
+});
 
 export const officerAbsences = pgTable(
   'officer_absence',

@@ -8,6 +8,8 @@ export interface Actor {
   username: string;
   role: 'field_officer' | 'branch_manager';
   branchId: string;
+  /** The officer row this user acts as (field officers only; null for managers). */
+  officerId: string | null;
   active: boolean;
 }
 
@@ -25,11 +27,43 @@ export async function resolveActor(authorization: string | null | undefined): Pr
   if (!verifyPassword(user.passwordHash, creds.password)) {
     return null;
   }
-  return { userId: user.id, username: user.username, role: user.role, branchId: user.branchId, active: user.active };
+  return { userId: user.id, username: user.username, role: user.role, branchId: user.branchId, officerId: user.officerId ?? null, active: user.active };
 }
 
 export function isManager(actor: Actor | null | undefined): boolean {
   return Boolean(actor && actor.active && actor.role === 'branch_manager');
+}
+
+/** Login lookup (routes never touch the driver directly): returns the columns
+ * the login route needs, including is_demo for the DEMO_MODE gate (A31). */
+export interface LoginAttemptRow {
+  id: string;
+  username: string;
+  passwordHash: string;
+  role: Actor['role'];
+  branchId: string;
+  officerId: string | null;
+  active: boolean;
+  isDemo: boolean;
+}
+
+export async function findLoginUser(username: string): Promise<LoginAttemptRow | null> {
+  const db = getDb();
+  const rows = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      passwordHash: users.passwordHash,
+      role: users.role,
+      branchId: users.branchId,
+      officerId: users.officerId,
+      active: users.active,
+      isDemo: users.isDemo
+    })
+    .from(users)
+    .where(eq(users.username, username))
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 export interface ImportBatchRecord {

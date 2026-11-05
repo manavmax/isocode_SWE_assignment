@@ -15,6 +15,13 @@
       "when": 1793802975474,
       "tag": "0001_contact_event_append_only",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793878593677,
+      "tag": "0002_safe_firedrake",
+      "breakpoints": true
     }
   ]
 }
