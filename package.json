@@ -18,6 +18,7 @@
     "db:migrate": "node --env-file=.env node_modules/drizzle-kit/bin.cjs migrate",
     "db:check": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/db-check.ts",
     "import:check": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/import-check.ts",
+    "assign:check": "node --env-file=.env node_modules/tsx/dist/cli.mjs scripts/assign-check.ts",
     "prepare": "simple-git-hooks"
   },
   "dependencies": {
