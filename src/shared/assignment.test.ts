@@ -172,7 +172,7 @@ describe('territory resolution (SPEC 10.1)', () => {
     expect(result.decisions[0]!.status).toBe('queue');
   });
 
-  it('sends an unmapped pincode to the branch-manager queue with a log entry', () => {
+  it('sends an unmapped pincode to the branch-manager queue; a never-assigned loan logs nothing (A27)', () => {
     const result = plan({
       loans: [loan({ loanId: 'L1', pincode: '999999' })],
       officers: [officer('O-1')],
@@ -183,8 +183,8 @@ describe('territory resolution (SPEC 10.1)', () => {
     expect(d.status).toBe('queue');
     expect(d.reason).toBe('queue_unmapped');
     expect(d.changed).toBe(true);
-    expect(result.logEntries).toHaveLength(1);
-    expect(result.logEntries[0]).toMatchObject({ loanId: 'L1', fromOfficerId: null, toOfficerId: null, reason: 'queue_unmapped' });
+    // The officer never changed (absent -> absent): no assignment_log row.
+    expect(result.logEntries).toHaveLength(0);
   });
 
   it('a queued loan is retried and assigned when the territory appears', () => {
@@ -225,7 +225,8 @@ describe('territory resolution (SPEC 10.1)', () => {
     expect(q.status).toBe('queue');
     expect(q.toOfficerId).toBeNull();
     expect(q.changed).toBe(true);
-    expect(queued.logEntries).toHaveLength(1);
+    // Officer never changed (the loan sits with nobody): no log row (A27).
+    expect(queued.logEntries).toHaveLength(0);
 
     const routed = plan({
       loans: [loan({ loanId: 'L2' })],

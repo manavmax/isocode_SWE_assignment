@@ -31,6 +31,7 @@ import { app } from '../src/server/app.js';
 import { closePool } from '../src/server/db.js';
 import { hashPassword, verifyPassword } from '../src/server/auth.js';
 import {
+  assignmentLog,
   auditLog,
   branches,
   importBatches,
@@ -69,6 +70,7 @@ interface Report {
   gone: number;
   warnings: number;
   errors: number;
+  assignment: Record<string, number>;
 }
 
 interface ImportJsonResult {
@@ -174,7 +176,19 @@ function stableJson(value: unknown): string {
 }
 
 function printReport(report: Report): void {
-  console.log(`           counts: ${Object.entries(report).map(([key, value]) => `${key}=${value}`).join(' ')}`);
+  // Nested maps (assignment outcomes by reason) print one flat entry each:
+  // assignment.new_assigned=3 ... so the console output stays greppable.
+  const flat: string[] = [];
+  for (const [key, value] of Object.entries(report)) {
+    if (value !== null && typeof value === 'object') {
+      for (const [sub, subValue] of Object.entries(value as Record<string, number>)) {
+        flat.push(`${key}.${sub}=${subValue}`);
+      }
+    } else {
+      flat.push(`${key}=${String(value)}`);
+    }
+  }
+  console.log(`           counts: ${flat.join(' ')}`);
 }
 
 function failUnless(condition: unknown, message: string): asserts condition {
@@ -269,6 +283,16 @@ async function run(database: Db): Promise<void> {
     .returning({ loanId: loanSnapshots.loanId });
   if (leftoverSnapshots.length > 0) {
     console.log(`pre-start: removed ${leftoverSnapshots.length} loan_snapshot row(s) at ${AS_OF} from a crashed run`);
+  }
+  // assignment_log rows at the script's own test date belong to this script's
+  // runs (the runner stamps runDate = as_of = AS_OF); they must go BEFORE the
+  // crashed-loan delete below because they reference loans (SPEC 10 wiring).
+  const leftoverLogRows = await database
+    .delete(assignmentLog)
+    .where(eq(assignmentLog.runDate, AS_OF))
+    .returning({ loanId: assignmentLog.loanId });
+  if (leftoverLogRows.length > 0) {
+    console.log(`pre-start: removed ${leftoverLogRows.length} assignment_log row(s) at ${AS_OF} from a crashed run`);
   }
   if (crashedLoanIds.length > 0) {
     const removed = await database.delete(loans).where(inArray(loans.loanId, crashedLoanIds)).returning({ loanId: loans.loanId });
@@ -614,6 +638,14 @@ async function cleanup(database: Db): Promise<void> {
   // batch at that date is refused at start), so a date-scoped delete is safe.
   const snapshotRows = await database.delete(loanSnapshots).where(eq(loanSnapshots.asOf, AS_OF)).returning({ loanId: loanSnapshots.loanId });
 
+  // assignment_log: every row at the script's own test date is script-created
+  // (the runner stamps runDate = as_of = AS_OF); date-scoped delete, before
+  // the loan deletes below because the log references loans.
+  const assignmentLogRows = await database
+    .delete(assignmentLog)
+    .where(eq(assignmentLog.runDate, AS_OF))
+    .returning({ loanId: assignmentLog.loanId });
+
   // loan: delete ONLY fixture loan_ids that did not exist at start. Dropped
   // and aborted rows never become loans, so only a subset of these ids can
   // exist; ownership is proven by the tracked-id list itself, and the safety
@@ -677,6 +709,7 @@ async function cleanup(database: Db): Promise<void> {
   // Final cleanliness assertions: nothing of ours survives.
   failUnless((await database.select({ id: importBatches.id }).from(importBatches).where(eq(importBatches.asOf, AS_OF))).length === 0, `cleanup: import_batch rows remain at ${AS_OF}`);
   failUnless((await database.select({ loanId: loanSnapshots.loanId }).from(loanSnapshots).where(eq(loanSnapshots.asOf, AS_OF))).length === 0, `cleanup: loan_snapshot rows remain at ${AS_OF}`);
+  failUnless((await database.select({ loanId: assignmentLog.loanId }).from(assignmentLog).where(eq(assignmentLog.runDate, AS_OF))).length === 0, `cleanup: assignment_log rows remain at ${AS_OF}`);
   const remainingCreatedUsers = state.userIds.length > 0
     ? await database.select({ id: users.id }).from(users).where(inArray(users.id, state.userIds))
     : [];
@@ -689,7 +722,7 @@ async function cleanup(database: Db): Promise<void> {
 
   console.log(
     `cleanup: import_row_error=${rowErrors.length} import_batch=${batchRows.length} loan_snapshot=${snapshotRows.length} ` +
-      `loan deleted=${deletedLoans.length} loan restored=${state.preExistingLoans.length} sentinel rows removed=${sentinelDeleted} ` +
-      `audit_log=${auditRows.length} app_user=${userRows.length} branch=${branchRows.length}`
+      `assignment_log=${assignmentLogRows.length} loan deleted=${deletedLoans.length} loan restored=${state.preExistingLoans.length} ` +
+      `sentinel rows removed=${sentinelDeleted} audit_log=${auditRows.length} app_user=${userRows.length} branch=${branchRows.length}`
   );
 }

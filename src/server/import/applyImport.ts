@@ -17,6 +17,8 @@ import { planImport } from '../../shared/import/planImport.js';
 import type { ImportPlan, TerritoryRow } from '../../shared/import/planImport.js';
 import type { ImportLoan, RowIssue } from '../../shared/import/validateRow.js';
 import { dpdBucketFor } from '../../shared/bucket.js';
+import { ASSIGNMENT_REASONS, type AssignmentReason } from '../../shared/assignment.js';
+import { runAssignment } from '../assignment/runAssignment.js';
 
 export interface ImportActor {
   userId: string | null;
@@ -43,6 +45,21 @@ export interface StoredImportReport {
   gone: number;
   warnings: number;
   errors: number;
+  /** Assignment outcomes by reason (A26); zeros until the runner has run. */
+  assignment: Record<AssignmentReason, number>;
+}
+
+export function zeroAssignmentOutcomes(): Record<AssignmentReason, number> {
+  return Object.fromEntries(ASSIGNMENT_REASONS.map((reason) => [reason, 0])) as Record<AssignmentReason, number>;
+}
+
+/** Noop replays read the stored json; a batch written before assignment ran
+ *  carries no key and reads back as all-zero so the shape stays stable. */
+export function withAssignmentOutcomes(stored: StoredImportReport | null, fallback: StoredImportReport): StoredImportReport {
+  if (!stored) {
+    return fallback;
+  }
+  return stored.assignment ? stored : { ...stored, assignment: zeroAssignmentOutcomes() };
 }
 
 export type ApplyImportOutcome =
@@ -99,7 +116,8 @@ function buildReport(
     anomalous: plan.counts.anomalous,
     gone: plan.counts.gone,
     warnings,
-    errors
+    errors,
+    assignment: zeroAssignmentOutcomes()
   };
 }
 
@@ -116,7 +134,8 @@ function zeroReport(parsed: { totalRows: number; rows: ImportLoan[]; dropped: nu
     anomalous: 0,
     gone: 0,
     warnings,
-    errors
+    errors,
+    assignment: zeroAssignmentOutcomes()
   };
 }
 
@@ -148,13 +167,16 @@ export async function applyImport(input: ApplyImportInput): Promise<ApplyImportO
 
   const branchByName = new Map(branchRows.map((row) => [row.name.trim().toLowerCase(), row.id]));
 
-  return withTx(async (tx) => {
+  const outcome: ApplyImportOutcome = await withTx(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`import:${input.asOf}`}))`);
 
     const existing = await tx.select().from(importBatches).where(eq(importBatches.asOf, input.asOf));
     const sameBytes = existing.find((batch) => batch.fileSha256 === digest);
     if (sameBytes) {
-      const previousReport = (sameBytes.rowCountJson as StoredImportReport | null) ?? zeroReport(parse, parse.warnings.length, parse.errors.length);
+      const previousReport = withAssignmentOutcomes(
+        sameBytes.rowCountJson as StoredImportReport | null,
+        zeroReport(parse, parse.warnings.length, parse.errors.length)
+      );
       return { status: 'noop', batchId: sameBytes.id, report: previousReport };
     }
 
@@ -311,6 +333,50 @@ export async function applyImport(input: ApplyImportInput): Promise<ApplyImportO
 
     return { status: replacing ? 'replaced' : 'imported', batchId, report };
   });
+
+  if (outcome.status === 'noop' || outcome.status === 'rejected') {
+    return outcome;
+  }
+
+  // Imported or replaced: rerun assignment after the import has committed
+  // (SPEC 11, A26). runAssignment carries its own transaction and the
+  // advisory lock; a failure here never un-saves the import, it is audited
+  // and the report stays without fresh outcomes.
+  try {
+    const assignment = await runAssignment(input.asOf, input.actor.username);
+    const report = { ...outcome.report, assignment: assignment.outcomesByReason };
+    await persistReport(outcome.batchId, report);
+    return { status: outcome.status, batchId: outcome.batchId, report };
+  } catch (err) {
+    await auditAssignmentFailure(input, outcome, err);
+    return outcome;
+  }
+}
+
+async function persistReport(batchId: string, report: StoredImportReport): Promise<void> {
+  await withTx(async (tx) => {
+    await tx.update(importBatches).set({ rowCountJson: report }).where(eq(importBatches.id, batchId));
+  });
+}
+
+async function auditAssignmentFailure(
+  input: ApplyImportInput,
+  outcome: Extract<ApplyImportOutcome, { batchId: string }>,
+  err: unknown
+): Promise<void> {
+  try {
+    await withTx(async (tx) => {
+      await tx.insert(auditLog).values({
+        actor: input.actor.username,
+        action: 'assignment:failed',
+        subject: outcome.batchId ?? null,
+        detail: { asOf: input.asOf, message: err instanceof Error ? err.message : String(err) }
+      });
+    });
+  } catch {
+    // The import itself is committed; do not mask its success because the
+    // failure audit could not be stored either.
+  }
 }
 
 async function upsertLoan(tx: PooledTx, row: ImportLoan, branchId: string, homeOfficerId: string | null) {
@@ -333,8 +399,14 @@ async function upsertLoan(tx: PooledTx, row: ImportLoan, branchId: string, homeO
     homeOfficerId,
     status: 'overdue' as const
   };
+  // A25: on a continuing loan the assignment runner owns home_officer_id —
+  // overwriting it with the CSV's bookkeeping Officer column on every import
+  // would make the runner see current != home and reroute through the
+  // leave-cover story. The CSV officer still seeds home on first insert.
+  const { homeOfficerId: _insertOnlyHome, ...updatable } = values;
+  void _insertOnlyHome;
   await tx
     .insert(loans)
     .values(values)
-    .onConflictDoUpdate({ target: loans.loanId, set: values });
+    .onConflictDoUpdate({ target: loans.loanId, set: updatable });
 }

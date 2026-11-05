@@ -15,6 +15,9 @@ import type { PromiseStatus } from './types.js';
  *   inactivity, 3+ working-day leave or a data-fix/queue rule moves them.
  * - caps filter candidates: projected > 1.2 excluded; prefer <= 1.0; nobody
  *   under 1.2 -> minimum utilisation + alert.
+ * - assignment_log rows carry an entry only when the officer changes; a
+ *   status-only flip (a reimported loan re-queued by the runner) is a write
+ *   without a log row, so reruns produce zero log rows (A27).
  */
 export const ASSIGNMENT_REASONS = [
   'carry_forward',
@@ -364,7 +367,10 @@ export function planAssignment(input: AssignmentInput): AssignmentPlan {
     const decision: AssignmentDecision = { loanId: loan.loanId, toOfficerId, homeOfficerId, status, changed, reason, flagged };
     decisions.push(decision);
     outcomesByReason[reason] += 1;
-    if (changed) {
+    // assignment_log carries an entry only when the officer changes (SPEC
+    // 10.5): a reimported loan whose status was re-asserted and re-queued
+    // keeps the same (absent) officer and must not log a rerun diff.
+    if (loan.assignedOfficerId !== toOfficerId) {
       logEntries.push({ loanId: loan.loanId, runDate, fromOfficerId: loan.assignedOfficerId, toOfficerId, reason });
     }
     return decision;
