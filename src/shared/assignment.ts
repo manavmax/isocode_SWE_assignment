@@ -1,11 +1,11 @@
-import type { PromiseStatus } from './types.js';
+import type { ContactKind, PromiseStatus } from './types.js';
 
 /**
  * Auto-assignment planner (SPEC 10, test-first). Pure: no I/O, no clocks —
  * the run date is an input. Deterministic loan by loan; a rerun on the
  * post-state produces zero changes and zero log entries.
  *
- * Documented readings (docs/assumptions.md A21-A23):
+ * Documented readings (docs/assumptions.md A21-A23, A29):
  * - primary officer = territory-resolved officer (locality row beats pincode
  *   row, then prefix tiers); the -0.10 bonus applies only to them.
  * - broken promise = status broken/broken_part with promised_date in the last
@@ -14,10 +14,15 @@ import type { PromiseStatus } from './types.js';
  * - 61+ DPD loans are never rescored while their officer is eligible; only
  *   inactivity, 3+ working-day leave or a data-fix/queue rule moves them.
  * - caps filter candidates: projected > 1.2 excluded; prefer <= 1.0; nobody
- *   under 1.2 -> minimum utilisation + alert.
+ *   under 1.2 -> minimum utilisation + alert. Caps never strip a hand: a
+ *   carried-forward loan stays with its officer unless a challenger wins
+ *   hysteresis (or the officer is inactive / left the territory / 3+ leave).
  * - assignment_log rows carry an entry only when the officer changes; a
  *   status-only flip (a reimported loan re-queued by the runner) is a write
  *   without a log row, so reruns produce zero log rows (A27).
+ * - a touch that protects a loan through a return-of-leave is CALL, VISIT or
+ *   MESSAGE inside the ended leave window; a BLOCKED attempt is an
+ *   enforcement denial, not a contact (A29).
  */
 export const ASSIGNMENT_REASONS = [
   'carry_forward',
@@ -95,6 +100,8 @@ export interface AssignmentPromise {
 export interface AssignmentContact {
   loanId: string;
   attemptedAt: string;
+  /** A BLOCKED attempt is an enforcement denial, not a contact (A29). */
+  kind: ContactKind;
 }
 
 export interface AssignmentInput {
@@ -451,8 +458,16 @@ export function planAssignment(input: AssignmentInput): AssignmentPlan {
           return;
         }
         const window = { from: ended.fromDate, to: ended.toDate };
+        // A29: a BLOCKED attempt is a window-enforcement denial, not a
+        // contact — only CALL/VISIT/MESSAGE make the loan touched.
         const touched =
-          input.contacts.some((c) => c.loanId === loan.loanId && c.attemptedAt >= window.from && c.attemptedAt <= window.to) ||
+          input.contacts.some(
+            (c) =>
+              c.loanId === loan.loanId &&
+              c.attemptedAt >= window.from &&
+              c.attemptedAt <= window.to &&
+              c.kind !== 'BLOCKED'
+          ) ||
           input.promises.some((p) => p.loanId === loan.loanId && p.createdOn >= window.from && p.createdOn <= window.to);
         if (touched || openPromiseByLoan.has(loan.loanId)) {
           decide(loan, current, home, 'overdue', false, 'carry_forward');

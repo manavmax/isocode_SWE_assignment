@@ -103,10 +103,10 @@ export async function runAssignment(runDate: string, actor: string): Promise<Run
     if (coverLoanIds.length > 0) {
       const contactFloor = addDays(runDate, -CONTACT_BACKSTOP_DAYS);
       const contactRows = await tx
-        .select({ loanId: contactEvents.loanId, attemptedAtIst: contactEvents.attemptedAtIst })
+        .select({ loanId: contactEvents.loanId, attemptedAtIst: contactEvents.attemptedAtIst, kind: contactEvents.kind })
         .from(contactEvents)
         .where(inArray(contactEvents.loanId, coverLoanIds));
-      assignmentContacts = contactRows.map((row) => ({ loanId: row.loanId, attemptedAt: dayPart(row.attemptedAtIst) }));
+      assignmentContacts = contactRows.map((row) => ({ loanId: row.loanId, attemptedAt: dayPart(row.attemptedAtIst), kind: row.kind }));
       // Backstop filter applied client-side so the loaded set stays inside the
       // window the plan can express as dates.
       assignmentContacts = assignmentContacts.filter((c) => c.attemptedAt >= contactFloor);

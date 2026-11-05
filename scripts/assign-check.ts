@@ -20,9 +20,9 @@
  * - loan:      only LN-53001..53005 whose borrower names match this script's
  *              marker set and whose branch is the script's own; any other row
  *              under these ids refuses the run
- * - promise / assignment_log / loan_snapshot / import_row_error /
- *              import_batch / audit_log: only rows tied to this run's ids, the
- *              run date, or the 'assign-check' actor.
+ * - promise / contact_event / assignment_log / loan_snapshot /
+ *              import_row_error / import_batch / audit_log: only rows tied to
+ *              this run's ids, the run date, or the 'assign-check' actor.
  *
  * Refusals (the run must not create, read or destroy anything else): a batch
  * dated after the run date, ANY earlier batch (a full-file import at the run
@@ -37,6 +37,7 @@ import {
   assignmentLog,
   auditLog,
   branches,
+  contactEvents,
   importBatches,
   importRowErrors,
   loanSnapshots,
@@ -131,6 +132,27 @@ function sha256Hex(bytes: Uint8Array): string {
 function failUnless(condition: unknown, message: string): asserts condition {
   if (!condition) {
     throw new Error(message);
+  }
+}
+
+/**
+ * contact_event is append-only by trigger (A14, drizzle/0001): any UPDATE or
+ * DELETE raises and the transaction aborts. Only fix/seed scripts own the
+ * bypass precedent (A17), and this is its tightest form: disable exactly the
+ * append-only trigger, run the id-scoped delete, and re-enable it in a
+ * `finally` so a failed delete can never leave the gate off. FK-constraint
+ * triggers and every other trigger are never touched, so the window doesn't
+ * weaken referential integrity.
+ */
+async function deleteScriptContacts(db: Db, loanIds: readonly string[]): Promise<{ id: string }[]> {
+  await db.execute(sql`alter table contact_event disable trigger contact_event_append_only`);
+  try {
+    return await db
+      .delete(contactEvents)
+      .where(inArray(contactEvents.loanId, [...loanIds]))
+      .returning({ id: contactEvents.id });
+  } finally {
+    await db.execute(sql`alter table contact_event enable trigger contact_event_append_only`);
   }
 }
 
@@ -254,6 +276,58 @@ async function run(database: Db): Promise<void> {
   )[0];
   if (branchRow) {
     state.branchExisted = true;
+  }
+
+  // Loans under the script's ids BEFORE the branch checks: a failed cleanup
+  // leaves them behind, and they are the branch's rows, so they must be gone
+  // before the branch-reference assertions below. They can only be crashed-run
+  // leftovers (marker borrower + script branch). Anything else refuses the
+  // run — the ids must never collide with real data.
+  const existingScriptLoans = await database
+    .select({
+      loanId: loans.loanId,
+      borrowerName: loans.borrowerName,
+      branchId: loans.branchId,
+      status: loans.status
+    })
+    .from(loans)
+    .where(inArray(loans.loanId, [...LOAN_IDS]));
+  for (const loan of existingScriptLoans) {
+    failUnless(
+      MARKER_BORROWERS.has(loan.borrowerName) && branchRow !== undefined && loan.branchId === branchRow.id,
+      `refusing to run: loan ${loan.loanId} exists (borrower '${loan.borrowerName}') without this script's markers; ` +
+        `loan ids LN-53001..53005 are reserved for assign:check`
+    );
+  }
+  const foreignSnapshotsForIds = await database
+    .select({ loanId: loanSnapshots.loanId, asOf: loanSnapshots.asOf })
+    .from(loanSnapshots)
+    .where(and(inArray(loanSnapshots.loanId, [...LOAN_IDS]), lt(loanSnapshots.asOf, RUN_DATE)));
+  failUnless(
+    foreignSnapshotsForIds.length === 0,
+    `refusing to run: loan_snapshot rows for LN-53001..53005 exist before ${RUN_DATE} ` +
+      `(${foreignSnapshotsForIds.map((s) => `${s.loanId}@${s.asOf}`).join(', ')}); the script only writes snapshots at its run date`
+  );
+  if (existingScriptLoans.length > 0) {
+    const leftoverIds = existingScriptLoans.map((loan) => loan.loanId);
+    // Children first: assignment_log is gone (date delete above); contacts
+    // and promises still reference the loans.
+    const removedContacts = await deleteScriptContacts(database, leftoverIds);
+    const removedPromises = await database
+      .delete(promises)
+      .where(inArray(promises.loanId, leftoverIds))
+      .returning({ id: promises.id });
+    const removedLoans = await database
+      .delete(loans)
+      .where(inArray(loans.loanId, leftoverIds))
+      .returning({ loanId: loans.loanId });
+    console.log(
+      `pre-start: removed ${removedLoans.length} leftover loan(s) ` +
+        `(with ${removedPromises.length} promise row(s) and ${removedContacts.length} contact_event row(s)) from a crashed run`
+    );
+  }
+
+  if (branchRow) {
     const appUsersOnBranch = await database
       .select({ username: users.username })
       .from(users)
@@ -327,52 +401,6 @@ async function run(database: Db): Promise<void> {
     failUnless(
       Number(snapshotsOnBranch[0]?.n ?? 0) === 0,
       `refusing to run: branch '${BRANCH_NAME}' has loan_snapshot row(s); the script only writes snapshots at ${RUN_DATE} alongside its batches`
-    );
-  }
-
-  // Loans under the script's ids: they can only be crashed-run leftovers
-  // (marker borrower + script branch). Anything else refuses the run — the
-  // ids must never collide with real data.
-  const existingScriptLoans = await database
-    .select({
-      loanId: loans.loanId,
-      borrowerName: loans.borrowerName,
-      branchId: loans.branchId,
-      status: loans.status
-    })
-    .from(loans)
-    .where(inArray(loans.loanId, [...LOAN_IDS]));
-  for (const loan of existingScriptLoans) {
-    failUnless(
-      MARKER_BORROWERS.has(loan.borrowerName) && branchRow !== undefined && loan.branchId === branchRow.id,
-      `refusing to run: loan ${loan.loanId} exists (borrower '${loan.borrowerName}') without this script's markers; ` +
-        `loan ids LN-53001..53005 are reserved for assign:check`
-    );
-  }
-  const foreignSnapshotsForIds = await database
-    .select({ loanId: loanSnapshots.loanId, asOf: loanSnapshots.asOf })
-    .from(loanSnapshots)
-    .where(and(inArray(loanSnapshots.loanId, [...LOAN_IDS]), lt(loanSnapshots.asOf, RUN_DATE)));
-  failUnless(
-    foreignSnapshotsForIds.length === 0,
-    `refusing to run: loan_snapshot rows for LN-53001..53005 exist before ${RUN_DATE} ` +
-      `(${foreignSnapshotsForIds.map((s) => `${s.loanId}@${s.asOf}`).join(', ')}); the script only writes snapshots at its run date`
-  );
-  if (existingScriptLoans.length > 0) {
-    const leftoverIds = existingScriptLoans.map((loan) => loan.loanId);
-    // Children first: assignment_log is gone (date delete above), promises
-    // still reference the loans.
-    const removedPromises = await database
-      .delete(promises)
-      .where(inArray(promises.loanId, leftoverIds))
-      .returning({ id: promises.id });
-    const removedLoans = await database
-      .delete(loans)
-      .where(inArray(loans.loanId, leftoverIds))
-      .returning({ loanId: loans.loanId });
-    console.log(
-      `pre-start: removed ${removedLoans.length} leftover loan(s) ` +
-        `(with ${removedPromises.length} promise row(s)) from a crashed run`
     );
   }
 
@@ -454,7 +482,7 @@ async function run(database: Db): Promise<void> {
 
   // --- phases ----------------------------------------------------------------
   console.log('');
-  console.log('phase 1/5  fresh import      : territory beats nothing, prefix fallback, queue for unmapped');
+  console.log('phase 1/6  fresh import      : territory beats nothing, prefix fallback, queue for unmapped');
 
   const first = await applyImport({
     bytes: CSV_BYTES,
@@ -513,7 +541,7 @@ async function run(database: Db): Promise<void> {
   console.log('           LN-53004 -> assign-check-gen (456005 has a generic pincode row; no locality row)');
   console.log('           LN-53003 -> queue (460001 unmapped; log row suppressed: A27)');
 
-  console.log('phase 2/5  leave + broken promise -> direct runAssignment call covers cover-officer routing');
+  console.log('phase 2/6  leave + broken promise -> direct runAssignment call covers cover-officer routing');
 
   const leave = { fromDate: '2030-01-09', toDate: '2030-01-23' };
   failUnless(
@@ -575,7 +603,7 @@ async function run(database: Db): Promise<void> {
   console.log('           LN-53005 (home assign-check-loc) and LN-53001 -> assign-check-cover, home preserved');
   console.log('           LN-53001 weight 1.5 via the broken promise (promised 2030-01-11, status broken: A22)');
 
-  console.log('phase 3/5  rerun on the post-state       -> zero writes, zero log rows (idempotent plan)');
+  console.log('phase 3/6  rerun on the post-state       -> zero writes, zero log rows (idempotent plan)');
 
   const thirdRun = await runAssignment(RUN_DATE, ACTOR);
   expectOutcomes(thirdRun.outcomesByReason, outcomesWith({ carry_forward: 4, queue_unmapped: 1 }), 'phase 3');
@@ -586,7 +614,75 @@ async function run(database: Db): Promise<void> {
   printAssignmentRun('phase 3', thirdRun);
   console.log('           carry_forward=4 covers the two cover-held loans plus the untouched officers');
 
-  console.log('phase 4/5  same date, changed bytes     -> replace re-queues LN-53003 and logs nothing (A27)');
+  console.log('phase 4/6  ended leave + BLOCKED attempt -> a rule denial is not a touch; a CALL is (A29)');
+
+  // LN-53004 (456005 generic row -> assign-check-gen) pretends it was covered
+  // during gen's finished leave (2030-01-07..2030-01-11, cover=cover). At the
+  // run date the leave is over, so the runner looks for touches inside that
+  // window: a BLOCKED attempt must not protect the loan, so it reverts.
+  await database.update(loans).set({ assignedOfficerId: officerId('cover') }).where(eq(loans.loanId, 'LN-53004'));
+  await database.insert(officerAbsences).values({
+    officerId: officerId('gen'),
+    fromDate: '2030-01-07',
+    toDate: '2030-01-11',
+    coverOfficerId: officerId('cover')
+  });
+  // Blocks are window-enforcement events: the attempt sits OUTSIDE the
+  // 08:00-19:00 IST window (07:45) and carries within_window=false (A4/A29).
+  const blockedAttempt = new Date('2030-01-09T07:45:00+05:30');
+  await database.insert(contactEvents).values({
+    loanId: 'LN-53004',
+    officerId: officerId('cover'),
+    kind: 'BLOCKED',
+    attemptedAtDevice: blockedAttempt,
+    deviceTzOffsetMinutes: 330,
+    attemptedAtIst: blockedAttempt,
+    withinWindow: false,
+    ruleSet: 'RECOVERY2026_100Y'
+  });
+
+  const blockedRun = await runAssignment(RUN_DATE, ACTOR);
+  expectOutcomes(blockedRun.outcomesByReason, outcomesWith({ carry_forward: 3, revert_return: 1, queue_unmapped: 1 }), 'phase 4');
+  failUnless(blockedRun.changedLoans === 1, `phase 4: the BLOCKED-protected lookalike must revert, got ${blockedRun.changedLoans} changed loans`);
+  failUnless(blockedRun.logRows === 1, `phase 4: expected 1 new log row, got ${blockedRun.logRows}`);
+  const blockedLoan = await loanRow('LN-53004');
+  failUnless(
+    blockedLoan.assignedOfficerId === officerId('gen') && blockedLoan.homeOfficerId === officerId('gen'),
+    'phase 4: LN-53004 must revert to assign-check-gen with home assign-check-gen'
+  );
+  const afterBlocked = await logRowsAt();
+  failUnless(afterBlocked.length === 6, `phase 4: expected 6 assignment_log rows in total, got ${afterBlocked.length}`);
+  failUnless(afterBlocked.some((row) => row.loanId === 'LN-53004' && row.reason === 'revert_return'), "phase 4: the revert must log with reason 'revert_return'");
+  printAssignmentRun('phase 4', blockedRun);
+  console.log('           assign-check-gen was on leave 2030-01-07..2030-01-11 (ended before the run date)');
+  console.log('           BLOCKED attempt 2030-01-09 07:45 IST (outside the window) inside the ended');
+  console.log('           leave window -> a denial is not a touch: LN-53004 reverted to assign-check-gen');
+
+  // Already-touched instead: a real CALL inside the window keeps the loan.
+  const callAttempt = new Date('2030-01-09T10:00:00+05:30');
+  await database.update(loans).set({ assignedOfficerId: officerId('cover') }).where(eq(loans.loanId, 'LN-53004'));
+  await database.insert(contactEvents).values({
+    loanId: 'LN-53004',
+    officerId: officerId('cover'),
+    kind: 'CALL',
+    attemptedAtDevice: callAttempt,
+    deviceTzOffsetMinutes: 330,
+    attemptedAtIst: callAttempt,
+    withinWindow: true,
+    ruleSet: 'RECOVERY2026_100Y'
+  });
+
+  const callRun = await runAssignment(RUN_DATE, ACTOR);
+  expectOutcomes(callRun.outcomesByReason, outcomesWith({ carry_forward: 4, queue_unmapped: 1 }), 'phase 4');
+  failUnless(callRun.changedLoans === 0, `phase 4: the CALL must keep LN-53004 with the cover officer, got ${callRun.changedLoans} changed loans`);
+  failUnless(callRun.logRows === 0, `phase 4: expected no new log rows, got ${callRun.logRows}`);
+  const afterCall = await logRowsAt();
+  failUnless(afterCall.length === 6, `phase 4: the CALL changes nothing, log rows must stay 6, got ${afterCall.length}`);
+  printAssignmentRun('phase 4', callRun);
+  console.log('           CALL attempt 2030-01-09 10:00 IST (inside the window) in the same ended');
+  console.log('           leave window -> a real touch: LN-53004 stays with assign-check-cover, no log row');
+
+  console.log('phase 5/6  same date, changed bytes     -> replace re-queues LN-53003 and logs nothing (A27)');
 
   const variant = await applyImport({
     bytes: VARIANT_BYTES,
@@ -594,22 +690,22 @@ async function run(database: Db): Promise<void> {
     asOf: RUN_DATE,
     actor: { userId: null, username: ACTOR }
   });
-  failUnless(variant.status === 'replaced' && 'batchId' in variant && variant.batchId !== undefined, `phase 4: expected replaced, got ${variant.status}`);
+  failUnless(variant.status === 'replaced' && 'batchId' in variant && variant.batchId !== undefined, `phase 5: expected replaced, got ${variant.status}`);
   state.batchIds.push(variant.batchId!);
-  expectOutcomes(variant.report.assignment, outcomesWith({ carry_forward: 4, queue_unmapped: 1 }), 'phase 4');
-  failUnless(variant.report.imported === 4 && variant.report.lateDiscovery === 0, `phase 4: replace must import 4 rows, got ${JSON.stringify(variant.report)}`);
-  failUnless((await batchCountAtRunDate()) === 1, 'phase 4: replace must leave exactly one batch for the run date');
+  expectOutcomes(variant.report.assignment, outcomesWith({ carry_forward: 4, queue_unmapped: 1 }), 'phase 5');
+  failUnless(variant.report.imported === 4 && variant.report.lateDiscovery === 0, `phase 5: replace must import 4 rows, got ${JSON.stringify(variant.report)}`);
+  failUnless((await batchCountAtRunDate()) === 1, 'phase 5: replace must leave exactly one batch for the run date');
   const variantLoan1 = await loanRow('LN-53001');
-  failUnless(variantLoan1.dpd === 11, `phase 4: replace must rewrite the loan row: expected dpd 11, got ${variantLoan1.dpd}`);
+  failUnless(variantLoan1.dpd === 11, `phase 5: replace must rewrite the loan row: expected dpd 11, got ${variantLoan1.dpd}`);
   const variantLoan3 = await loanRow('LN-53003');
   failUnless(
     variantLoan3.status === 'queue' && variantLoan3.assignedOfficerId === null,
-    'phase 4: the upsert reset LN-53003 to overdue and the runner re-queues it'
+    'phase 5: the upsert reset LN-53003 to overdue and the runner re-queues it'
   );
   const afterVariant = await logRowsAt();
-  failUnless(afterVariant.length === 5, `phase 4: A27 re-queue must not log: log rows must stay 5, got ${afterVariant.length}`);
+  failUnless(afterVariant.length === 6, `phase 5: A27 re-queue must not log: log rows must stay 6, got ${afterVariant.length}`);
   const loan3Logs = afterVariant.filter((row) => row.loanId === 'LN-53003');
-  failUnless(loan3Logs.length === 0, 'phase 4: LN-53003 must have no assignment_log row at any point (A27)');
+  failUnless(loan3Logs.length === 0, 'phase 5: LN-53003 must have no assignment_log row at any point (A27)');
   const variantSnapshot = (
     await database
       .select({ dpd: loanSnapshots.dpd })
@@ -617,11 +713,11 @@ async function run(database: Db): Promise<void> {
       .where(and(eq(loanSnapshots.asOf, RUN_DATE), eq(loanSnapshots.loanId, 'LN-53001')))
       .limit(1)
   )[0];
-  failUnless(variantSnapshot?.dpd === 11, `phase 4: replace must refresh the snapshot dpd, got ${variantSnapshot?.dpd ?? 'none'}`);
+  failUnless(variantSnapshot?.dpd === 11, `phase 5: replace must refresh the snapshot dpd, got ${variantSnapshot?.dpd ?? 'none'}`);
   printReport(variant.report);
   console.log(`           replace proof: loan + loan_snapshot LN-53001 dpd 10 -> 11; ${LOAN_IDS.length - 1} snapshots at ${RUN_DATE}`);
 
-  console.log('phase 5/5  same bytes again            -> noop replays the stored report byte-for-byte');
+  console.log('phase 6/6  same bytes again            -> noop replays the stored report byte-for-byte');
 
   const noop = await applyImport({
     bytes: VARIANT_BYTES,
@@ -629,14 +725,14 @@ async function run(database: Db): Promise<void> {
     asOf: RUN_DATE,
     actor: { userId: null, username: ACTOR }
   });
-  failUnless(noop.status === 'noop', `phase 5: expected noop, got ${noop.status}`);
-  failUnless(noop.status === 'noop' && noop.batchId === (variant.status === 'replaced' ? variant.batchId : undefined), 'phase 5: noop must return the previous batch id');
-  failUnless(stableJson(noop.report) === stableJson(variant.report), 'phase 5: noop must replay the previous report including assignment outcomes');
+  failUnless(noop.status === 'noop', `phase 6: expected noop, got ${noop.status}`);
+  failUnless(noop.status === 'noop' && noop.batchId === (variant.status === 'replaced' ? variant.batchId : undefined), 'phase 6: noop must return the previous batch id');
+  failUnless(stableJson(noop.report) === stableJson(variant.report), 'phase 6: noop must replay the previous report including assignment outcomes');
   console.log('           noop replay includes assignment.carry_forward=4 and assignment.queue_unmapped=1 (persisted report)');
 
   const finalLogs = afterVariant;
   console.log('');
-  console.log(`           final run-state: ${finalLogs.length} log rows across the five phases (3 new_assigned + 2 reassigned_leave)`);
+  console.log(`           final run-state: ${finalLogs.length} log rows across the six phases (3 new_assigned + 2 reassigned_leave + 1 revert_return)`);
 
   // Deliberate-failure hook: proves a failed assertion exits non-zero while
   // cleanup still runs in finally.
@@ -681,6 +777,12 @@ async function cleanup(database: Db): Promise<void> {
 
   const promiseRows = await database.delete(promises).where(inArray(promises.loanId, [...LOAN_IDS])).returning({ id: promises.id });
 
+  // Contacts reference the loans like promises do; every contact under the
+  // script's ids is script-created (foreign LN-53xxx loans are refused in
+  // pre-start), so an id-scoped delete is safe. The append-only trigger is
+  // disabled only around this one delete (A14 gate, A17 bypass precedent).
+  const contactRows = await deleteScriptContacts(database, LOAN_IDS);
+
   // Absences reference two officers (subject + cover); territory and the
   // loans' assignment columns reference the officers too, so children first.
   const officerIds = state.officerIds;
@@ -719,6 +821,7 @@ async function cleanup(database: Db): Promise<void> {
   failUnless((await database.select({ loanId: assignmentLog.loanId }).from(assignmentLog).where(eq(assignmentLog.runDate, RUN_DATE))).length === 0, `cleanup: assignment_log rows remain at ${RUN_DATE}`);
   failUnless((await database.select({ loanId: loans.loanId }).from(loans).where(inArray(loans.loanId, [...LOAN_IDS]))).length === 0, 'cleanup: LN-53001..53005 rows remain');
   failUnless((await database.select({ id: promises.id }).from(promises).where(inArray(promises.loanId, [...LOAN_IDS]))).length === 0, 'cleanup: promise rows remain for the script\'s loans');
+  failUnless((await database.select({ id: contactEvents.id }).from(contactEvents).where(inArray(contactEvents.loanId, [...LOAN_IDS]))).length === 0, "cleanup: contact_event rows remain for the script's loans");
   if (!state.branchExisted) {
     const survivingOfficers = await database.select({ id: officers.id }).from(officers).where(like(officers.name, `${ACTOR}-%`));
     failUnless(survivingOfficers.length === 0, 'cleanup: assign-check- officers remain');
@@ -726,7 +829,8 @@ async function cleanup(database: Db): Promise<void> {
 
   console.log(
     `cleanup: import_row_error=${rowErrorRows.length} import_batch=${batchRows.length} loan_snapshot=${snapshotRows.length} ` +
-      `assignment_log=${logRows.length} promise=${promiseRows.length} absence=${absenceRows.length} territory=${territoryRows.length} ` +
+      `assignment_log=${logRows.length} promise=${promiseRows.length} contact_event=${contactRows.length} ` +
+      `absence=${absenceRows.length} territory=${territoryRows.length} ` +
       `loan=${loanRows.length} officer=${officerRows.length} audit_log=${auditRows.length} ` +
       `branch=${branchRows.length}${state.branchExisted ? ' (pre-existing branch kept)' : ''}`
   );

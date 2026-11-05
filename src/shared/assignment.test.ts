@@ -46,8 +46,8 @@ function absence(officerId: string, fromDate: string, toDate: string, coverOffic
   return { officerId, fromDate, toDate, coverOfficerId };
 }
 
-function contact(loanId: string, attemptedAt: string): AssignmentContact {
-  return { loanId, attemptedAt };
+function contact(loanId: string, attemptedAt: string, kind: AssignmentContact['kind'] = 'CALL'): AssignmentContact {
+  return { loanId, attemptedAt, kind };
 }
 
 function promise(loanId: string, promisedDate: string, status: AssignmentPromise['status'], createdOn = promisedDate): AssignmentPromise {
@@ -377,6 +377,53 @@ describe('caps and scoring (SPEC 10.3, 10.4)', () => {
     expect(d.reason).toBe('reassigned_score');
   });
 
+  it('keeps a carried-forward loan on its over-hard-cap officer when no challenger exists (and raises no alert)', () => {
+    // O-A holds L1 + 12 plain loans (w=1 each): projected (13+1)/10 = 1.4,
+    // over the hard cap. Caps filter candidates for new hands; they do not
+    // strip carried-forward loans. No challenger exists, so every decision
+    // carries forward silently — no alert, no log row.
+    const held = Array.from({ length: 12 }, (_, i) =>
+      loan({ loanId: `O-A-H${i}`, pincode: '452004', assignedOfficerId: 'O-A', homeOfficerId: 'O-A' })
+    );
+    const result = plan({
+      loans: [...held, loan({ loanId: 'L1', assignedOfficerId: 'O-A', homeOfficerId: 'O-A' })],
+      officers: [officer('O-A')],
+      territory: [terr('452001', null, 'O-A'), terr('452004', null, 'O-A')]
+    });
+    const d = result.decisions.find((x) => x.loanId === 'L1')!;
+    expect(d.toOfficerId).toBe('O-A');
+    expect(d.reason).toBe('carry_forward');
+    expect(d.changed).toBe(false);
+    expect(result.alerts).toEqual([]);
+    expect(result.logEntries).toHaveLength(0);
+  });
+
+  it('keeps a carried-forward loan on its over-hard-cap officer when every challenger is over the hard cap too (with the alert)', () => {
+    // O-A holds L1 + 12 (projected 1.4); O-B (primary for the loan's pincode)
+    // holds 20 heavier plain loans (projected 2.1). The only challenger is
+    // over the hard cap, so the comparison falls back to the
+    // minimum-utilisation challenger under hysteresis: O-A wins, the loan
+    // stays, and the over-cap challenger pool raises the alert. O-A's other
+    // loans carry forward silently (their territory names O-A alone).
+    const heldA = Array.from({ length: 12 }, (_, i) =>
+      loan({ loanId: `O-A-H${i}`, pincode: '452004', assignedOfficerId: 'O-A', homeOfficerId: 'O-A' })
+    );
+    const heldB = Array.from({ length: 20 }, (_, i) =>
+      loan({ loanId: `O-B-H${i}`, pincode: '452005', assignedOfficerId: 'O-B', homeOfficerId: 'O-B' })
+    );
+    const result = plan({
+      loans: [...heldA, ...heldB, loan({ loanId: 'L1', assignedOfficerId: 'O-A', homeOfficerId: 'O-A' })],
+      officers: [officer('O-A'), officer('O-B')],
+      territory: [terr('452001', null, 'O-B'), terr('452001', null, 'O-A', B1, 2), terr('452004', null, 'O-A'), terr('452005', null, 'O-B')]
+    });
+    const d = result.decisions.find((x) => x.loanId === 'L1')!;
+    expect(d.toOfficerId).toBe('O-A');
+    expect(d.reason).toBe('carry_forward');
+    expect(d.changed).toBe(false);
+    expect(result.alerts).toEqual([{ code: 'all_officers_over_hard_cap', loanId: 'L1' }]);
+    expect(result.logEntries).toHaveLength(0);
+  });
+
   it('gives the -0.10 primary officer bonus from the territory-resolved officer', () => {
     // Both empty: equal projected utilisation. Tie-break on officer id would
     // pick O-A; the primary bonus must make O-Z win despite the id order.
@@ -508,6 +555,39 @@ describe('leave (SPEC 10.6)', () => {
     expect(d.changed).toBe(false);
     expect(d.homeOfficerId).toBe('O-C');
     expect(result.logEntries).toHaveLength(0);
+  });
+
+  it('on return, a BLOCKED attempt inside the leave window is not a touch: the loan still reverts (A29)', () => {
+    // The blocked attempt happened during the leave window, but a control
+    // denial (the attempt never went through the window) cannot keep the loan
+    // with the cover officer. Only CALL/VISIT/MESSAGE count.
+    const result = plan({
+      loans: [loan({ loanId: 'L1', assignedOfficerId: 'O-V', homeOfficerId: 'O-C' })],
+      officers: [officer('O-C'), officer('O-V')],
+      territory: [terr('452001', null, 'O-C'), terr('452002', null, 'O-V')],
+      absences: [absence('O-C', '2026-11-02', '2026-11-06', 'O-V')],
+      contacts: [contact('L1', '2026-11-05', 'BLOCKED')]
+    });
+    const d = result.decisions[0]!;
+    expect(d.toOfficerId).toBe('O-C');
+    expect(d.reason).toBe('revert_return');
+    expect(d.changed).toBe(true);
+    expect(result.logEntries[0]).toMatchObject({ loanId: 'L1', fromOfficerId: 'O-V', toOfficerId: 'O-C', reason: 'revert_return' });
+  });
+
+  it('on return, a MESSAGE on the leave window\'s first day counts as a touch and the loan stays', () => {
+    // Boundary proof for the touch window: attemptedAt is inclusive on both ends.
+    const result = plan({
+      loans: [loan({ loanId: 'L1', assignedOfficerId: 'O-V', homeOfficerId: 'O-C' })],
+      officers: [officer('O-C'), officer('O-V')],
+      territory: [terr('452001', null, 'O-C'), terr('452002', null, 'O-V')],
+      absences: [absence('O-C', '2026-11-02', '2026-11-06', 'O-V')],
+      contacts: [contact('L1', '2026-11-02', 'MESSAGE')]
+    });
+    const d = result.decisions[0]!;
+    expect(d.toOfficerId).toBe('O-V');
+    expect(d.reason).toBe('carry_forward');
+    expect(d.changed).toBe(false);
   });
 
   it('on return, loans with an open promise stay with the cover officer', () => {
