@@ -33,6 +33,12 @@ territory:
   ujjain_localities: "Freeganj,Nanakheda"
   ratlam_pincode: "457001"
   unmapped_defect_pincode: "466001"
+  indore_main_generic_share: "0.333"
+  indore_main_locality_share: "0.167"
+  indore_east_share: "0.256"
+  indore_south_share: "0.244"
+  ujjain_city_locality_share: "0.4"
+  dewas_locality_split: "0.5,0.5"
 
 loans:
   total_end_active: 180

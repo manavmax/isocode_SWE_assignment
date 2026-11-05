@@ -35,6 +35,12 @@ export interface SeedConfig {
     ujjain_localities: string[];
     ratlam_pincode: string;
     unmapped_defect_pincode: string;
+    indore_main_generic_share: number;
+    indore_main_locality_share: number;
+    indore_east_share: number;
+    indore_south_share: number;
+    ujjain_city_locality_share: number;
+    dewas_locality_split: number[];
   };
   loans: {
     total_end_active: number;
@@ -106,7 +112,13 @@ const EXPECTED_KEYS: Record<string, Record<string, 'scalar' | 'list'>> = {
     ujjain_pincode: 'scalar',
     ujjain_localities: 'list',
     ratlam_pincode: 'scalar',
-    unmapped_defect_pincode: 'scalar'
+    unmapped_defect_pincode: 'scalar',
+    indore_main_generic_share: 'scalar',
+    indore_main_locality_share: 'scalar',
+    indore_east_share: 'scalar',
+    indore_south_share: 'scalar',
+    ujjain_city_locality_share: 'scalar',
+    dewas_locality_split: 'list'
   },
   loans: {
     total_end_active: 'scalar',
@@ -289,7 +301,13 @@ export function parseSeedConfig(text: string, source = 'seed_config.yaml'): Seed
       ujjain_pincode: str('territory.ujjain_pincode'),
       ujjain_localities: list('territory.ujjain_localities'),
       ratlam_pincode: str('territory.ratlam_pincode'),
-      unmapped_defect_pincode: str('territory.unmapped_defect_pincode')
+      unmapped_defect_pincode: str('territory.unmapped_defect_pincode'),
+      indore_main_generic_share: num('territory.indore_main_generic_share'),
+      indore_main_locality_share: num('territory.indore_main_locality_share'),
+      indore_east_share: num('territory.indore_east_share'),
+      indore_south_share: num('territory.indore_south_share'),
+      ujjain_city_locality_share: num('territory.ujjain_city_locality_share'),
+      dewas_locality_split: list('territory.dewas_locality_split').map(Number)
     },
     loans: {
       total_end_active: num('loans.total_end_active'),
@@ -349,6 +367,17 @@ function validateCrossChecks(config: SeedConfig): void {
   const officerTotal = people.officer_count_indore + people.officer_count_dewas + people.officer_count_ujjain + people.officer_count_ratlam;
   if (officerTotal !== 9 || people.manager_count !== 3) {
     throw new Error(`people: expected 9 officers and 3 managers, got ${officerTotal} and ${people.manager_count}`);
+  }
+  const territory = config.territory;
+  const indoreShareSum = territory.indore_main_generic_share + territory.indore_main_locality_share + territory.indore_east_share + territory.indore_south_share;
+  if (Math.abs(indoreShareSum - 1) > 1e-6) {
+    throw new Error(`territory: indore share slices must sum to 1, got ${indoreShareSum}`);
+  }
+  if (territory.dewas_locality_split.length !== 2 || Math.abs(territory.dewas_locality_split.reduce((a, b) => a + b, 0) - 1) > 1e-6) {
+    throw new Error('territory: dewas_locality_split must be two shares summing to 1 (one per officer)');
+  }
+  if (territory.ujjain_city_locality_share <= 0 || territory.ujjain_city_locality_share >= 1) {
+    throw new Error('territory: ujjain_city_locality_share must sit strictly inside (0, 1)');
   }
   const loans = config.loans;
   if (loans.per_branch_indore + loans.per_branch_ujjain_branch + loans.per_branch_dewas !== loans.total_end_active) {
