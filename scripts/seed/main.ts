@@ -153,7 +153,8 @@ async function readSummary(t0: string, asOf: string): Promise<SummaryQueries> {
     )
   ).rows[0]!;
   const bucketRows = await pool.query(
-    `SELECT bucket, count(*)::int AS loans FROM loan WHERE status = 'overdue' GROUP BY 1 ORDER BY 1`
+    // The active book: assigned overdue + the branch-manager queue (A24).
+    `SELECT bucket, count(*)::int AS loans FROM loan WHERE status IN ('overdue', 'queue') GROUP BY 1 ORDER BY 1`
   );
   const cohortResult = await pool.query(cohortSanitySql(t0, asOf));
   return {
