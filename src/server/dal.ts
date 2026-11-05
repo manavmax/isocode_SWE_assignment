@@ -3,6 +3,7 @@ import { getDb } from './db.js';
 import { importBatches, importRowErrors, loans, users } from './db/schema.js';
 import { maskPhone } from '../shared/phone.js';
 import type { LoanStatus } from '../shared/types.js';
+import { DEMO_ACCOUNTS } from './demo.js';
 
 export interface Actor {
   userId: string;
@@ -223,8 +224,11 @@ export async function fetchLoanForActor(actor: Actor, loanId: string): Promise<L
   return maskLoan(loan as LoanRowData);
 }
 
-/** A34/A31: demo-account chips. Returns ONLY usernames of active demo users;
- * nothing else (no ids, roles, hashes). Callers gate on demoModeEnabled(). */
+/** A34/A31: demo-account chips. Returns ONLY the A31 demo usernames
+ * (demo-manager/demo-officer-1/demo-officer-2) that are active demo users;
+ * nothing else (no ids, roles, hashes). Callers gate on demoModeEnabled().
+ * The seeded synthetic officers are is_demo for the "(demo)" marker (A40)
+ * but are NOT demo login chips. */
 export async function listDemoUsernames(): Promise<string[]> {
   const db = getDb();
   const rows = await db
@@ -232,7 +236,8 @@ export async function listDemoUsernames(): Promise<string[]> {
     .from(users)
     .where(and(eq(users.isDemo, true), eq(users.active, true)))
     .orderBy(asc(users.username));
-  return rows.map((row) => row.username);
+  const chipNames = new Set<string>(DEMO_ACCOUNTS.map((account) => account.username));
+  return rows.map((row) => row.username).filter((username) => chipNames.has(username));
 }
 
 export interface AssignmentSummary {
