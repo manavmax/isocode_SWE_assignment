@@ -1,0 +1,98 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Noto Sans', 'Noto Sans Devanagari', system-ui, -apple-system, sans-serif;
+  font-size: var(--font-size-16);
+  line-height: 1.5;
+  min-height: 100dvh;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+p {
+  margin: 0;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+a {
+  color: var(--accent);
+}
+
+input {
+  font: inherit;
+  color: inherit;
+}
+
+/* tabular numerals for money and DPD figures (SPEC 15) */
+.num,
+.money {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+:lang(hi) {
+  font-size: 1.1em;
+  line-height: 1.55;
+}
+
+:lang(hi) button,
+:lang(hi) .chip,
+:lang(hi) .nav-item {
+  white-space: normal;
+  min-width: max-content;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* motion: 150-200ms transitions, honoured by prefers-reduced-motion (SPEC 15) */
+.btn,
+.chip,
+.card,
+.skeleton,
+.state {
+  transition: background-color var(--motion), border-color var(--motion), color var(--motion), transform var(--motion);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}

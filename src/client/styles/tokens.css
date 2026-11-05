@@ -1,0 +1,68 @@
+:root {
+  /* 9-step cool-grey neutral scale (cool, slightly blue) */
+  --grey-50: #f7f8fa;
+  --grey-100: #eef0f4;
+  --grey-200: #dfe3ea;
+  --grey-300: #c7cdd8;
+  --grey-400: #9aa3b2;
+  --grey-500: #6f7a8c;
+  --grey-600: #525c6d;
+  --grey-700: #3d4553;
+  --grey-800: #232a36;
+  --grey-900: #10141c;
+
+  /* one deep-teal accent */
+  --accent: #0f5f5c;
+  --accent-strong: #0b4b49;
+  --accent-soft: #e2f0ef;
+
+  /* semantic colours: status only */
+  --status-ok: #1a7f37;
+  --status-ok-soft: #e6f4ea;
+  --status-warn: #9a5b00;
+  --status-warn-soft: #fdf3e0;
+  --status-danger: #b3261e;
+  --status-danger-soft: #fdecea;
+
+  /* single-hue DPD bucket ramp (teal -> deep) with text labels in UI */
+  --dpd-1: #9fd8d4;
+  --dpd-2: #5fb3ae;
+  --dpd-3: #2e8a86;
+  --dpd-4: #14504e;
+
+  /* type scale 12/14/16/18/22/28/36 */
+  --font-size-12: 0.75rem;
+  --font-size-14: 0.875rem;
+  --font-size-16: 1rem;
+  --font-size-18: 1.125rem;
+  --font-size-22: 1.375rem;
+  --font-size-28: 1.75rem;
+  --font-size-36: 2.25rem;
+
+  /* 4px spacing */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-6: 1.5rem;
+  --sp-8: 2rem;
+
+  /* one radius, borders not shadows */
+  --radius: 8px;
+  --border: 1px solid var(--grey-200);
+  --border-strong: 1px solid var(--grey-300);
+
+  /* motion 150-200ms */
+  --motion: 175ms ease-out;
+
+  /* surfaces */
+  --bg: var(--grey-50);
+  --surface: #ffffff;
+  --text: var(--grey-800);
+  --text-muted: var(--grey-600);
+  --text-faint: var(--grey-500);
+
+  /* targets */
+  --target-min: 48px;
+  --target-primary: 56px;
+}
