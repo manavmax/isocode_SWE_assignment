@@ -1,12 +1,10 @@
 import { Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
 import type { Context } from 'hono';
-import { sql } from 'drizzle-orm';
-import { getDb } from './db.js';
 import { applyImport } from './import/applyImport.js';
 import { validateAsOf, validateUploadFile } from './import/uploadMeta.js';
 import { buildErrorsCsv } from './errorsCsv.js';
-import { fetchBatchWithRowErrors, findLoginUser, isManager, resolveActor } from './dal.js';
+import { fetchBatchWithRowErrors, fetchLoanForActor, findLoginUser, isManager, listOfficerAssignments, probeDb, resolveActor } from './dal.js';
 import { verifyPassword } from './auth.js';
 import {
   createSession,
@@ -23,8 +21,7 @@ export const app = new Hono();
 
 app.get('/api/health', async (c) => {
   try {
-    const db = getDb();
-    await db.execute(sql`select 1 as ok`);
+    await probeDb();
     return c.json({ status: 'ok', db: 'ok', time: new Date().toISOString() });
   } catch {
     return c.json({ status: 'degraded', db: 'error', time: new Date().toISOString() }, 503);
@@ -102,6 +99,43 @@ app.get('/api/me', async (c) => {
       return c.json({ error: 'unauthorized' }, 401);
     }
     return c.json({ user: { username: actor.username, role: actor.role, branchId: actor.branchId, officerId: actor.officerId } });
+  } catch {
+    return c.json({ status: 'degraded' }, 503);
+  }
+});
+
+/** A33: the officer's own overdue worklist, phones already masked by the
+ * data-access layer. Managers are refused: assignments are officer-scoped. */
+app.get('/api/me/assignments', async (c) => {
+  try {
+    const actor = await resolveSessionActor(getCookie(c, SESSION_COOKIE));
+    if (!actor) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    if (actor.role !== 'field_officer' || !actor.officerId) {
+      return c.json({ error: 'forbidden' }, 403);
+    }
+    const assignments = await listOfficerAssignments(actor);
+    return c.json({ assignments });
+  } catch {
+    return c.json({ status: 'degraded' }, 503);
+  }
+});
+
+/** A33: one loan detail per session actor. Officer: only their assignment;
+ * manager: only their branch. Every invisible loan answers the same generic
+ * 404 as a missing loan, and the payload carries no raw phone numbers. */
+app.get('/api/loans/:id', async (c) => {
+  try {
+    const actor = await resolveSessionActor(getCookie(c, SESSION_COOKIE));
+    if (!actor) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    const loan = await fetchLoanForActor(actor, c.req.param('id'));
+    if (!loan) {
+      return c.json({ error: 'not found' }, 404);
+    }
+    return c.json({ loan });
   } catch {
     return c.json({ status: 'degraded' }, 503);
   }
