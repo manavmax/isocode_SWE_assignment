@@ -10,7 +10,11 @@ import { hashPassword, verifyPassword } from './auth.js';
  */
 const h = vi.hoisted(() => {
   const queue: unknown[] = [];
-  const sessionsWritten: unknown[] = [];
+  /** Every insert the routes attempt: the value plus its onConflictDoUpdate
+   * payload when present. Session writes carry tokenHash, attempt writes
+   * carry windowStart — the fake cannot see table names, tests sort by shape. */
+  const writes: { value: Record<string, unknown>; conflictSet: unknown }[] = [];
+  const counters = { deletes: 0 };
   const shift = () => {
     const next = queue.shift();
     if (next === undefined) {
@@ -31,22 +35,32 @@ const h = vi.hoisted(() => {
     limit: async () => shift(),
     then: (resolve: (rows: unknown) => void, reject: (e: unknown) => void) => Promise.resolve(shift()).then(resolve, reject)
   };
+  const resolved = Promise.resolve(undefined);
   const fakeDb = {
     select: () => chain,
     insert: () => ({
-      values: async (value: unknown) => {
-        sessionsWritten.push(value);
-        return value;
+      values: (value: unknown) => {
+        const entry = { value: value as Record<string, unknown>, conflictSet: null as unknown };
+        writes.push(entry);
+        return {
+          onConflictDoUpdate: (arg: unknown) => {
+            entry.conflictSet = arg;
+            return resolved;
+          },
+          then: resolved.then.bind(resolved),
+          catch: resolved.catch.bind(resolved),
+          finally: resolved.finally.bind(resolved)
+        };
       }
     }),
     delete: () => ({
       where: async () => {
-        sessionsWritten.length = 0;
-        return { rowCount: sessionsWritten.length };
+        counters.deletes += 1;
+        return { rowCount: 1 };
       }
     })
   };
-  return { queue, sessionsWritten, fakeDb };
+  return { queue, writes, counters, fakeDb };
 });
 
 vi.mock('./db.js', () => ({
@@ -62,9 +76,22 @@ vi.mock('./db.js', () => ({
 }));
 
 import { app } from './app.js';
-import { checkLoginThrottle, resetLoginThrottleForTests } from './rateLimit.js';
+import { LOGIN_WINDOW_MS } from './rateLimit.js';
 import { hashSessionToken, SESSION_COOKIE, SESSION_TTL_MS } from './sessions.js';
 import { DEMO_PIN } from './demo.js';
+
+/** Row the login route's throttle lookup would read from login_attempt. */
+function attemptRow(failCount: number, windowStartMs: number) {
+  return { failCount, windowStart: new Date(windowStartMs) };
+}
+
+function attemptWrites() {
+  return h.writes.filter((w) => 'windowStart' in w.value && w.conflictSet !== null);
+}
+
+function sessionWrites() {
+  return h.writes.filter((w) => 'tokenHash' in w.value);
+}
 
 const NOW = Date.now();
 const BRANCH = 'branch-aaaa-aaaa-aaaaaaaaaaaa';
@@ -117,36 +144,42 @@ function cookieFor(token: string): string {
 describe('POST /api/auth/login', () => {
   beforeEach(() => {
     h.queue.length = 0;
-    h.sessionsWritten.length = 0;
+    h.writes.length = 0;
+    h.counters.deletes = 0;
   });
   afterEach(() => {
-    resetLoginThrottleForTests();
     delete process.env.DEMO_MODE;
   });
 
   it('requires a username and pin', async () => {
-    h.queue.push(fieldOfficerRow());
     const res = await login('', '');
     expect(res.status).toBe(400);
     expect((await res.json() as { error: string }).error).toBe('username and pin are required');
+    expect(h.queue).toHaveLength(0); // nothing ran before validation
   });
 
   it('answers an unknown username with the generic wrong-username-or-PIN message', async () => {
-    h.queue.push([]); // select resolves to "no rows"
+    h.queue.push([]); // throttle lookup: no locked key
+    h.queue.push([]); // user lookup: no rows
     const res = await login('nobody', 'pin-7777');
     expect(res.status).toBe(401);
     expect((await res.json() as { error: string }).error).toBe('wrong username or PIN');
+    expect(attemptWrites()).toHaveLength(1); // counted as a failure (A30)
   });
 
   it('answers a wrong PIN with the generic message and records the failure (real scrypt verify ran)', async () => {
+    h.queue.push([]);
     h.queue.push(fieldOfficerRow());
     const res = await login('ss-officer', 'pin-0000');
     expect(res.status).toBe(401);
     expect((await res.json() as { error: string }).error).toBe('wrong username or PIN');
-    expect(checkLoginThrottle('ss-officer|unknown', NOW).failures).toBe(1);
+    const writes = attemptWrites();
+    expect(writes).toHaveLength(1);
+    expect(writes[0]!.value).toMatchObject({ key: 'ss-officer|unknown', failCount: 1 });
   });
 
   it('a correct PIN checks the scrypt hash, records a hashed session, and sets an HttpOnly Secure SameSite=Lax 7-day cookie', async () => {
+    h.queue.push([]);
     h.queue.push(fieldOfficerRow());
     const res = await login('ss-officer', 'pin-7777');
     expect(res.status).toBe(200);
@@ -158,15 +191,17 @@ describe('POST /api/auth/login', () => {
     expect(setCookie).toContain('secure');
     expect(setCookie).toContain('samesite=lax');
     expect(setCookie).toContain(`max-age=${SESSION_TTL_MS / 1000}`);
-    expect(h.sessionsWritten).toHaveLength(1);
-    const written = h.sessionsWritten[0]! as { tokenHash: string };
+    const written = sessionWrites();
+    expect(written).toHaveLength(1);
     const token = (res.headers.get('set-cookie')?.split(/[=;]/) ?? [])[1] ?? '';
-    expect(written.tokenHash).toBe(hashSessionToken(token));
+    expect(written[0]!.value.tokenHash).toBe(hashSessionToken(token));
     expect(verifyPassword(hashPassword('pin-7777'), 'pin-7777')).toBe(true);
-    expect(checkLoginThrottle('ss-officer|unknown', NOW).failures).toBe(0);
+    expect(attemptWrites()).toHaveLength(0); // open key: nothing recorded
+    expect(h.counters.deletes).toBe(1); // a successful login clears the counter (A30)
   });
 
   it('rejects a demo account while the DEMO_MODE off-switch is not set, with the same generic text (A31)', async () => {
+    h.queue.push([]);
     h.queue.push(fieldOfficerRow({ isDemo: true, passwordHash: hashPassword(DEMO_PIN) }));
     const res = await login('demo-officer-1', DEMO_PIN);
     expect(res.status).toBe(401);
@@ -175,43 +210,39 @@ describe('POST /api/auth/login', () => {
 
   it('lets a demo account log in only when DEMO_MODE=true (A31)', async () => {
     process.env.DEMO_MODE = 'true';
+    h.queue.push([]);
     h.queue.push(managerRow({ isDemo: true, passwordHash: hashPassword(DEMO_PIN) }));
     const res = await login('demo-manager', DEMO_PIN);
     expect(res.status).toBe(200);
     const body = await res.json() as { user: { role: string } };
     expect(body.user?.role).toBe('branch_manager');
+    expect(attemptWrites()).toHaveLength(0);
   });
 
-  it('blocks the username+IP key after 5 failed attempts and returns Retry-After (A30)', async () => {
-    for (let i = 0; i < 5; i++) {
-      h.queue.push(fieldOfficerRow());
-      const res = await login('ss-officer', 'pin-0000');
-      expect(res.status).toBe(401);
-    }
+  it('a key with 5 recorded failures inside the window answers 429 + Retry-After without ever probing the user (A30)', async () => {
+    h.queue.push(attemptRow(5, NOW + 60_000)); // the locked login_attempt row
     const res = await login('ss-officer', 'pin-7777');
     expect(res.status).toBe(429);
     expect(Number(res.headers.get('retry-after'))).toBeGreaterThan(0);
+    expect(h.queue).toHaveLength(0); // the user lookup never ran
+    expect(sessionWrites()).toHaveLength(0);
   });
 
-  it('rates the same username scoped by client IP: another IP is a separate key', async () => {
-    for (let i = 0; i < 5; i++) {
-      h.queue.push(fieldOfficerRow());
-      await login('ss-officer', 'pin-0000');
-    }
-    expect(checkLoginThrottle('ss-officer|unknown', NOW).blocked).toBe(true);
+  it('a failure row older than the 15-minute window does not block and starts a fresh window', async () => {
+    h.queue.push(attemptRow(5, NOW - LOGIN_WINDOW_MS - 60_000)); // expired window
     h.queue.push(fieldOfficerRow());
-    const res = await login('ss-officer', 'pin-7777', { 'x-forwarded-for': '9.9.9.9' });
-    expect(res.status).toBe(200);
-    expect(checkLoginThrottle('ss-officer|9.9.9.9', NOW).failures).toBe(0);
+    const res = await login('ss-officer', 'pin-0000');
+    expect(res.status).toBe(401);
+    expect((await res.json() as { error: string }).error).toBe('wrong username or PIN');
+    expect(attemptWrites()).toHaveLength(1); // next failure opened a fresh window
   });
 });
 
 describe('GET /api/me', () => {
   beforeEach(() => {
     h.queue.length = 0;
-  });
-  afterEach(() => {
-    resetLoginThrottleForTests();
+    h.writes.length = 0;
+    h.counters.deletes = 0;
   });
 
   it('resolves a live cookie session to the actor it belongs to', async () => {
@@ -240,10 +271,8 @@ describe('GET /api/me', () => {
 describe('POST /api/auth/logout', () => {
   beforeEach(() => {
     h.queue.length = 0;
-    h.sessionsWritten.length = 0;
-  });
-  afterEach(() => {
-    resetLoginThrottleForTests();
+    h.writes.length = 0;
+    h.counters.deletes = 0;
   });
 
   it('deletes the session row and clears the cookie, whatever the cookie said', async () => {
@@ -254,20 +283,22 @@ describe('POST /api/auth/logout', () => {
     const setCookie = (res.headers.get('set-cookie') ?? '').toLowerCase();
     expect(setCookie).toContain('fc_session=');
     expect(setCookie).toContain('max-age=0');
+    expect(h.counters.deletes).toBe(1);
+    expect(h.writes).toHaveLength(0);
   });
 
   it('is idempotent with no session cookie at all', async () => {
     const res = await app.request('/api/auth/logout', { method: 'POST' });
     expect(res.status).toBe(200);
+    expect(h.counters.deletes).toBe(0);
   });
 });
 
 describe('POST /api/import through a cookie session', () => {
   beforeEach(() => {
     h.queue.length = 0;
-  });
-  afterEach(() => {
-    resetLoginThrottleForTests();
+    h.writes.length = 0;
+    h.counters.deletes = 0;
   });
 
   it('a field officer session reaches the manager-only gate and gets 403', async () => {

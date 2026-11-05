@@ -96,6 +96,16 @@ export const sessions = pgTable('session', {
   expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }).notNull()
 });
 
+/** Login-throttle state (A30): one row per username + client-IP key, shared
+ * across serverless instances. windowStart opens the current window at the
+ * first recorded failure; a row older than the window rolls into a fresh
+ * one on the next failure, so rows stay small without a sweeper. */
+export const loginAttempts = pgTable('login_attempt', {
+  key: text('key').primaryKey(),
+  failCount: integer('fail_count').notNull(),
+  windowStart: timestamp('window_start', { withTimezone: true, mode: 'date' }).notNull()
+});
+
 export const officerAbsences = pgTable(
   'officer_absence',
   {

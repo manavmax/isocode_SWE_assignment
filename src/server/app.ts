@@ -14,7 +14,7 @@ import {
   SESSION_COOKIE,
   SESSION_TTL_MS
 } from './sessions.js';
-import { checkLoginThrottle, clearLoginFailures, recordLoginFailure } from './rateLimit.js';
+import { clearLoginFailures, findLoginAttempts, loginThrottleKey, recordLoginFailure, throttleDecision } from './rateLimit.js';
 import { demoLoginAllowed, demoModeEnabled } from './demo.js';
 
 export const app = new Hono();
@@ -54,10 +54,11 @@ app.post('/api/auth/login', async (c) => {
       return c.json({ error: 'username and pin are required' }, 400);
     }
 
-    // A30: throttle per username + client IP before any password work.
-    const throttleKey = `${username}|${clientIp(c)}`;
+    // A30: throttle per username + client IP before any password work; the
+    // counter lives in the login_attempt table so it holds across instances.
+    const throttleKey = loginThrottleKey(username, clientIp(c));
     const now = Date.now();
-    const throttle = checkLoginThrottle(throttleKey, now);
+    const throttle = throttleDecision(await findLoginAttempts(throttleKey), now);
     if (throttle.blocked) {
       return c.json({ error: 'too many login attempts; try again later' }, 429, {
         'Retry-After': String(Math.ceil(throttle.retryAfterMs / 1000))
@@ -69,13 +70,13 @@ app.post('/api/auth/login', async (c) => {
     // record for all of them, so nothing is enumerable (A30/A31).
     const user = await findLoginUser(username);
     if (!user || !user.active || !demoLoginAllowed(user.isDemo, demoModeEnabled()) || !verifyPassword(user.passwordHash, pin)) {
-      recordLoginFailure(throttleKey, now);
+      await recordLoginFailure(throttleKey, now);
       return c.json({ error: 'wrong username or PIN' }, 401);
     }
 
     const session = await createSession(user.id);
     setCookie(c, SESSION_COOKIE, session.token, sessionCookieOptions(Math.ceil(SESSION_TTL_MS / 1000)));
-    clearLoginFailures(throttleKey);
+    await clearLoginFailures(throttleKey);
     return c.json({ user: { username: user.username, role: user.role, branchId: user.branchId, officerId: user.officerId ?? null } });
   } catch {
     return c.json({ status: 'degraded' }, 503);

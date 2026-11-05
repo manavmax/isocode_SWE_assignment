@@ -11,7 +11,7 @@ Variables are set in the local `.env` (gitignored) and in the Vercel project das
 ## Order of a deploy (offline-safe steps first)
 
 1. `pnpm install`
-2. `pnpm db:migrate` — applies `drizzle/*.sql` (0002 adds the `session` table and `app_user.is_demo`; ADR-0005 AUTH.)
+2. `pnpm db:migrate` — applies `drizzle/*.sql` (0002 adds the `session` table and `app_user.is_demo`; 0003 adds the `login_attempt` throttle table; ADR-0005 auth).
 3. `DEMO_MODE=true pnpm demo:accounts` — idempotent creation of the demo logins below (stand-in until the full seed of SPEC §13 exists; the real seed will call the same `ensureDemoAccounts`).
 4. `pnpm check:api` — plain-Node ESM load of the Vercel entry, `{ fetch }` shape and degraded `/api/health`.
 5. `pnpm build && vercel deploy` (user-run; regions `bom1` via `vercel.json`).
@@ -30,7 +30,7 @@ The PIN is a **documented demo credential for the synthetic demo** (assumption A
 
 - Cookie `fc_session`: HttpOnly, Secure, SameSite=Lax, `Path=/`, Max-Age 7 days; the cookie value is a random 32-byte base64url token whose sha256 is the only thing the database stores.
 - Sessions expire server-side after 7 days (checked at lookup, so an expired row cannot authenticate even if a cookie survives).
-- Login rate limit: 5 failed attempts per username + client IP within 15 minutes (in-memory, per serverless instance — A30), `Retry-After` on 429, counter cleared by a successful login.
+- Login rate limit: 5 failed attempts per username + client IP within 15 minutes; the counter lives in the `login_attempt` table (`key`, `fail_count`, `window_start`), so it holds across serverless instances and invocation boundaries (A30, migration 0003). `Retry-After` on 429; a successful login deletes the row.
 - Every auth failure (unknown user, inactive, demo account with the switch off, wrong PIN) answers the same generic `wrong username or PIN`.
 
 ## Data-access rules (SPEC 24, A32/A33)
