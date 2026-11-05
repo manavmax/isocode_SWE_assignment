@@ -223,6 +223,18 @@ export async function fetchLoanForActor(actor: Actor, loanId: string): Promise<L
   return maskLoan(loan as LoanRowData);
 }
 
+/** A34/A31: demo-account chips. Returns ONLY usernames of active demo users;
+ * nothing else (no ids, roles, hashes). Callers gate on demoModeEnabled(). */
+export async function listDemoUsernames(): Promise<string[]> {
+  const db = getDb();
+  const rows = await db
+    .select({ username: users.username })
+    .from(users)
+    .where(and(eq(users.isDemo, true), eq(users.active, true)))
+    .orderBy(asc(users.username));
+  return rows.map((row) => row.username);
+}
+
 export interface AssignmentSummary {
   loanId: string;
   borrowerName: string;

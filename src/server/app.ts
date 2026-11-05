@@ -16,6 +16,7 @@ import {
 } from './sessions.js';
 import { clearLoginFailures, findLoginAttempts, loginThrottleKey, recordLoginFailure, throttleDecision } from './rateLimit.js';
 import { demoLoginAllowed, demoModeEnabled } from './demo.js';
+import { listDemoUsernames } from './dal.js';
 
 export const app = new Hono();
 
@@ -86,6 +87,22 @@ app.post('/api/auth/logout', async (c) => {
     await revokeSession(getCookie(c, SESSION_COOKIE));
     setCookie(c, SESSION_COOKIE, '', sessionCookieOptions(0));
     return c.json({ ok: true });
+  } catch {
+    return c.json({ status: 'degraded' }, 503);
+  }
+});
+
+/** SPEC 2/16: demo chips exist only while DEMO_MODE is on. The endpoint is
+ * public (login screen has no session yet) but returns usernames only — no
+ * roles, ids or presence of real accounts — and an empty list (not an error)
+ * when the switch is off. */
+app.get('/api/demo-accounts', async (c) => {
+  try {
+    if (!demoModeEnabled()) {
+      return c.json({ usernames: [] });
+    }
+    const usernames = await listDemoUsernames();
+    return c.json({ usernames });
   } catch {
     return c.json({ status: 'degraded' }, 503);
   }
