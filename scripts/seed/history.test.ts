@@ -151,9 +151,9 @@ describe('end-date mixture and cohort calibration (SPEC 13, SPEC 20.3, prompt 8 
   });
 
   it('shows the brief loans at their exact brief DPD and POS on the final file', () => {
-    expect(finalRows.get('LN-10293')).toMatchObject({ dpd: 12, outstanding: 64000000, branchCode: 'UJJ' });
-    expect(finalRows.get('LN-10871')).toMatchObject({ dpd: 27, outstanding: 31000000, branchCode: 'UJJ' });
-    expect(finalRows.get('LN-11930')).toMatchObject({ dpd: 19, outstanding: 22000000, branchCode: 'DWS' });
+    expect(finalRows.get('LN-10293')).toMatchObject({ dpd: 12, outstanding: 64000000, branchCode: 'IDR' });
+    expect(finalRows.get('LN-10871')).toMatchObject({ dpd: 27, outstanding: 31000000, branchCode: 'DWS' });
+    expect(finalRows.get('LN-11930')).toMatchObject({ dpd: 19, outstanding: 22000000, branchCode: 'UJJ' });
   });
 
   it('the t0 snapshot holds exactly the configured cohort members, all in 1-30 dpd', () => {

@@ -77,7 +77,11 @@ interface BriefSpec {
 }
 
 /** The brief's three sample rows carry exact POS and DPD pins; business name
- *  of LN-10871 is NULL because that is how data/sample_overdue.csv ships it. */
+ *  of LN-10871 is NULL because that is how data/sample_overdue.csv ships it.
+ *  Branch/pincode/locality are chosen so TERRITORY resolves each loan to the
+ *  officer the brief names (A48): LN-10293's own sample row is internally
+ *  inconsistent (pincode 457001/branch Ujjain but Officer Rahul Chouhan, an
+ *  Indore officer), so the Officer column wins as the brief's intent. */
 function briefSpecs(config: SeedConfig): BriefSpec[] {
   return [
     {
@@ -86,12 +90,11 @@ function briefSpecs(config: SeedConfig): BriefSpec[] {
       borrowerName: 'Ramesh Sharma',
       businessName: 'Sharma Kirana',
       rupees: 640_000,
-      branchCode: 'UJJ',
-      subBranch: 'ratlam',
-      pincode: config.territory.ratlam_pincode,
-      // The brief's own locality label; the planner falls through to the
-      // 457001 generic row -> Imran Qureshi (verified in planAssignment).
-      locality: 'Ratlam',
+      branchCode: 'IDR',
+      subBranch: 'indore',
+      pincode: config.territory.indore_pincode_main,
+      // 452001 generic row -> Rahul Chouhan.
+      locality: null,
       segment: 'trader'
     },
     {
@@ -100,12 +103,11 @@ function briefSpecs(config: SeedConfig): BriefSpec[] {
       borrowerName: 'Sunita Bai',
       businessName: null,
       rupees: 310_000,
-      branchCode: 'UJJ',
-      subBranch: 'ujjain',
-      // Branch UJJ with an Indore pincode shard: no Ujjain territory row
-      // matches and every prefix tier misses -> genuinely queues (A24).
-      pincode: config.territory.indore_pincode_main,
-      locality: config.territory.indore_shared_locality,
+      branchCode: 'DWS',
+      subBranch: 'dewas',
+      pincode: config.territory.dewas_pincode,
+      // The Civil Lines slice -> Neha Solanki (one of the two locality rows).
+      locality: config.territory.dewas_localities[0] ?? null,
       segment: 'service'
     },
     {
@@ -114,10 +116,11 @@ function briefSpecs(config: SeedConfig): BriefSpec[] {
       borrowerName: 'Abdul Khan',
       businessName: 'Khan Traders',
       rupees: 220_000,
-      branchCode: 'DWS',
-      subBranch: 'dewas',
-      pincode: config.territory.dewas_pincode,
-      locality: config.territory.dewas_localities[0] ?? null,
+      branchCode: 'UJJ',
+      subBranch: 'ratlam',
+      pincode: config.territory.ratlam_pincode,
+      // 457001 generic row -> Imran Qureshi (Ratlam, Ujjain branch, A3).
+      locality: null,
       segment: 'trader'
     }
   ] satisfies BriefSpec[];
@@ -192,7 +195,7 @@ export function buildLoanUniverse(rng: Rng, config: SeedConfig, seed: number): L
     UJJ: historyConfig.cohort_count_ujjain_branch - historyConfig.roll_count_ujjain_branch - historyConfig.stayed_count_ujjain_branch,
     DWS: historyConfig.cohort_count_dewas - historyConfig.roll_count_dewas - historyConfig.stayed_count_dewas
   };
-  const briefsByBranch: Record<BranchCode, number> = { IDR: 0, UJJ: 2, DWS: 1 };
+  const briefsByBranch: Record<BranchCode, number> = { IDR: 1, UJJ: 1, DWS: 1 };
 
   // ---- names, ids ----
   const borrowerNames = borrowerNamePool(rng, universeSize);

@@ -129,31 +129,39 @@ describe('the brief\'s three loans (prompt 8 row)', () => {
     const byId = new Map(universe.loans.map((loan) => [loan.loanId, loan]));
     const briefs = briefLoanDefinitions(universe, config);
     expect(briefs.map((brief) => brief.loanId).sort()).toEqual(['LN-10293', 'LN-10871', 'LN-11930']);
-    // Values straight from data/sample_overdue.csv (POS rupees, DPD at end).
+    // Values straight from data/sample_overdue.csv (POS rupees, DPD at end);
+    // branch/pincode/locality follow A48 so territory resolves each loan to
+    // the officer the brief names.
     expect(byId.get('LN-10293')).toMatchObject({
       borrowerName: 'Ramesh Sharma',
       businessName: 'Sharma Kirana',
       outstandingRupees: 640_000,
       entryDayOffset: 11, // briefEndDpd 12 minus 1
-      branchCode: 'UJJ',
-      subBranch: 'ratlam'
+      branchCode: 'IDR',
+      subBranch: 'indore',
+      pincode: config.territory.indore_pincode_main,
+      locality: null
     });
     expect(byId.get('LN-10871')).toMatchObject({
       borrowerName: 'Sunita Bai',
       businessName: null, // the brief itself ships this row without a business name
       outstandingRupees: 310_000,
       entryDayOffset: 26, // briefEndDpd 27 minus 1
-      branchCode: 'UJJ'
+      branchCode: 'DWS',
+      pincode: config.territory.dewas_pincode,
+      locality: config.territory.dewas_localities[0]
     });
     expect(byId.get('LN-11930')).toMatchObject({
       borrowerName: 'Abdul Khan',
       businessName: 'Khan Traders',
       outstandingRupees: 220_000,
       entryDayOffset: 18, // briefEndDpd 19 minus 1
-      branchCode: 'DWS'
+      branchCode: 'UJJ',
+      subBranch: 'ratlam',
+      pincode: config.territory.ratlam_pincode,
+      locality: null
     });
-    // LN-10871/11930 are destiny-fresh entries (dpd 27/19 both below 30);
-    // LN-10293 stays active on a Ratlam slice. All three are end-active.
+    // All three are destiny-fresh entries (dpd 12/27/19 all below 30).
     for (const brief of briefs) {
       expect(byId.get(brief.loanId)!.destiny).toBe('fresh');
       expect(byId.get(brief.loanId)!.entryDayOffset).toBe(brief.briefEndDpd - 1);
