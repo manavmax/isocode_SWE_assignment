@@ -16,6 +16,7 @@ import {
 } from './sessions.js';
 import { clearLoginFailures, findLoginAttempts, loginThrottleKey, recordLoginFailure, throttleDecision } from './rateLimit.js';
 import { processEventBatch } from './events.js';
+import { revealBorrowerPhone } from './reveal.js';
 import { contactEventBatchSchema, MAX_EVENT_BATCH } from '../shared/sync/eventSchema.js';
 import { demoLoginAllowed, demoModeEnabled } from './demo.js';
 import { listDemoUsernames } from './dal.js';
@@ -267,6 +268,39 @@ app.post('/api/events/batch', async (c) => {
       Date.now()
     );
     return c.json(outcome);
+  } catch {
+    return c.json({ status: 'degraded' }, 503);
+  }
+});
+
+/** SPEC 16: reveal is officer-only, on an assigned loan, inside the contact
+ * window by SERVER time, rate-limited in the DB (A56) and audited. This is
+ * the ONLY route that answers an unmasked number; the client may cache it
+ * until the end of the IST day (A57). Hono resolves the more specific
+ * /reveal-phone path before the :id catch-all above. */
+app.get('/api/loans/:id/reveal-phone', async (c) => {
+  try {
+    const actor = await resolveSessionActor(getCookie(c, SESSION_COOKIE));
+    if (!actor) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    if (actor.role !== 'field_officer' || !actor.officerId) {
+      return c.json({ error: 'forbidden' }, 403);
+    }
+    const outcome = await revealBorrowerPhone(
+      { ...actor, officerId: actor.officerId },
+      c.req.param('id'),
+      Date.now()
+    );
+    if (!outcome.ok) {
+      if (outcome.code === 429 && outcome.retryAfterMs) {
+        return c.json({ error: outcome.error }, 429, {
+          'Retry-After': String(Math.ceil(outcome.retryAfterMs / 1000))
+        });
+      }
+      return c.json({ error: outcome.error }, outcome.code);
+    }
+    return c.json({ mobile: outcome.mobile, altMobile: outcome.altMobile });
   } catch {
     return c.json({ status: 'degraded' }, 503);
   }
