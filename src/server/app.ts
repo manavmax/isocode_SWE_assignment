@@ -15,6 +15,8 @@ import {
   SESSION_TTL_MS
 } from './sessions.js';
 import { clearLoginFailures, findLoginAttempts, loginThrottleKey, recordLoginFailure, throttleDecision } from './rateLimit.js';
+import { processEventBatch } from './events.js';
+import { contactEventBatchSchema, MAX_EVENT_BATCH } from '../shared/sync/eventSchema.js';
 import { demoLoginAllowed, demoModeEnabled } from './demo.js';
 import { listDemoUsernames } from './dal.js';
 
@@ -230,6 +232,41 @@ app.get('/api/import/:id/errors.csv', async (c) => {
         'Content-Disposition': `attachment; filename="errors_${found.batch.id}.csv"`
       }
     });
+  } catch {
+    return c.json({ status: 'degraded' }, 503);
+  }
+});
+
+/** SPEC 6: the offline outbox flushes here, batches of 20, always HTTP 200
+ * while authenticated so one bad item cannot fail the queue (SPEC 6 answer
+ * shape: [{id, status: created|duplicate|rejected, reason}]). The response
+ * also carries serverNow for the client's skew estimation. Never retryable
+ * failures (4xx-grade) arrive as per-item `rejected` entries. */
+app.post('/api/events/batch', async (c) => {
+  try {
+    const actor = await resolveSessionActor(getCookie(c, SESSION_COOKIE));
+    if (!actor) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    if (actor.role !== 'field_officer' || !actor.officerId) {
+      return c.json({ error: 'forbidden' }, 403);
+    }
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid json body' }, 400);
+    }
+    const envelope = contactEventBatchSchema.safeParse(body);
+    if (!envelope.success) {
+      return c.json({ error: `events must contain 1 to ${MAX_EVENT_BATCH} items` }, 400);
+    }
+    const outcome = await processEventBatch(
+      { ...actor, officerId: actor.officerId },
+      envelope.data.events,
+      Date.now()
+    );
+    return c.json(outcome);
   } catch {
     return c.json({ status: 'degraded' }, 503);
   }
