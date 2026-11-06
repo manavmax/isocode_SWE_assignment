@@ -65,5 +65,9 @@ export const api = {
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
   me: () => request<{ user: ApiUser }>('/api/me'),
   assignments: () => request<{ assignments: AssignmentCard[] }>('/api/me/assignments'),
-  loan: (loanId: string) => request<{ loan: LoanDetailDto }>(`/api/loans/${encodeURIComponent(loanId)}`)
+  loan: (loanId: string) => request<{ loan: LoanDetailDto }>(`/api/loans/${encodeURIComponent(loanId)}`),
+  revealPhone: (loanId: string) =>
+    request<{ mobile: string | null; altMobile: string | null }>(`/api/loans/${encodeURIComponent(loanId)}/reveal-phone`, {
+      method: 'POST'
+    })
 };

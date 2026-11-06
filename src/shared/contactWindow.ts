@@ -13,6 +13,11 @@ import { contactRuleSetForAttemptDate, type ContactRuleSet } from './ruleSets.js
 export const CONTACT_WINDOW_START_MIN = 480; // 08:00 IST
 export const CONTACT_WINDOW_END_MIN = 1140; // 19:00 IST (exclusive)
 
+/** Rule code carried by BLOCKED attempts (SPEC 7: blocked attempts are
+ * BLOCKED events carrying rule code and rule-set version — the version is
+ * stamped from the attempt date on sync, the code rides the event note). */
+export const CONTACT_WINDOW_RULE_CODE = 'CONTACT_WINDOW_CLOSED';
+
 /** The window check on raw minute-of-day terms; the formula itself lives in
  * datetime.istMinutesOfDay and matches SPEC 7 seconds for seconds. */
 export function isWithinContactWindow(instantUtcMs: number): boolean {
