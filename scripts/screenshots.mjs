@@ -27,6 +27,23 @@ function start(cmd, args, env, waitText, port) {
 const api = await start('node', ['--env-file=.env', 'scripts/dev-api.mjs'], {}, 'dev-api:', 8787);
 const vite = await start('pnpm', ['dev'], {}, 'Local:', 5173);
 
+// Never leave orphan servers behind on a crash (they poison the next run's
+// ports 5173/8787).
+function cleanup() {
+  try { api.kill('SIGKILL'); } catch {}
+  try { vite.kill('SIGKILL'); } catch {}
+}
+process.on('uncaughtException', (err) => {
+  console.error(err);
+  cleanup();
+  process.exit(1);
+});
+process.on('unhandledRejection', (err) => {
+  console.error(err);
+  cleanup();
+  process.exit(1);
+});
+
 const browser = await chromium.launch();
 const shots = [];
 
@@ -59,6 +76,35 @@ function setLang(page, lang, label) {
   return page.evaluate((l) => window.localStorage.setItem('fc.lang', l), lang).then(() => page.reload({ waitUntil: 'networkidle' })).then(() => page.getByRole('button', { name: label }).first().waitFor({ timeout: 10000 }));
 }
 
+/** Capture the loan-detail sheets: Outcome (chips + promise date chips),
+ * the 5 s Undo toast after a Paid save, and the Blocked-by-window sheet
+ * with the clock frozen outside 08:00–19:00 IST. */
+async function shootDetailSheets(page, lang) {
+  await page.locator('button.sticky-btn-accent').click();
+  await page.waitForSelector('dialog.outcome-sheet');
+  await shoot(page, `outcome-${lang}`);
+  await page.getByRole('button', { name: /Promise to pay|भुगतान का वादा/ }).click();
+  await page.waitForTimeout(200);
+  await shoot(page, `outcome-promise-${lang}`);
+  await page.getByRole('button', { name: /Cancel|रद्द करें/ }).click();
+  await page.waitForSelector('dialog.outcome-sheet', { state: 'detached' });
+
+  await page.locator('button.sticky-btn-accent').click();
+  await page.getByRole('button', { name: /Paid|भुगतान किया/ }).click();
+  await page.getByRole('button', { name: /Save|सहेजें/ }).click();
+  await page.waitForSelector('.undo-toast');
+  await shoot(page, `undo-${lang}`);
+  await page.waitForSelector('.undo-toast', { state: 'detached', timeout: 8000 });
+
+  await page.clock.setFixedTime(new Date('2026-11-06T16:30:00Z'));
+  await page.locator('button.sticky-btn', { hasText: /Call|कॉल/ }).first().click();
+  await page.waitForSelector('dialog.blocked-sheet');
+  await shoot(page, `blocked-${lang}`);
+  await page.getByRole('button', { name: /Close|बंद करें/ }).click();
+  await page.waitForSelector('dialog.blocked-sheet', { state: 'detached' });
+  await page.clock.setFixedTime(new Date());
+}
+
 // --- login (default lang hi) ---
 const loginCtx = await newPage('hi');
 await loginCtx.page.getByText('साइन इन करें').first().waitFor({ timeout: 10000 });
@@ -72,21 +118,22 @@ await loginCtx.page.evaluate(() => window.localStorage.setItem('fc.lang', 'en'))
 await login(loginCtx.page, 'arjun.verma');
 await shoot(loginCtx.page, 'today-en');
 
-// --- detail (English) ---
+// --- detail (English) + sheets ---
 await loginCtx.page.locator('button.card').first().click();
 await loginCtx.page.waitForURL('**/loans/**', { timeout: 10000 });
 await loginCtx.page.waitForTimeout(400);
 await shoot(loginCtx.page, 'detail-en');
+await shootDetailSheets(loginCtx.page, 'en');
 
-// --- me + switch to Hindi ---
-await loginCtx.page.getByRole('button', { name: 'Me' }).click();
+// --- me (English): sync section with the just-queued item ---
+await loginCtx.page.locator('nav.bottom-nav').getByRole('button', { name: 'Me' }).click();
 await loginCtx.page.waitForURL('**/me', { timeout: 10000 });
 await shoot(loginCtx.page, 'me-en');
 await loginCtx.page.getByRole('group').getByRole('button', { name: 'हिंदी' }).click();
 await loginCtx.page.waitForTimeout(300);
 await shoot(loginCtx.page, 'me-hi');
 
-// --- today + detail (Hindi) ---
+// --- today + detail (Hindi) + sheets ---
 await loginCtx.page.getByRole('button', { name: 'आज' }).click();await loginCtx.page.waitForURL('**/today', { timeout: 10000 });
 await loginCtx.page.waitForTimeout(300);
 await shoot(loginCtx.page, 'today-hi');
@@ -94,6 +141,7 @@ await loginCtx.page.locator('button.card').first().click();
 await loginCtx.page.waitForURL('**/loans/**', { timeout: 10000 });
 await loginCtx.page.waitForTimeout(400);
 await shoot(loginCtx.page, 'detail-hi');
+await shootDetailSheets(loginCtx.page, 'hi');
 await loginCtx.context.close();
 
 // --- empty state (fresh context, empty assignments fulfilled) ---

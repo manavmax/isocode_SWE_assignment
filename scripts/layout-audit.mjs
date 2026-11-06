@@ -22,6 +22,23 @@ function start(cmd, args, env, waitText) {
 
 const api = await start('node', ['--env-file=.env', 'scripts/dev-api.mjs'], {}, 'dev-api:');
 const vite = await start('pnpm', ['dev'], {}, 'Local:');
+
+// Never leave orphan servers behind on a crash (they poison the next run's
+// ports 5173/8787).
+function cleanup() {
+  try { api.kill('SIGKILL'); } catch {}
+  try { vite.kill('SIGKILL'); } catch {}
+}
+process.on('uncaughtException', (err) => {
+  console.error(err);
+  cleanup();
+  process.exit(1);
+});
+process.on('unhandledRejection', (err) => {
+  console.error(err);
+  cleanup();
+  process.exit(1);
+});
 const browser = await chromium.launch();
 
 const AUDIT = () => {
@@ -39,8 +56,17 @@ const AUDIT = () => {
 };
 
 async function auditPage(name, page) {
-  const result = await page.evaluate(AUDIT);
-  console.log(`[${name}]`, JSON.stringify(result));
+  try {
+    const result = await page.evaluate(AUDIT);
+    console.log(`[${name}]`, JSON.stringify(result));
+  } catch (err) {
+    console.error(`[${name}] AUDIT FAILED:`, err.message);
+    console.error(`[${name}] url:`, page.url());
+    try {
+      console.error(`[${name}] body:`, (await page.locator('body').innerText()).slice(0, 300).replace(/\n/g, ' | '));
+    } catch {}
+    throw err;
+  }
 }
 
 async function login(page, username) {
@@ -49,6 +75,40 @@ async function login(page, username) {
   await page.getByRole('button', { name: /Sign in|साइन इन/ }).click();
   await page.waitForURL('**/today', { timeout: 15000 });
   await page.waitForTimeout(400);
+}
+
+/** Drive the loan detail into every new sheet state and audit each one.
+ * The Blocked sheet needs the clock OUTSIDE 08:00–19:00 IST: Playwright's
+ * clock API freezes Date (16:30Z = 22:00 IST), so the skew-corrected window
+ * check fails exactly as it would at night in the field. */
+async function auditDetailSheets(page, lang) {
+  // Outcome sheet: chips + kind toggle.
+  await page.locator('button.sticky-btn-accent').click();
+  await page.waitForSelector('dialog.outcome-sheet');
+  await auditPage(`outcome-${lang}`, page);
+  // Promise date chips (amount prefilled, validated client-side).
+  await page.getByRole('button', { name: /Promise to pay|भुगतान का वादा/ }).click();
+  await page.waitForTimeout(150);
+  await auditPage(`outcome-promise-${lang}`, page);
+  await page.getByRole('button', { name: /Cancel|रद्द करें/ }).click();
+
+  // Save a Paid outcome: pending outbox item + 5 s Undo toast (no promise
+  // side effects on the shared demo DB).
+  await page.locator('button.sticky-btn-accent').click();
+  await page.getByRole('button', { name: /Paid|भुगतान किया/ }).click();
+  await page.getByRole('button', { name: /Save|सहेजें/ }).click();
+  await page.waitForSelector('.undo-toast');
+  await auditPage(`undo-${lang}`, page);
+  await page.waitForSelector('.undo-toast', { state: 'detached', timeout: 8000 });
+
+  // Blocked-by-window sheet (button looks muted but stays tappable).
+  await page.clock.setFixedTime(new Date('2026-11-06T16:30:00Z'));
+  await page.locator('button.sticky-btn', { hasText: /Call|कॉल/ }).first().click();
+  await page.waitForSelector('dialog.blocked-sheet');
+  await auditPage(`blocked-${lang}`, page);
+  await page.getByRole('button', { name: /Close|बंद करें/ }).click();
+  await page.waitForSelector('dialog.blocked-sheet', { state: 'detached' });
+  await page.clock.setFixedTime(new Date());
 }
 
 for (const lang of ['hi', 'en']) {
@@ -65,8 +125,9 @@ for (const lang of ['hi', 'en']) {
   await page.waitForURL('**/loans/**');
   await page.waitForTimeout(400);
   await auditPage(`detail-${lang}`, page);
-  await page.getByRole('button', { name: /Me|मेरी जानकारी/ }).click();
-  await page.waitForTimeout(300);
+  await auditDetailSheets(page, lang);
+  await page.locator('nav.bottom-nav').getByRole('button', { name: /Me|मेरी जानकारी/ }).click();
+  await page.waitForTimeout(500);
   await auditPage(`me-${lang}`, page);
   await context.close();
 }
