@@ -1,7 +1,5 @@
 export type Lang = 'hi' | 'en';
 
-/** One dictionary file (SPEC 15). Values use {param} slots filled by t();
- * never concatenated fragments. Hindi uses polite "aap" throughout. */
 const en = {
   appName: 'Field Collections',
   navToday: 'Today',
@@ -15,6 +13,7 @@ const en = {
   loginNetwork: "Couldn't reach server. Check your connection and try again.",
   loginThrottled: 'Too many attempts. Try again in a few minutes.',
   loginLanguageLabel: 'Choose language',
+  sessionExpired: 'Your session has expired. Please sign in again.',
   todayTitle: "Today's visits",
   todayVisits: '{n} visits assigned',
   todayVisitsOne: '1 visit assigned',
@@ -62,14 +61,78 @@ const en = {
   notFoundTitle: 'Not found',
   notFoundBody: 'This loan is not in your assignments.',
   back: 'Back',
-  demoBadge: '(demo)'
+  demoBadge: '(demo)',
+  // Sticky bar
+  callButton: 'Call',
+  callLoading: 'Opening…',
+  mapButtonLabel: 'Map',
+  logOutcome: 'Log outcome',
+  // Reveal errors
+  revealOffline: 'Connect once online to reveal this number',
+  revealError: "Couldn't reveal number. Try again.",
+  revealOutsideWindow: "Couldn't reveal number. Contact is allowed 8 am to 7 pm.",
+  dismiss: 'Dismiss',
+  // Outcome sheet
+  outcomeSheetTitle: 'Log outcome',
+  kindToggle: 'Contact type',
+  kindCall: 'Call',
+  kindVisit: 'Visit',
+  outcomeLabel: 'What happened?',
+  outcomePaid: 'Paid',
+  outcomePromise: 'Promise to pay',
+  outcomeNotReachable: 'Not reachable',
+  outcomeDispute: 'Dispute',
+  outcomeWrongNumber: 'Wrong number',
+  addDetails: 'Add details',
+  notePlaceholder: 'Add a note (optional)',
+  promiseAmountLabel: 'Amount (₹)',
+  promiseDateToday: 'Today',
+  promiseDateTomorrow: 'Tomorrow',
+  promiseDatePlus3: '+3 days',
+  promiseDateRolled: '* Sunday — shifted to Monday',
+  promiseErrInvalidDate: 'Enter a valid date.',
+  promiseErrBeforeToday: 'The promise date cannot be before today.',
+  promiseErrTooFarOut: 'The promise date is too far ahead (7 days, 10 for this bucket).',
+  promiseErrSunday: 'Promises cannot fall on a Sunday. Pick another day.',
+  promiseErrAmountPositive: 'Enter an amount greater than zero.',
+  promiseErrAmountLow: 'The amount must be at least half the overdue amount.',
+  promiseErrAmountHigh: 'The amount cannot exceed the outstanding balance.',
+  promiseErrReschedule: 'This promise has been rescheduled twice already. Ask your manager.',
+  cancel: 'Cancel',
+  save: 'Save',
+  // Undo toast
+  undoMessage: 'Saved on phone',
+  undo: 'Undo',
+  // Blocked sheet
+  blockedTitle: 'Contact window closed',
+  blockedBody: 'Contact allowed 8 am to 7 pm. Your attempt has been logged.',
+  blockedRuleLabel: 'Rule',
+  close: 'Close',
+  // Sync
+  syncTitle: 'Sync',
+  syncNow: 'Sync now',
+  syncing: 'Syncing…',
+  syncPending: 'Pending',
+  syncFailed: 'Failed',
+  syncSynced: 'Synced',
+  syncPendingNote: 'Updates are saved on this phone and will sync automatically.',
+  syncEmpty: 'No synced items yet.',
+  syncLast: 'Last sync',
+  retry: 'Retry',
+  discard: 'Discard',
+  statePending: 'Pending',
+  stateFailed: 'Failed',
+  stateSynced: 'Synced',
+  // Sync pill
+  pillPending: 'pending',
+  pillFailed: 'failed',
+  pillSynced: 'synced',
+  // Persistence
+  persistWarn: 'Storage not persistent — install to Home Screen to avoid data loss.',
+  persistOk: 'Storage is persistent.'
 };
 
-export type Dict = typeof en;
-
-/** Hindi copy: polite register ("aap"), spoken-finance phrasing.
- * NOTE: native review pending (docs/assumptions.md A49). */
-const hi: Dict = {
+const hi: typeof en = {
   appName: 'फील्ड कलेक्शन',
   navToday: 'आज',
   navMe: 'मेरी जानकारी',
@@ -82,6 +145,7 @@ const hi: Dict = {
   loginNetwork: 'सर्वर से संपर्क नहीं हो पाया। कनेक्शन जाँचकर फिर कोशिश करें।',
   loginThrottled: 'बहुत अधिक कोशिशें हो गईं। कुछ मिनट बाद फिर कोशिश करें।',
   loginLanguageLabel: 'भाषा चुनें',
+  sessionExpired: 'आपका सेशन समाप्त हो गया। कृपया फिर से साइन इन करें।',
   todayTitle: 'आज की विज़िट',
   todayVisits: '{n} विज़िट सौंपी गई हैं',
   todayVisitsOne: '1 विज़िट सौंपी गई है',
@@ -129,11 +193,71 @@ const hi: Dict = {
   notFoundTitle: 'नहीं मिला',
   notFoundBody: 'यह लोन आपकी सूची में नहीं है।',
   back: 'वापस',
-  demoBadge: '(डेमो)'
+  demoBadge: '(डेमो)',
+  callButton: 'कॉल',
+  callLoading: 'खोल रहा है…',
+  mapButtonLabel: 'नक्शा',
+  logOutcome: 'परिणाम लिखें',
+  revealOffline: 'इस नंबर को जानने के लिए एक बार ऑनलाइन कनेक्ट करें',
+  revealError: 'नंबर नहीं देखा जा सका। फिर कोशिश करें।',
+  revealOutsideWindow: 'नंबर नहीं देखा जा सका। संपर्क सुबह 8 बजे से रात 7 बजे तक ही है।',
+  dismiss: 'बंद करें',
+  outcomeSheetTitle: 'परिणाम लिखें',
+  kindToggle: 'संपर्क का प्रकार',
+  kindCall: 'कॉल',
+  kindVisit: 'विज़िट',
+  outcomeLabel: 'क्या हुआ?',
+  outcomePaid: 'भुगतान किया',
+  outcomePromise: 'भुगतान का वादा',
+  outcomeNotReachable: 'पहुँच नहीं हो पाया',
+  outcomeDispute: 'विवाद',
+  outcomeWrongNumber: 'ग़लत नंबर',
+  addDetails: 'विवरण जोड़ें',
+  notePlaceholder: 'नोट जोड़ें (वैकल्पिक)',
+  promiseAmountLabel: 'राशि (₹)',
+  promiseDateToday: 'आज',
+  promiseDateTomorrow: 'कल',
+  promiseDatePlus3: '+3 दिन',
+  promiseDateRolled: '* रविवार — सोमवार को स्थानांतरित',
+  promiseErrInvalidDate: 'मान्य तारीख चुनें।',
+  promiseErrBeforeToday: 'वादे की तारीख आज से पहले नहीं हो सकती।',
+  promiseErrTooFarOut: 'वादे की तारीख बहुत आगे है (7 दिन, इस बकेट में 10 दिन)।',
+  promiseErrSunday: 'वादा रविवार को नहीं हो सकता। कोई और दिन चुनें।',
+  promiseErrAmountPositive: 'शून्य से अधिक राशि भरें।',
+  promiseErrAmountLow: 'राशि कम से कम बकाया के आधे से भी ज़्यादा होनी चाहिए।',
+  promiseErrAmountHigh: 'राशि कुल बाकी रकम से अधिक नहीं हो सकती।',
+  promiseErrReschedule: 'इस वादे को पहले ही दो बार बदला जा चुका है। प्रबंधक से बात करें।',
+  cancel: 'रद्द करें',
+  save: 'सहेजें',
+  undoMessage: 'फ़ोन पर सहेजा गया',
+  undo: 'पूर्ववत करें',
+  blockedTitle: 'संपर्क विंडो बंद है',
+  blockedBody: 'संपर्क सुबह 8 बजे से रात 7 बजे तक। आपकी कोशिश दर्ज कर ली गई है।',
+  blockedRuleLabel: 'नियम',
+  close: 'बंद करें',
+  syncTitle: 'सिंक',
+  syncNow: 'अभी सिंक करें',
+  syncing: 'सिंक हो रहा है…',
+  syncPending: 'बाकी',
+  syncFailed: 'विफल',
+  syncSynced: 'सिंक हुआ',
+  syncPendingNote: 'अपडेट इस फ़ोन पर सहेजे गए हैं और स्वचालित रूप से सिंक होंगे।',
+  syncEmpty: 'अभी तक कोई सिंक आइटम नहीं।',
+  syncLast: 'आख़िरी सिंक',
+  retry: 'फिर कोशिश',
+  discard: 'हटाएँ',
+  statePending: 'बाकी',
+  stateFailed: 'विफल',
+  stateSynced: 'सिंक हुआ',
+  pillPending: 'बाकी',
+  pillFailed: 'विफल',
+  pillSynced: 'सिंक हुआ',
+  persistWarn: 'स्टोरेज स्थायी नहीं है — डेटा संरक्षण के लिए होम स्क्रीन में इंस्टॉल करें।',
+  persistOk: 'स्टोरेज स्थायी है।'
 };
 
-export const dictionaries: Record<Lang, Dict> = { en, hi };
-
+export const dictionaries: Record<Lang, typeof en> = { en, hi };
+export type Dict = typeof en;
 export type DictKey = keyof Dict;
 
 export function t(lang: Lang, key: DictKey, params?: Record<string, string | number>): string {

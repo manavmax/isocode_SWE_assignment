@@ -368,3 +368,476 @@ button.card:hover {
   margin-bottom: var(--sp-3);
   text-align: center;
 }
+/* === Sticky action bar (LoanDetail) === */
+.sticky-bar {
+  position: fixed;
+  bottom: 64px;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border-top: var(--border);
+  display: flex;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  z-index: 8;
+}
+
+.sticky-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--target-primary);
+  border-radius: var(--radius);
+  font-size: var(--font-size-14);
+  font-weight: 600;
+  border: var(--border-strong);
+  background: var(--surface);
+  color: var(--accent-strong);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.sticky-btn:hover {
+  background: var(--grey-100);
+}
+
+.sticky-btn-accent {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.sticky-btn-accent:hover {
+  background: var(--accent-strong);
+}
+
+.sticky-btn-loading {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+/* SPEC 7 layer (a): outside the window the Call button LOOKS disabled but
+ * stays tappable — tapping records a BLOCKED attempt and opens the notice. */
+.sticky-btn-muted {
+  opacity: 0.45;
+  color: var(--grey-500);
+  background: var(--grey-100);
+  border-color: var(--grey-200);
+}
+
+/* Reveal error */
+.reveal-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  background: var(--status-warn-soft);
+  color: var(--status-warn);
+  border: var(--border);
+  border-radius: var(--radius);
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--font-size-14);
+  margin-bottom: var(--sp-3);
+}
+
+/* === Bottom sheets (dialog) === */
+dialog.outcome-sheet,
+dialog.blocked-sheet {
+  position: fixed;
+  inset: auto 0 0 0;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  border: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 0;
+  background: var(--surface);
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
+  animation: sheetSlideUp 200ms ease-out;
+}
+
+dialog.blocked-sheet {
+  border-radius: var(--radius);
+  margin: auto;
+  inset: 0;
+  width: min(480px, calc(100vw - 32px));
+  height: fit-content;
+  max-height: 80dvh;
+  align-self: center;
+}
+
+@keyframes sheetSlideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+.sheet-content {
+  padding: var(--sp-4) var(--sp-4) calc(var(--sp-6) + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.sheet-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--grey-300);
+  margin: 0 auto var(--sp-2);
+}
+
+.sheet-title {
+  font-size: var(--font-size-18);
+  font-weight: 600;
+  text-align: center;
+}
+
+.blocked-title {
+  font-size: var(--font-size-18);
+  font-weight: 600;
+  text-align: center;
+  color: var(--status-warn);
+}
+
+.blocked-body {
+  font-size: var(--font-size-14);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.blocked-rule {
+  font-size: var(--font-size-12);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.blocked-rule code {
+  font-size: var(--font-size-12);
+  background: var(--grey-100);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.sheet-actions {
+  display: flex;
+  gap: var(--sp-3);
+  margin-top: var(--sp-2);
+}
+
+.sheet-actions .btn {
+  flex: 1;
+}
+
+/* Chip selected state */
+.chip-selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+/* Outcome chip — larger touch targets */
+.outcome-chip {
+  min-height: var(--target-min);
+  font-size: var(--font-size-14);
+}
+
+/* Kind toggle in outcome sheet */
+.kind-toggle {
+  border-bottom: var(--border);
+  padding-bottom: var(--sp-3);
+}
+
+/* Promise fields */
+.promise-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  background: var(--grey-100);
+  border-radius: var(--radius);
+  padding: var(--sp-3);
+}
+
+.promise-amount-label {
+  font-size: var(--font-size-12);
+  color: var(--text-muted);
+}
+
+.promise-amount-input {
+  min-height: var(--target-min);
+  border: var(--border-strong);
+  border-radius: var(--radius);
+  padding: 0 var(--sp-3);
+  background: var(--surface);
+  font-size: var(--font-size-16);
+  font-weight: 600;
+}
+
+.chip-sunday {
+  opacity: 0.7;
+}
+
+.field-note {
+  font-size: var(--font-size-12);
+  color: var(--status-warn);
+  margin: 0;
+}
+
+.add-note-btn {
+  width: 100%;
+  font-size: var(--font-size-14);
+  color: var(--text-muted);
+  border: 1px dashed var(--border-strong);
+  background: transparent;
+}
+
+.note-input {
+  width: 100%;
+  min-height: 80px;
+  border: var(--border-strong);
+  border-radius: var(--radius);
+  padding: var(--sp-3);
+  font-size: var(--font-size-14);
+  resize: vertical;
+  background: var(--surface);
+}
+
+/* === Undo toast === */
+.undo-toast {
+  position: fixed;
+  bottom: calc(64px + var(--sp-4));
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--grey-900);
+  color: #ffffff;
+  border-radius: var(--radius);
+  padding: var(--sp-3) var(--sp-4);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  font-size: var(--font-size-14);
+  z-index: 20;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  animation: toastIn 200ms ease-out;
+  white-space: nowrap;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.undo-text {
+  flex: 1;
+}
+
+.undo-action {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: var(--font-size-14);
+  padding: var(--sp-2) var(--sp-3);
+  min-height: var(--target-min); /* SPEC 15: 48 dp minimum tap target */
+  cursor: pointer;
+}
+
+/* === Today header row === */
+.today-header-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+/* === Sync pill === */
+.sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--target-min); /* SPEC 15: 48 dp minimum tap target (it opens Sync now) */
+  padding: 0 var(--sp-4);
+  border-radius: 999px;
+  border: var(--border);
+  background: var(--surface);
+  font-size: var(--font-size-12);
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.sync-dot-ok    { background: var(--status-ok); }
+.sync-dot-pending { background: var(--status-warn); }
+.sync-dot-fail  { background: var(--status-danger); }
+
+/* === Sync section (Me) === */
+.sync-section {
+  background: var(--surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+
+.sync-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.sync-now-btn {
+  min-height: var(--target-min); /* SPEC 15: 48 dp minimum tap target */
+  font-size: var(--font-size-12);
+  padding: 0 var(--sp-4);
+}
+
+.sync-counts {
+  display: flex;
+  gap: var(--sp-4);
+}
+
+.sync-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.sync-count-value {
+  font-size: var(--font-size-22);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sync-count-chip {
+  font-size: var(--font-size-10);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sync-count-chip-pending { color: var(--status-warn); }
+.sync-count-chip-failed  { color: var(--status-danger); }
+.sync-count-chip-synced  { color: var(--status-ok); }
+
+.sync-note {
+  font-size: var(--font-size-12);
+  color: var(--text-muted);
+}
+
+.sync-last {
+  font-size: var(--font-size-12);
+  color: var(--text-faint);
+  text-align: right;
+}
+
+.sync-empty {
+  font-size: var(--font-size-14);
+  color: var(--text-faint);
+  text-align: center;
+}
+
+/* Outbox list */
+.outbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.outbox-item {
+  background: var(--grey-100);
+  border-radius: var(--radius);
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.outbox-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.outbox-id {
+  font-size: var(--font-size-12);
+  font-weight: 600;
+  color: var(--grey-700);
+  text-transform: capitalize;
+}
+
+.outbox-chip {
+  font-size: var(--font-size-10);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.outbox-chip-pending { background: var(--status-warn-soft); color: var(--status-warn); }
+.outbox-chip-failed  { background: var(--status-danger-soft); color: var(--status-danger); }
+.outbox-chip-synced  { background: var(--status-ok-soft); color: var(--status-ok); }
+
+.outbox-error {
+  font-size: var(--font-size-11);
+  color: var(--status-danger);
+  margin: 0;
+}
+
+.outbox-warning {
+  font-size: var(--font-size-11);
+  color: var(--status-warn);
+  margin: 0;
+}
+
+.outbox-actions {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+}
+
+/* Small buttons */
+.btn-sm {
+  min-height: var(--target-min); /* still a tap target, just typographically small*/
+  font-size: var(--font-size-12);
+  padding: 0 var(--sp-3);
+}
+
+.btn-danger {
+  color: var(--status-danger);
+  border-color: var(--status-danger);
+}
+
+.btn-loading {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+/* Persistence status */
+.persist-warn {
+  font-size: var(--font-size-12);
+  color: var(--status-warn);
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--status-warn-soft);
+  border-radius: var(--radius);
+}
+
+.persist-ok {
+  font-size: var(--font-size-12);
+  color: var(--status-ok);
+  margin: 0;
+}
