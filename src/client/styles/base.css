@@ -60,16 +60,19 @@ input {
   font-feature-settings: 'tnum' 1;
 }
 
-:lang(hi) {
+/* Hindi ~1.1x Latin size, on the root only so it does not compound (SPEC 15) */
+html:lang(hi) {
   font-size: 1.1em;
+}
+
+:lang(hi) {
   line-height: 1.55;
 }
 
-:lang(hi) button,
 :lang(hi) .chip,
 :lang(hi) .nav-item {
   white-space: normal;
-  min-width: max-content;
+  min-width: 0;
 }
 
 :focus-visible {
