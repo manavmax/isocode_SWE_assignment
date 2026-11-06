@@ -29,7 +29,7 @@ import type { Actor } from './dal.js';
 export const CLOCK_AHEAD_ALLOWANCE_MS = 2 * 60_000;
 /** A supplied skew smaller than this means the stamp was taken right after
  * the last flush, so the corrected time is 'high' confidence (SPEC 7: fresh
- * sync and skew < 5 min). A5x: approximation — freshness is inferred. */
+ * sync and skew < 5 min). A52: approximation — freshness is inferred. */
 export const SKEW_FRESH_MAX_MS = 5 * 60_000;
 
 export interface BatchItemResult {
