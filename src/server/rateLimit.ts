@@ -32,17 +32,34 @@ export function loginThrottleKey(username: string, clientIp: string): string {
   return `${username}|${clientIp}`;
 }
 
-/** Pure window math: a row whose window has expired is treated as absent and
- * the next recorded failure opens a fresh window (DB does the rollover). */
-export function throttleDecision(row: AttemptRow | null | undefined, nowMs: number): LoginThrottle {
-  if (!row || nowMs - row.windowStart.getTime() >= LOGIN_WINDOW_MS) {
-    return { blocked: false, retryAfterMs: 0, failures: 0 };
+/** Pure fixed-window math, parameterised so the same rule shape serves both
+ * the login throttle (5 per 15 min) and the phone-reveal limiter (30 per hour
+ * per officer, A56). A row whose window has expired is treated as absent and
+ * the next increment opens a fresh window (DB does the rollover). */
+export function windowDecision(
+  row: AttemptRow | null | undefined,
+  nowMs: number,
+  windowMs: number,
+  maxCount: number
+): { blocked: boolean; retryAfterMs: number; count: number } {
+  if (!row || nowMs - row.windowStart.getTime() >= windowMs) {
+    return { blocked: false, retryAfterMs: 0, count: 0 };
   }
-  const blocked = row.failCount >= MAX_FAILURES_PER_WINDOW;
+  const blocked = row.failCount >= maxCount;
   return {
     blocked,
-    retryAfterMs: blocked ? Math.max(1, Math.ceil(row.windowStart.getTime() + LOGIN_WINDOW_MS - nowMs)) : 0,
-    failures: row.failCount
+    retryAfterMs: blocked ? Math.max(1, Math.ceil(row.windowStart.getTime() + windowMs - nowMs)) : 0,
+    count: row.failCount
+  };
+}
+
+/** The login policy expressed through the generic decision. */
+export function throttleDecision(row: AttemptRow | null | undefined, nowMs: number): LoginThrottle {
+  const decision = windowDecision(row, nowMs, LOGIN_WINDOW_MS, MAX_FAILURES_PER_WINDOW);
+  return {
+    blocked: decision.blocked,
+    retryAfterMs: decision.retryAfterMs,
+    failures: decision.count
   };
 }
 
@@ -60,9 +77,9 @@ export async function findLoginAttempts(key: string): Promise<AttemptRow | null>
  * exists — start a fresh window with count 1 if the old window expired,
  * otherwise increment. In the conflict update, the table-qualified columns
  * read the existing row (Postgres ON CONFLICT semantics). */
-export async function recordLoginFailure(key: string, nowMs: number): Promise<void> {
+export async function incrementFixedWindow(key: string, nowMs: number, windowMs: number): Promise<void> {
   const db = getDb();
-  const cutoff = new Date(nowMs - LOGIN_WINDOW_MS).toISOString();
+  const cutoff = new Date(nowMs - windowMs).toISOString();
   const now = new Date(nowMs).toISOString();
   await db
     .insert(loginAttempts)
@@ -74,6 +91,10 @@ export async function recordLoginFailure(key: string, nowMs: number): Promise<vo
         windowStart: sql`case when ${loginAttempts.windowStart} <= ${cutoff}::timestamptz then ${now}::timestamptz else ${loginAttempts.windowStart} end`
       }
     });
+}
+
+export async function recordLoginFailure(key: string, nowMs: number): Promise<void> {
+  return incrementFixedWindow(key, nowMs, LOGIN_WINDOW_MS);
 }
 
 export async function clearLoginFailures(key: string): Promise<void> {

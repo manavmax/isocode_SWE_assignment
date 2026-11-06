@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { LOGIN_WINDOW_MS, loginThrottleKey, MAX_FAILURES_PER_WINDOW, throttleDecision, type AttemptRow } from './rateLimit.js';
+import {
+  LOGIN_WINDOW_MS,
+  loginThrottleKey,
+  MAX_FAILURES_PER_WINDOW,
+  throttleDecision,
+  windowDecision,
+  type AttemptRow
+} from './rateLimit.js';
 
 const T0 = 5_000_000; // a fixed epoch ms
 
@@ -40,5 +47,44 @@ describe('throttleDecision (window math; the counter lives in the login_attempt 
     const fresh = throttleDecision(attemptRow(MAX_FAILURES_PER_WINDOW, T0), T0);
     const aged = throttleDecision(attemptRow(MAX_FAILURES_PER_WINDOW, T0), T0 + LOGIN_WINDOW_MS - 1);
     expect(aged.retryAfterMs).toBeLessThan(fresh.retryAfterMs);
+  });
+});
+
+/**
+ * The generic fixed-window counter (reveal limiter, A56): same login-attempt
+ * table, same upsert shape, parameterised window and cap. 30 reveals per
+ * officer per hour is the reveal policy.
+ */
+const REVEAL_WINDOW_MS = 60 * 60_000;
+const REVEAL_MAX_PER_WINDOW = 30;
+
+describe('windowDecision — shared fixed-window math (reveal: 30/hour per officer)', () => {
+  it('is open with no row or an expired row and reports count 0', () => {
+    expect(windowDecision(null, T0, REVEAL_WINDOW_MS, REVEAL_MAX_PER_WINDOW)).toEqual({
+      blocked: false,
+      retryAfterMs: 0,
+      count: 0
+    });
+    const expired = attemptRow(REVEAL_MAX_PER_WINDOW, T0 - REVEAL_WINDOW_MS);
+    expect(windowDecision(expired, T0, REVEAL_WINDOW_MS, REVEAL_MAX_PER_WINDOW).blocked).toBe(false);
+  });
+
+  it('stays open at -1 and blocks exactly at the cap inside the window', () => {
+    expect(windowDecision(attemptRow(29, T0), T0, REVEAL_WINDOW_MS, REVEAL_MAX_PER_WINDOW).blocked).toBe(false);
+    expect(windowDecision(attemptRow(30, T0), T0, REVEAL_WINDOW_MS, REVEAL_MAX_PER_WINDOW).blocked).toBe(true);
+  });
+
+  it('re-opens the instant the hour lapses and answers a usable Retry-After while blocked', () => {
+    const blocked = attemptRow(30, T0);
+    expect(windowDecision(blocked, T0 + REVEAL_WINDOW_MS, REVEAL_WINDOW_MS, REVEAL_MAX_PER_WINDOW).blocked).toBe(false);
+    const nearClose = windowDecision(blocked, T0 + 1000, REVEAL_WINDOW_MS, REVEAL_MAX_PER_WINDOW);
+    expect(nearClose.retryAfterMs).toBeGreaterThan(0);
+    expect(nearClose.retryAfterMs).toBeLessThanOrEqual(REVEAL_WINDOW_MS);
+  });
+
+  it('the login decision is the generic one with its own policy numbers', () => {
+    expect(throttleDecision(attemptRow(5, T0), T0).blocked).toBe(
+      windowDecision(attemptRow(5, T0), T0, LOGIN_WINDOW_MS, MAX_FAILURES_PER_WINDOW).blocked
+    );
   });
 });
