@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * POST /api/events/batch with NO live database — same fake-driver approach as
@@ -448,7 +448,8 @@ describe('POST /api/events/batch — window and confidence derivation (server ti
     await res.json();
     const value = eventWrites()[0]!.value;
     expect(value.timeConfidence).toBe('high');
-    // skew = serverNow - clientTime, so corrected = device - skew.
+    // Convention (A52): positive skew_estimate_ms = device clock FAST; the
+    // server corrects via device - skew, so a -4s skew means the device is slow.
     expect(value.attemptedAtIst).toEqual(new Date(Date.parse('2026-11-06T04:00:00.000Z') + 4_000));
   });
 
@@ -559,6 +560,66 @@ describe('POST /api/events/batch — promises (SPEC 12 in the same transaction)'
     const supersede = h.writes.find((w) => w.kind === 'promise-supersede')!;
     expect(supersede.value).toMatchObject({ status: 'superseded', supersededBy: promiseWrite.generatedId });
     expect(supersede.value.supersededBy).not.toBe('old-promise-id'); // points at the new row
+  });
+});
+
+describe('POST /api/events/batch — promise window judged on the attempt date (A51)', () => {
+  beforeEach(() => {
+    h.queue.length = 0;
+    h.writes.length = 0;
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('a promise logged 3 days earlier with a date valid THEN syncs fine (attempt date, not server today)', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-06T05:45:00.000Z')); // server Thu 11:15 IST
+    // Attempted Monday 11:31 IST with a 60s skew (corrected Monday 11:30 IST).
+    const payload = eventPayload({
+      attempted_at_device: '2026-11-03T06:01:00.000Z', // Mon 11:31 IST
+      skew_estimate_ms: 60_000, // device 60s fast (A52: skew = device - true); corrected = Mon 11:30 IST
+      outcome: 'promise_to_pay',
+      promised_date: '2026-11-04', // Tuesday: valid on Monday (today+1)
+      promised_amount: 25_000
+    });
+    h.queue.push(loanRow());
+    h.queue.push([]); // no existing event
+    h.queue.push([]); // no open promise
+    h.queue.push([]); // no superseded chain
+    const res = await post({ events: [payload] });
+    const body = (await res.json()) as { items: { status: string; reason?: string }[] };
+    expect(body.items[0]!.status).toBe('created');
+    expect(body.items[0]!.reason).toBeUndefined();
+    const value = eventWrites()[0]!.value;
+    expect(value.attemptedAtIst).toEqual(new Date(Date.parse('2026-11-03T06:00:00.000Z'))); // corrected Mon 11:30 IST
+    expect(value.ruleSet).toBe('RBC2025_para100');
+    expect(promiseWrites()[0]!.value).toMatchObject({ promisedDate: '2026-11-04', promisedAmount: 25_000 });
+  });
+
+  it('a promise whose date was ALREADY invalid at attempt time is still flagged (valid per server today proves the attempt-date check ran)', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-06T05:45:00.000Z'));
+    // Attempted Monday: attempt-day + 9 days is past Monday's +7 window, but
+    // inside the SERVER's +7 (2026-11-06 .. 11-13). Only an attempt-date check
+    // can flag this.
+    h.queue.push(loanRow());
+    h.queue.push([]);
+    h.queue.push([]);
+    h.queue.push([]);
+    const res = await post({
+      events: [
+        eventPayload({
+          attempted_at_device: '2026-11-03T05:30:00.000Z', // Mon 11:00 IST
+          outcome: 'promise_to_pay',
+          promised_date: '2026-11-12',
+          promised_amount: 25_000
+        })
+      ]
+    });
+    const body = (await res.json()) as { items: { status: string; reason?: string }[] };
+    expect(body.items[0]!.reason).toBe('date_too_far_out');
+    expect(h.writes).toHaveLength(0);
   });
 });
 

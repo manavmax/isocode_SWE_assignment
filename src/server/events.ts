@@ -13,6 +13,9 @@
  * Writes go in one transaction per item: the contact_event append (idempotent,
  * ON CONFLICT (id) DO NOTHING) plus, for a valid promise outcome, the
  * promise row (SPEC 12) and the superseding update of any previous promise.
+ * The promise window is judged on the ATTEMPT's IST date (the skew-corrected
+ * best estimate, A51) — a promise made offline on Monday and synced on
+ * Thursday is valid if it was valid on Monday.
  */
 import { and, eq, or } from 'drizzle-orm';
 import { getDb, withTx } from './db.js';
@@ -280,7 +283,7 @@ async function gradeEventItem(
         promised_amount: event.promised_amount ?? -1
       },
       {
-        todayIst: istDateKey(nowMs),
+        todayIst: timing.attemptDateIstKey,
         bucket: loan.bucket,
         overduePaise: loan.overdueAmount,
         outstandingPaise: loan.outstanding,
