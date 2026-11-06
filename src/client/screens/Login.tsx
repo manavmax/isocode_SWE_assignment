@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { t as translate, type Lang } from '../i18n/dictionary.js';
 
-export function Login({ lang, setLang, onSignedIn }: { lang: Lang; setLang: (lang: Lang) => void; onSignedIn: () => void }) {
+export function Login({ lang, setLang, onSignedIn, sessionExpired }: { lang: Lang; setLang: (lang: Lang) => void; onSignedIn: () => void; sessionExpired?: boolean }) {
   const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
   const [demoUsernames, setDemoUsernames] = useState<string[]>([]);
@@ -97,6 +97,11 @@ export function Login({ lang, setLang, onSignedIn }: { lang: Lang; setLang: (lan
         {errorKey === 'network' ? (
           <p className="state-body" role="alert" style={{ color: 'var(--status-danger)' }}>
             {tr('loginNetwork')}
+          </p>
+        ) : null}
+        {sessionExpired ? (
+          <p className="state-body" role="alert" style={{ color: 'var(--status-warn)' }}>
+            {tr('sessionExpired')}
           </p>
         ) : null}
         <button type="submit" className="btn btn-primary" disabled={submitting || username.length === 0 || pin.length === 0}>

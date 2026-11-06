@@ -5,6 +5,8 @@ import { formatIstTime } from '../../shared/datetime.js';
 import { formatRupeePaise } from '../../shared/money.js';
 import { t as translate, type Lang } from '../i18n/dictionary.js';
 import { BucketChip, EmptyState, ErrorState, OfflineBanner, SkeletonList } from '../components/States.js';
+import { useOutboxCounts } from '../sync/useOutboxCounts.js';
+import { syncNow } from '../sync/scheduler.js';
 
 type Load = 'loading' | 'empty' | 'error' | 'ready';
 
@@ -15,6 +17,7 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
   const [offline, setOffline] = useState(false);
   const [fromCache, setFromCache] = useState(false);
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const counts = useOutboxCounts();
 
   const tr = (key: Parameters<typeof translate>[1], params?: Record<string, string | number>) => translate(lang, key, params);
 
@@ -77,13 +80,33 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
   const sorted = [...loans].sort((a, b) => b.dpd - a.dpd || a.loanId.localeCompare(b.loanId));
   const visitCount = sorted.length;
 
+  function syncPillLabel(): string {
+    if (counts.failed > 0) return `${counts.failed} ${tr('pillFailed')}`;
+    if (counts.pending > 0) return `${counts.pending} ${tr('pillPending')}`;
+    return tr('pillSynced');
+  }
+
   return (
     <main className="screen">
       <header className="screen-header">
-        <h1 className="screen-title">{tr('todayTitle')}</h1>
-        <p className="screen-subtitle">
-          {visitCount === 1 ? tr('todayVisitsOne') : tr('todayVisits', { n: visitCount })} · {tr('todayLastUpdated', { time: fetchedAt ? formatIstTime(fetchedAt) : '—' })}
-        </p>
+        <div className="today-header-row">
+          <div>
+            <h1 className="screen-title">{tr('todayTitle')}</h1>
+            <p className="screen-subtitle">
+              {visitCount === 1 ? tr('todayVisitsOne') : tr('todayVisits', { n: visitCount })} · {tr('todayLastUpdated', { time: fetchedAt ? formatIstTime(fetchedAt) : '—' })}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="sync-pill"
+            onClick={() => void syncNow()}
+            title={tr('syncNow')}
+            aria-live="polite"
+          >
+            <span className={`sync-dot ${counts.failed > 0 ? 'sync-dot-fail' : counts.pending > 0 ? 'sync-dot-pending' : 'sync-dot-ok'}`} aria-hidden="true" />
+            {syncPillLabel()}
+          </button>
+        </div>
       </header>
       {offline || !online ? <OfflineBanner text={tr('offlineBanner')} /> : null}
       {load === 'loading' ? <SkeletonList /> : null}

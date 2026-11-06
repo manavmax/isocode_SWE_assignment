@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api, type ApiUser } from './api.js';
 import { useLang } from './i18n/LangContext.js';
 import { useRoute } from './router.js';
+import { startSyncScheduler } from './sync/scheduler.js';
+import { resetLoginRequired } from './sync/engine.js';
 
 import { Login } from './screens/Login.js';
 import { Today } from './screens/Today.js';
@@ -15,6 +17,7 @@ export function App() {
   const [route, navigate] = useRoute();
   const [auth, setAuth] = useState<Auth>('checking');
   const [user, setUser] = useState<ApiUser | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -23,14 +26,32 @@ export function App() {
         setUser(result.data.user);
         setAuth('signedIn');
       } else if (result.error.kind === 'network') {
-        // Offline with an unknown session: try the app shell; protected
-        // screens redirect to login on their first failing API call.
         setAuth('signedIn');
       } else {
         setAuth('signedOut');
       }
     })();
   }, []);
+
+  useEffect(() => {
+    const stopSync = startSyncScheduler();
+    return () => stopSync();
+  }, []);
+
+  // A 401 mid-flush keeps the outbox and asks the officer to log in again
+  // (SPEC 6: expired session offline — never wipe). Raised as an event from
+  // the engine, handled here as a plain transition, no effect round-trip.
+  const handleAuthRequired = useCallback(() => {
+    setUser(null);
+    setAuth('signedOut');
+    setSessionExpired(true);
+    navigate({ name: 'login' });
+  }, [navigate]);
+
+  useEffect(() => {
+    window.addEventListener('fc:auth-required', handleAuthRequired);
+    return () => window.removeEventListener('fc:auth-required', handleAuthRequired);
+  }, [handleAuthRequired]);
 
   const isLoginRoute = route.name === 'login';
   const showLogin = auth === 'signedOut' || isLoginRoute;
@@ -46,6 +67,8 @@ export function App() {
       const result = await api.me();
       if (result.ok) setUser(result.data.user);
       setAuth('signedIn');
+      setSessionExpired(false);
+      resetLoginRequired();
       navigate({ name: 'today' });
     })();
   }
@@ -61,7 +84,7 @@ export function App() {
   return (
     <>
       {showLogin ? (
-        <Login lang={lang} setLang={setLang} onSignedIn={signIn} />
+        <Login lang={lang} setLang={setLang} onSignedIn={signIn} sessionExpired={sessionExpired} />
       ) : (
         <>
           {route.name === 'loan' ? (
