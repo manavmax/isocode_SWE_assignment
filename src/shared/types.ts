@@ -16,7 +16,13 @@ export const CONTACT_KINDS = ['CALL', 'VISIT', 'MESSAGE', 'BLOCKED'] as const;
 export const contactKindSchema = z.enum(CONTACT_KINDS);
 export type ContactKind = z.infer<typeof contactKindSchema>;
 
-export const CONTACT_OUTCOMES = ['paid', 'promise_to_pay', 'not_reachable', 'refused', 'wrong_number'] as const;
+/**
+ * Outcome vocabulary for contact attempts. 'dispute' and 'dialled' are the
+ * additions for the event-sync work (assumption A50): 'dispute' records the
+ * borrower disputing the debt (SPEC 12 disputed-promise edge case), 'dialled'
+ * a connected attempt that produced no terminal answer.
+ */
+export const CONTACT_OUTCOMES = ['paid', 'promise_to_pay', 'not_reachable', 'dispute', 'dialled', 'refused', 'wrong_number'] as const;
 export const contactOutcomeSchema = z.enum(CONTACT_OUTCOMES);
 export type ContactOutcome = z.infer<typeof contactOutcomeSchema>;
 
