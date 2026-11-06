@@ -401,6 +401,49 @@ describe('POST /api/events/batch — partial failure isolation', () => {
     expect(body.items[0]!.status).toBe('created');
     expect(body.items[0]!.assignmentChanged).toBe(true);
   });
+
+  it('a promise-failed sibling is created with a warning while a schema-invalid sibling is still rejected whole (A57)', async () => {
+    h.queue.push(loanRow());
+    h.queue.push([]);
+    h.queue.push([]);
+    h.queue.push([]);
+    h.queue.push(loanRow());
+    h.queue.push([]);
+    const res = await post({
+      events: [
+        eventPayload({ kind: 'LETTER' }), // schema-invalid: rejected, pops nothing
+        eventPayload({
+          outcome: 'promise_to_pay',
+          promised_date: '2026-11-07',
+          promised_amount: 24_999 // business rule fails: event stored, promise skipped
+        })
+      ]
+    });
+    const body = (await res.json()) as {
+      items: { status: string; reason?: string; warnings?: { code: string; reason: string }[] }[];
+    };
+    expect(body.items[0]!.status).toBe('rejected');
+    expect(body.items[0]!.reason).toContain('invalid_event');
+    expect(body.items[1]!.status).toBe('created');
+    expect(body.items[1]!.warnings).toEqual([{ code: 'promise_not_created', reason: 'amount_below_half_overdue' }]);
+    expect(eventWrites()).toHaveLength(1);
+    expect(promiseWrites()).toHaveLength(0);
+  });
+
+  it('a stranger-loan promise item is still rejected whole (no event, no promise, no warning)', async () => {
+    h.queue.push(loanRow({ assignedOfficerId: OTHER_OFFICER }));
+    h.queue.push([]); // no assignment history for this officer
+    const res = await post({
+      events: [
+        eventPayload({ outcome: 'promise_to_pay', promised_date: '2026-11-07', promised_amount: 25_000 })
+      ]
+    });
+    const body = (await res.json()) as { items: { status: string; reason?: string; warnings?: unknown }[] };
+    expect(body.items[0]!.status).toBe('rejected');
+    expect(body.items[0]!.reason).toBe('loan_not_assigned_to_officer');
+    expect(body.items[0]!.warnings).toBeUndefined();
+    expect(h.writes).toHaveLength(0);
+  });
 });
 
 describe('POST /api/events/batch — window and confidence derivation (server time)', () => {
@@ -508,7 +551,7 @@ describe('POST /api/events/batch — promises (SPEC 12 in the same transaction)'
     expect(h.txRuns()).toBeGreaterThan(0); // the pair went through withTx
   });
 
-  it('an amount below half the overdue rejects the item and writes nothing', async () => {
+  it('an amount below half the overdue stores the event, skips the promise row, and warns promise_not_created (A57)', async () => {
     h.queue.push(loanRow());
     h.queue.push([]);
     h.queue.push([]);
@@ -522,13 +565,15 @@ describe('POST /api/events/batch — promises (SPEC 12 in the same transaction)'
         })
       ]
     });
-    const body = (await res.json()) as { items: { status: string; reason?: string }[] };
-    expect(body.items[0]!.status).toBe('rejected');
-    expect(body.items[0]!.reason).toBe('amount_below_half_overdue');
-    expect(h.writes).toHaveLength(0);
+    const body = (await res.json()) as { items: { status: string; reason?: string; warnings?: { code: string; reason: string }[] }[] };
+    expect(body.items[0]!.status).toBe('created'); // the compliance record survives
+    expect(body.items[0]!.warnings).toEqual([{ code: 'promise_not_created', reason: 'amount_below_half_overdue' }]);
+    expect(eventWrites()).toHaveLength(1); // contact event stored
+    expect(promiseWrites()).toHaveLength(0); // promise row skipped
+    expect(h.writes.some((w) => w.kind === 'promise-supersede')).toBe(false);
   });
 
-  it('the third reschedule is refused (max two per bucket stay)', async () => {
+  it('the third reschedule still logs the attempt but creates no promise (max two per bucket stay)', async () => {
     h.queue.push(loanRow());
     h.queue.push([]);
     h.queue.push([{ id: 'open-promise' }]); // one open promise: the reschedule target
@@ -538,10 +583,26 @@ describe('POST /api/events/batch — promises (SPEC 12 in the same transaction)'
         eventPayload({ outcome: 'promise_to_pay', promised_date: '2026-11-07', promised_amount: 25_000 })
       ]
     });
-    const body = (await res.json()) as { items: { status: string; reason?: string }[] };
-    expect(body.items[0]!.status).toBe('rejected');
-    expect(body.items[0]!.reason).toBe('reschedule_limit_reached');
-    expect(h.writes).toHaveLength(0);
+    const body = (await res.json()) as { items: { status: string; warnings?: { code: string; reason: string }[] }[] };
+    expect(body.items[0]!.status).toBe('created');
+    expect(body.items[0]!.warnings).toEqual([{ code: 'promise_not_created', reason: 'reschedule_limit_reached' }]);
+    expect(eventWrites()).toHaveLength(1);
+    expect(promiseWrites()).toHaveLength(0);
+  });
+
+  it('a clean promise item carries NO warnings key', async () => {
+    h.queue.push(loanRow());
+    h.queue.push([]);
+    h.queue.push([]);
+    h.queue.push([]);
+    const res = await post({
+      events: [
+        eventPayload({ outcome: 'promise_to_pay', promised_date: '2026-11-07', promised_amount: 25_000 })
+      ]
+    });
+    const body = (await res.json()) as { items: { status: string; warnings?: unknown }[] };
+    expect(body.items[0]!.status).toBe('created');
+    expect(body.items[0]!.warnings).toBeUndefined();
   });
 
   it('a reschedule marks the old promise superseded with the NEW promise id, same transaction', async () => {
@@ -597,7 +658,7 @@ describe('POST /api/events/batch — promise window judged on the attempt date (
     expect(promiseWrites()[0]!.value).toMatchObject({ promisedDate: '2026-11-04', promisedAmount: 25_000 });
   });
 
-  it('a promise whose date was ALREADY invalid at attempt time is still flagged (valid per server today proves the attempt-date check ran)', async () => {
+  it('a promise whose date was ALREADY invalid at attempt time is still flagged — as a warning, with the event stored (A51 + A57)', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-11-06T05:45:00.000Z'));
     // Attempted Monday: attempt-day + 9 days is past Monday's +7 window, but
@@ -617,9 +678,13 @@ describe('POST /api/events/batch — promise window judged on the attempt date (
         })
       ]
     });
-    const body = (await res.json()) as { items: { status: string; reason?: string }[] };
-    expect(body.items[0]!.reason).toBe('date_too_far_out');
-    expect(h.writes).toHaveLength(0);
+    const body = (await res.json()) as {
+      items: { status: string; warnings?: { code: string; reason: string }[] }[];
+    };
+    expect(body.items[0]!.status).toBe('created');
+    expect(body.items[0]!.warnings).toEqual([{ code: 'promise_not_created', reason: 'date_too_far_out' }]);
+    expect(eventWrites()).toHaveLength(1); // compliance record stored
+    expect(promiseWrites()).toHaveLength(0); // promise skipped
   });
 });
 

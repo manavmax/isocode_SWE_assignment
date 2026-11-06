@@ -42,6 +42,13 @@ export interface BatchItemResult {
   reason?: string;
   assignmentChanged?: boolean;
   complianceStatus?: 'COMPLIANT' | 'VIOLATION_DETECTED';
+  /**
+   * Soft failures attached to a `created` item (SPEC 6 + prompt 10b): the
+   * contact event — the compliance record — is always stored; a business rule
+   * that only fails the side-effect (e.g. a promise outcome) skips that side
+   * effect and reports it here, never rejects the whole event.
+   */
+  warnings?: { code: string; reason: string }[];
 }
 
 export interface EventBatchOutcome {
@@ -266,6 +273,7 @@ async function gradeEventItem(
   // schema already demands promised_date/promised_amount for it, a failure
   // reaching here is a business rule (window, amounts, cap), not a wire one.
   let promisePlan: PromisePlan | null = null;
+  let promiseWarning: { code: string; reason: string } | null = null;
   if (event.outcome === 'promise_to_pay') {
     const openRows = await db
       .select({ id: promises.id })
@@ -291,17 +299,21 @@ async function gradeEventItem(
         rescheduleCount: supersededRows.length
       }
     );
-    // A promise whose rules fail rejects the whole item: no event row AND no
-    // promise row, so the officer sees the real reason instead of a silently
-    // missing ledger entry (A57).
+    // A promise whose business rules fail NEVER rejects the event (prompt
+    // 10b): the call/visit happened and the contact_event row is the
+    // compliance record, so it is always stored. Only the promise row is
+    // skipped and the item answers `created` with a promise_not_created
+    // warning carrying the real reason (A57). A schema-invalid item or a
+    // stranger-loan item is still rejected whole — there is nothing to store.
     if (!validation.ok) {
-      return { id: event.id, status: 'rejected', reason: validation.reasons[0] };
+      promiseWarning = { code: 'promise_not_created', reason: validation.reasons[0] };
+    } else {
+      promisePlan = {
+        supersedesPromiseId: validation.supersedesPromiseId,
+        promisedDateIst: validation.promisedDateIst,
+        promisedAmountPaise: validation.promisedAmountPaise
+      };
     }
-    promisePlan = {
-      supersedesPromiseId: validation.supersedesPromiseId,
-      promisedDateIst: validation.promisedDateIst,
-      promisedAmountPaise: validation.promisedAmountPaise
-    };
   }
 
   try {
@@ -374,7 +386,8 @@ async function gradeEventItem(
         id: event.id,
         status: 'created' as const,
         assignmentChanged,
-        complianceStatus: timing.complianceStatus
+        complianceStatus: timing.complianceStatus,
+        ...(promiseWarning ? { warnings: [promiseWarning] } : {})
       };
     });
     return written;
