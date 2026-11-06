@@ -278,7 +278,7 @@ app.post('/api/events/batch', async (c) => {
  * the ONLY route that answers an unmasked number; the client may cache it
  * until the end of the IST day (A57). Hono resolves the more specific
  * /reveal-phone path before the :id catch-all above. */
-app.get('/api/loans/:id/reveal-phone', async (c) => {
+app.post('/api/loans/:id/reveal-phone', async (c) => {
   try {
     const actor = await resolveSessionActor(getCookie(c, SESSION_COOKIE));
     if (!actor) {

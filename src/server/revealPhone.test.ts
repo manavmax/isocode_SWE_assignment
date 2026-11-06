@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * GET /api/loans/:id/reveal-phone with NO live database (fake driver, as in
+ * POST /api/loans/:id/reveal-phone with NO live database (fake driver, as in
  * authFlow.test.ts). The contact-window gate runs on SERVER time, so the
  * suite freezes the system clock with vi.useFakeTimers around IST instants
  * instead of hoping the wall clock cooperates. The limiter lives in the
@@ -112,16 +112,16 @@ function cookie() {
   return `${SESSION_COOKIE}=reveal-officer-token`;
 }
 
-const get = (loanId = LOAN_ID, sessionOverride: Record<string, unknown> | null = null) => {
+const post = (loanId = LOAN_ID, sessionOverride: Record<string, unknown> | null = null) => {
   // The session lookup is the first pop of every request.
   h.queue.unshift(sessionRow(sessionOverride ?? {}));
-  return app.request(`/api/loans/${loanId}/reveal-phone`, { headers: { cookie: cookie() } });
+  return app.request(`/api/loans/${loanId}/reveal-phone`, { method: 'POST', headers: { cookie: cookie() } });
 };
 
 const auditWrites = () => h.writes.filter((w) => w.kind === 'audit' && w.value.action === 'phone_reveal');
 const counterWrites = () => h.writes.filter((w) => w.kind === 'reveal-counter');
 
-describe('GET /api/loans/:id/reveal-phone — gates', () => {
+describe('POST /api/loans/:id/reveal-phone — gates', () => {
   beforeEach(() => {
     h.queue.length = 0;
     h.writes.length = 0;
@@ -132,20 +132,20 @@ describe('GET /api/loans/:id/reveal-phone — gates', () => {
   });
 
   it('answers 401 without a session cookie, before any query', async () => {
-    const res = await app.request(`/api/loans/${LOAN_ID}/reveal-phone`);
+    const res = await app.request(`/api/loans/${LOAN_ID}/reveal-phone`, { method: 'POST' });
     expect(res.status).toBe(401);
     expect(h.queue).toHaveLength(0);
   });
 
   it('refuses managers — reveal is an officer-only capability', async () => {
-    const res = await get(LOAN_ID, { role: 'branch_manager', officerId: null });
+    const res = await post(LOAN_ID, { role: 'branch_manager', officerId: null });
     expect(res.status).toBe(403);
     expect(h.queue).toHaveLength(0); // loan lookup never ran
   });
 
   it('loan not assigned to this officer (or unknown loan) answers the same generic 404, any time of day', async () => {
     h.queue.push(loanRow({ assignedOfficerId: 'officer-reveal-ZZZZZZZZZZZZZZZZZZZZZZZZZZ' }));
-    const res = await get('LN-23002');
+    const res = await post('LN-23002');
     expect(res.status).toBe(404);
     expect(((await res.json()) as { error: string }).error).toBe('not found');
     expect(auditWrites()).toHaveLength(0); // reveal attempt is not audited
@@ -153,7 +153,7 @@ describe('GET /api/loans/:id/reveal-phone — gates', () => {
   });
 });
 
-describe('GET /api/loans/:id/reveal-phone — the window is SERVER time (SPEC 16)', () => {
+describe('POST /api/loans/:id/reveal-phone — the window is SERVER time (SPEC 16)', () => {
   beforeEach(() => {
     h.queue.length = 0;
     h.writes.length = 0;
@@ -166,7 +166,7 @@ describe('GET /api/loans/:id/reveal-phone — the window is SERVER time (SPEC 16
     vi.useFakeTimers({ now: new Date(INSIDE_IST), toFake: ['Date'] });
     h.queue.push(loanRow());
     h.queue.push(counterRow(0));
-    const res = await get();
+    const res = await post();
     expect(res.status).toBe(200);
     const body = (await res.json()) as { mobile: string; altMobile: string | null };
     expect(body.mobile).toBe('9876543210'); // raw, by design — this is the reveal
@@ -180,14 +180,14 @@ describe('GET /api/loans/:id/reveal-phone — the window is SERVER time (SPEC 16
     vi.useFakeTimers({ now: new Date(WINDOW_START_IST), toFake: ['Date'] });
     h.queue.push(loanRow());
     h.queue.push(counterRow(0));
-    const res = await get();
+    const res = await post();
     expect(res.status).toBe(200);
   });
 
   it('19:00:00 IST plus a hair is outside: a clear error, no audit, no count', async () => {
     vi.useFakeTimers({ now: new Date(WINDOW_END_IST), toFake: ['Date'] });
     h.queue.push(loanRow());
-    const res = await get();
+    const res = await post();
     expect(res.status).toBe(403);
     const body = (await res.json()) as { error: string };
     expect(body.error).toContain('08:00-19:00 IST');
@@ -198,7 +198,7 @@ describe('GET /api/loans/:id/reveal-phone — the window is SERVER time (SPEC 16
   it('deep outside the window (01:00 IST), same refusal', async () => {
     vi.useFakeTimers({ now: new Date(OUTSIDE_IST), toFake: ['Date'] });
     h.queue.push(loanRow());
-    const res = await get();
+    const res = await post();
     expect(res.status).toBe(403);
     expect(h.writes).toHaveLength(0);
   });
@@ -209,7 +209,7 @@ describe('GET /api/loans/:id/reveal-phone — the window is SERVER time (SPEC 16
     try {
       h.queue.push(loanRow());
       h.queue.push(counterRow(0));
-      const res = await get();
+      const res = await post();
       expect(res.status).toBe(200); // server says 10:00 IST, so the reveal stands
     } finally {
       delete process.env.TZ;
@@ -217,7 +217,7 @@ describe('GET /api/loans/:id/reveal-phone — the window is SERVER time (SPEC 16
   });
 });
 
-describe('GET /api/loans/:id/reveal-phone — 30 per hour per officer, DB-backed (A56)', () => {
+describe('POST /api/loans/:id/reveal-phone — 30 per hour per officer, DB-backed (A56)', () => {
   beforeEach(() => {
     h.queue.length = 0;
     h.writes.length = 0;
@@ -230,7 +230,7 @@ describe('GET /api/loans/:id/reveal-phone — 30 per hour per officer, DB-backed
   it('at the cap: 429 without revealing, and nothing counted or audited', async () => {
     h.queue.push(loanRow());
     h.queue.push(counterRow(30, INSIDE_IST - 1000)); // 30 in the current hour
-    const res = await get();
+    const res = await post();
     expect(res.status).toBe(429);
     expect(((await res.json()) as { error: string }).error).toContain('30 per officer per hour');
     expect(Number(res.headers.get('Retry-After'))).toBeGreaterThan(0); // same contract as the login throttle
@@ -240,7 +240,7 @@ describe('GET /api/loans/:id/reveal-phone — 30 per hour per officer, DB-backed
   it('at 29: allowed, one counter increment, one audit row', async () => {
     h.queue.push(loanRow());
     h.queue.push(counterRow(29, INSIDE_IST - 1000));
-    const res = await get();
+    const res = await post();
     expect(res.status).toBe(200);
     expect(counterWrites()).toHaveLength(1);
     expect(auditWrites()).toHaveLength(1);
@@ -251,7 +251,7 @@ describe('GET /api/loans/:id/reveal-phone — 30 per hour per officer, DB-backed
   it('an expired window (an hour+ old row) reopens the limiter without a reset', async () => {
     h.queue.push(loanRow());
     h.queue.push(counterRow(30, INSIDE_IST - 60 * 60_000)); // previous hour's exhausted key
-    const res = await get();
+    const res = await post();
     expect(res.status).toBe(200);
     expect(counterWrites()).toHaveLength(1);
   });
@@ -259,7 +259,7 @@ describe('GET /api/loans/:id/reveal-phone — 30 per hour per officer, DB-backed
   it('the audit row names the actor, action and loan but no phone data', async () => {
     h.queue.push(loanRow());
     h.queue.push(counterRow(0));
-    await get();
+    await post();
     const audit = auditWrites()[0]!.value;
     expect(audit).toMatchObject({ actor: 'reveal-officer', action: 'phone_reveal', subject: LOAN_ID });
     expect(JSON.stringify(audit.valueOf())).not.toContain('9876543210'); // PII scrub (SPEC 16)
