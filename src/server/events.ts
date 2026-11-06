@@ -306,7 +306,7 @@ async function gradeEventItem(
     // warning carrying the real reason (A57). A schema-invalid item or a
     // stranger-loan item is still rejected whole — there is nothing to store.
     if (!validation.ok) {
-      promiseWarning = { code: 'promise_not_created', reason: validation.reasons[0] };
+      promiseWarning = { code: 'promise_not_created', reason: validation.reasons[0]! };
     } else {
       promisePlan = {
         supersedesPromiseId: validation.supersedesPromiseId,
