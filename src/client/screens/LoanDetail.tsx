@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { api, type LoanDetailDto } from '../api.js';
 import { formatRupeePaise } from '../../shared/money.js';
 import { isWithinContactWindow } from '../../shared/contactWindow.js';
@@ -7,9 +7,7 @@ import { CONTACT_WINDOW_RULE_CODE } from '../../shared/contactWindow.js';
 import { t as translate, type Lang } from '../i18n/dictionary.js';
 import { BucketChip, ErrorState, SkeletonList } from '../components/States.js';
 import { bucketLabel } from './Today.js';
-import { OutcomeSheet, type OutcomeValue, type KindValue } from '../components/OutcomeSheet.js';
-import { BlockedSheet } from '../components/BlockedSheet.js';
-import { UndoToast } from '../components/UndoToast.js';
+import type { OutcomeValue, KindValue } from '../components/OutcomeSheet.js';
 import { startGpsWatch } from '../gps.js';
 import type { GpsState } from '../gps.js';
 import { buildContactEvent } from '../sync/buildEvent.js';
@@ -17,6 +15,15 @@ import { correctedNowMs } from '../sync/engine.js';
 import { getSkew, setMeta, getMeta, META_KEYS, queueEvent, undoItem } from '../dexie/db.js';
 import { getBorrowerPhone } from '../sync/reveal.js';
 import { kick } from '../sync/scheduler.js';
+
+// The sheets only render on a tap, so they load on first open instead of
+// riding the detail route (SPEC 3 budget): the outcome sheet carries the
+// promise validation + GPS-linked flow, the blocked sheet the rule-set text.
+const OutcomeSheet = lazy(() =>
+  import('../components/OutcomeSheet.js').then((m) => ({ default: m.OutcomeSheet }))
+);
+const BlockedSheet = lazy(() => import('../components/BlockedSheet.js').then((m) => ({ default: m.BlockedSheet })));
+const UndoToast = lazy(() => import('../components/UndoToast.js').then((m) => ({ default: m.UndoToast })));
 
 type Load = 'loading' | 'ready' | 'error' | 'notFound';
 
@@ -262,32 +269,38 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
       ) : null}
 
       {showOutcome && loan && (
-        <OutcomeSheet
-          lang={lang}
-          defaultKind={lastKind}
-          overdueAmount={loan.overdueAmount}
-          outstandingAmount={loan.outstanding}
-          bucket={loan.bucket}
-          onSave={(data) => void handleOutcomeSave(data)}
-          onClose={() => setShowOutcome(false)}
-        />
+        <Suspense fallback={null}>
+          <OutcomeSheet
+            lang={lang}
+            defaultKind={lastKind}
+            overdueAmount={loan.overdueAmount}
+            outstandingAmount={loan.outstanding}
+            bucket={loan.bucket}
+            onSave={(data) => void handleOutcomeSave(data)}
+            onClose={() => setShowOutcome(false)}
+          />
+        </Suspense>
       )}
 
       {showBlocked && (
-        <BlockedSheet
-          lang={lang}
-          ruleCode={blockedRule}
-          onClose={() => setShowBlocked(false)}
-        />
+        <Suspense fallback={null}>
+          <BlockedSheet
+            lang={lang}
+            ruleCode={blockedRule}
+            onClose={() => setShowBlocked(false)}
+          />
+        </Suspense>
       )}
 
       {undoId && (
-        <UndoToast
-          lang={lang}
-          itemId={undoId}
-          onUndo={handleUndo}
-          onDone={() => setUndoId(null)}
-        />
+        <Suspense fallback={null}>
+          <UndoToast
+            lang={lang}
+            itemId={undoId}
+            onUndo={handleUndo}
+            onDone={() => setUndoId(null)}
+          />
+        </Suspense>
       )}
     </main>
   );

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { api, type ApiUser } from './api.js';
 import { useLang } from './i18n/LangContext.js';
 import { useRoute } from './router.js';
@@ -7,8 +7,14 @@ import { resetLoginRequired } from './sync/engine.js';
 
 import { Login } from './screens/Login.js';
 import { Today } from './screens/Today.js';
-import { LoanDetail } from './screens/LoanDetail.js';
-import { Me } from './screens/Me.js';
+
+// Route-level code splitting (SPEC 3 budget): the officer's first paint is
+// Login + Today; the loan detail (with its sheets and GPS code), the Me
+// screen and the Promises screen load on navigation. The manager dashboard,
+// when it arrives, follows the same lazy pattern — no manager route exists
+// yet, so there is nothing manager-side to split today.
+const LoanDetail = lazy(() => import('./screens/LoanDetail.js').then((m) => ({ default: m.LoanDetail })));
+const Me = lazy(() => import('./screens/Me.js').then((m) => ({ default: m.Me })));
 
 type Auth = 'checking' | 'signedOut' | 'signedIn';
 
@@ -87,13 +93,15 @@ export function App() {
         <Login lang={lang} setLang={setLang} onSignedIn={signIn} sessionExpired={sessionExpired} />
       ) : (
         <>
-          {route.name === 'loan' ? (
-            <LoanDetail lang={lang} loanId={route.loanId} onBack={() => navigate({ name: 'today' })} />
-          ) : route.name === 'me' ? (
-            <Me lang={lang} setLang={setLang} user={user} onLoggedOut={signOut} />
-          ) : (
-            <Today lang={lang} onOpenLoan={(loanId) => navigate({ name: 'loan', loanId })} />
-          )}
+          <Suspense fallback={<main className="screen"><p className="screen-subtitle">{t('stateLoading')}</p></main>}>
+            {route.name === 'loan' ? (
+              <LoanDetail lang={lang} loanId={route.loanId} onBack={() => navigate({ name: 'today' })} />
+            ) : route.name === 'me' ? (
+              <Me lang={lang} setLang={setLang} user={user} onLoggedOut={signOut} />
+            ) : (
+              <Today lang={lang} onOpenLoan={(loanId) => navigate({ name: 'loan', loanId })} />
+            )}
+          </Suspense>
           <nav className="bottom-nav" aria-label={t('appName')}>
             <button type="button" className="nav-item" aria-current={route.name === 'today' ? 'page' : undefined} onClick={() => navigate({ name: 'today' })}>
               {t('navToday')}
