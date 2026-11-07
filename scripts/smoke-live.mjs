@@ -28,10 +28,6 @@ function report(ok, label, detail) {
   if (!ok) failures += 1;
 }
 
-function skip(label, detail) {
-  console.log(`SKIP  ${label} — ${detail}`);
-}
-
 async function call(label, path, init = {}, { auth = true } = {}) {
   const res = await fetch(`${root}${path}`, {
     ...init,
@@ -93,26 +89,28 @@ if (sessionCookie.startsWith('fc_session=')) {
     report(ok, 'GET  /api/me', `${res.status}${ok ? ` role=${body.user.role}` : hint}`);
   }
 
-  // 5. Assignments: nested three segments deep; phones must be masked.
+  // 5. Assignments: nested three segments deep; phones must be masked AND the
+  // demo officer's worklist must be non-empty — in a demo deployment an empty
+  // worklist is a failure, not a state to skip over.
   let loanId = null;
   {
     const { res, body, hint } = await call('assignments', '/api/me/assignments');
     const assignments = body?.assignments;
     const phonesMasked = Array.isArray(assignments) && assignments.every((a) => maskOk(a.mobileMasked));
     loanId = Array.isArray(assignments) ? (assignments.find((a) => a.loanId)?.loanId ?? null) : null;
-    const ok = res.status === 200 && Array.isArray(assignments) && phonesMasked;
+    const ok = res.status === 200 && Array.isArray(assignments) && assignments.length > 0 && phonesMasked;
     report(ok, 'GET  /api/me/assignments', `${res.status} count=${assignments?.length ?? '?'} phones masked=${phonesMasked}${ok ? '' : hint}`);
+    if (res.status === 200 && Array.isArray(assignments) && assignments.length === 0) {
+      report(false, 'GET  /api/me/assignments (worklist)', 'demo officer has no assigned loans: seed missing, demo account not linked to an officer, or the deployment points at a different database');
+    }
   }
 
-  // 6. Loan detail from the assignment list (needs seeded assignments; a
-  // deployment whose DB only has the demo accounts has none — SKIP, not FAIL,
-  // because the routing + masking assertions above already passed).
+  // 6. Loan detail from the assignment list (its precondition is asserted
+  // above: an empty worklist already failed the run there).
   if (loanId) {
     const { res, body, hint } = await call('loan', `/api/loans/${encodeURIComponent(loanId)}`);
     const ok = res.status === 200 && body?.loan?.loanId === loanId && maskOk(body.loan.mobileMasked) && maskOk(body.loan.altMobileMasked);
     report(ok, `GET  /api/loans/${loanId}`, `${res.status}${ok ? '' : hint}`);
-  } else {
-    skip('GET  /api/loans/<id>', 'demo officer has no assigned loans in this deployment DB (run the seed against it to enable this check)');
   }
 } else {
   report(false, 'GET  /api/me + /api/me/assignments + /api/loans/<id>', 'skipped — no session cookie from login');
