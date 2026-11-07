@@ -119,16 +119,46 @@ for (const lang of ['hi', 'en']) {
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForTimeout(300);
   await auditPage(`login-${lang}`, page);
-  await login(page, 'arjun.verma');
+  await login(page, 'demo-officer-1');
   await auditPage(`today-${lang}`, page);
   await page.locator('button.card').first().click();
   await page.waitForURL('**/loans/**');
   await page.waitForTimeout(400);
   await auditPage(`detail-${lang}`, page);
   await auditDetailSheets(page, lang);
+  // Promises screen (prompt 11 item 5): three segments audited in place.
+  // Login is demo-officer-1 (Rahul Chouhan) so every segment has content.
+  await page.locator('nav.bottom-nav').getByRole('button', { name: /Promises|वादे/ }).click();
+  await page.waitForURL('**/promises', { timeout: 10000 });
+  await page.waitForTimeout(600);
+  await auditPage(`promises-due-${lang}`, page);
+  await page.getByRole('tab', { name: /Upcoming|आने वाले/ }).click();
+  await page.waitForTimeout(300);
+  await auditPage(`promises-upcoming-${lang}`, page);
+  await page.getByRole('tab', { name: /Broken|टूटे/ }).click();
+  await page.waitForTimeout(300);
+  await auditPage(`promises-broken-${lang}`, page);
   await page.locator('nav.bottom-nav').getByRole('button', { name: /Me|मेरी जानकारी/ }).click();
   await page.waitForTimeout(500);
   await auditPage(`me-${lang}`, page);
+  await context.close();
+}
+
+// The empty state is a demo product in its own right (step 0.5): demo-
+// officer-3 is the territory-less joiner, so Due today shows the empty
+// state with its refresh action.
+{
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
+  await page.evaluate(() => window.localStorage.setItem('fc.lang', 'en'));
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(300);
+  await login(page, 'demo-officer-3');
+  await page.locator('nav.bottom-nav').getByRole('button', { name: /Promises|वादे/ }).click();
+  await page.waitForURL('**/promises', { timeout: 10000 });
+  await page.waitForTimeout(600);
+  await auditPage('promises-empty-en', page);
   await context.close();
 }
 

@@ -51,6 +51,19 @@ interface PromiseTruthRow {
   paid: number;
 }
 
+/** timestamptz arrives as a Date (pooled driver) or an ISO string (neon
+ *  http) — normalise to Date or null. */
+function parseTimestamp(value: unknown): Date | null {
+  if (value instanceof Date) {
+    return value;
+  }
+  if (typeof value === 'string' && value !== '') {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return null;
+}
+
 export async function recomputePromiseStatuses(nowMs: number = Date.now()): Promise<NightlyOutcome> {
   const db = getDb();
   const todayIst = istDateKey(nowMs);
@@ -85,7 +98,10 @@ export async function recomputePromiseStatuses(nowMs: number = Date.now()): Prom
       promisedDate: String(row.promised_date).slice(0, 10),
       graceDays: Number(row.grace_days),
       paidAmount: row.paid_amount === null || row.paid_amount === undefined ? null : Number(row.paid_amount),
-      resolvedAt: row.resolved_at instanceof Date ? row.resolved_at : null,
+      // The neon-http driver returns timestamptz as ISO strings; the pooled
+      // driver returns Dates. Accept both — an instanceof-only check made
+      // every settled row look unresolved over http and rewrote it.
+      resolvedAt: parseTimestamp(row.resolved_at),
       loanCleared: row.loan_cleared === true,
       paid: Number(row.paid)
     };

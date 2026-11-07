@@ -841,3 +841,87 @@ dialog.blocked-sheet {
   color: var(--status-ok);
   margin: 0;
 }
+
+/* Promises screen (SPEC 12, prompt 11 item 5) */
+.segment-row {
+  display: flex;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0;
+}
+
+.segment {
+  flex: 1;
+  min-height: 44px;
+  border: var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--font-size-14);
+  padding: var(--sp-2) var(--sp-3);
+}
+
+.segment-active {
+  border: var(--border-strong);
+  background: var(--accent-soft, var(--surface));
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.promise-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.promise-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.promise-card-actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.promise-card-actions .btn {
+  flex: 1;
+  min-height: 44px;
+}
+
+.chip-warn {
+  color: var(--status-warn);
+  border-color: var(--status-warn);
+  margin-inline-start: var(--sp-2);
+}
+
+.nav-item {
+  position: relative;
+}
+
+.nav-badge {
+  position: absolute;
+  top: 2px;
+  right: calc(50% - 26px);
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--accent-strong);
+  color: var(--surface);
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 4px;
+}
+
+.btn-accent {
+  background: var(--accent-strong);
+  border: var(--border-strong);
+  color: var(--surface);
+}

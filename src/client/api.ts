@@ -37,6 +37,30 @@ export interface LoanDetailDto {
   altMobileMasked: string | null;
 }
 
+export interface PromiseCardDto {
+  promiseId: string;
+  loanId: string;
+  borrowerName: string;
+  /** Paise (A11). */
+  amountPaise: number;
+  promisedDate: string;
+  status: 'open' | 'broken' | 'broken_part';
+  loanCleared: boolean;
+}
+
+export interface BrokenPromiseCardDto extends PromiseCardDto {
+  deadline: string;
+  daysPastDue: number;
+  needsManagerAttention: boolean;
+  stuck: boolean;
+}
+
+export interface OfficerPromisesDto {
+  dueToday: PromiseCardDto[];
+  upcoming: PromiseCardDto[];
+  brokenNeedingFollowup: BrokenPromiseCardDto[];
+}
+
 export type ApiError = {
   kind: 'unauthorized' | 'forbidden' | 'notFound' | 'server' | 'network' | 'throttled';
   status: number;
@@ -80,6 +104,7 @@ export const api = {
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
   me: () => request<{ user: ApiUser }>('/api/me'),
   assignments: () => request<{ assignments: AssignmentCard[] }>('/api/me/assignments'),
+  promises: () => request<OfficerPromisesDto>('/api/me/promises'),
   loan: (loanId: string) => request<{ loan: LoanDetailDto }>(`/api/loans/${encodeURIComponent(loanId)}`),
   revealPhone: (loanId: string) =>
     request<{ mobile: string | null; altMobile: string | null }>(`/api/loans/${encodeURIComponent(loanId)}/reveal-phone`, {

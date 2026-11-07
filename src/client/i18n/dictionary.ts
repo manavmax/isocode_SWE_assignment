@@ -130,7 +130,27 @@ const en = {
   pillSynced: 'synced',
   // Persistence
   persistWarn: 'Storage not persistent — install to Home Screen to avoid data loss.',
-  persistOk: 'Storage is persistent.'
+  persistOk: 'Storage is persistent.',
+  // Promises (SPEC 12, prompt 11 item 5)
+  navPromises: 'Promises',
+  promisesTitle: 'Promises',
+  promisesLastUpdated: 'Last updated {time}',
+  segmentDueToday: 'Due today',
+  segmentUpcoming: 'Upcoming',
+  segmentBroken: 'Broken',
+  promisesEmptyDue: 'No promises today',
+  promisesEmptyUpcoming: 'No upcoming promises',
+  promisesEmptyBroken: 'Nothing broken — good work',
+  promisesEmptyAction: 'Refresh',
+  promiseStatusDue: 'Due today',
+  promiseStatusGrace: 'In grace',
+  promiseStatusBroken: 'Broken',
+  promiseStatusBrokenPart: 'Part paid, broken',
+  promiseStuck: 'Stuck {n} days',
+  promiseManagerAttention: '2nd break — manager attention',
+  promiseNotSynced: 'Not synced yet',
+  promiseBrokenFollowup: 'Follow up: no contact since the break',
+  promisesOfflineCache: 'Promise list cached on this phone; expires after 24 hours.'
 };
 
 const hi: typeof en = {
@@ -255,7 +275,26 @@ const hi: typeof en = {
   pillFailed: 'विफल',
   pillSynced: 'सिंक हुआ',
   persistWarn: 'स्टोरेज स्थायी नहीं है — डेटा संरक्षण के लिए होम स्क्रीन में इंस्टॉल करें।',
-  persistOk: 'स्टोरेज स्थायी है।'
+  persistOk: 'स्टोरेज स्थायी है।',
+  navPromises: 'वादे',
+  promisesTitle: 'वादे',
+  promisesLastUpdated: 'आख़िरी अपडेट {time}',
+  segmentDueToday: 'आज देने हैं',
+  segmentUpcoming: 'आने वाले',
+  segmentBroken: 'टूटे',
+  promisesEmptyDue: 'आज कोई वादा नहीं',
+  promisesEmptyUpcoming: 'कोई आने वाला वादा नहीं',
+  promisesEmptyBroken: 'कुछ भी टूटा नहीं — बहुत बढ़िया',
+  promisesEmptyAction: 'रिफ्रेश',
+  promiseStatusDue: 'आज देना है',
+  promiseStatusGrace: 'छूट अवधि में',
+  promiseStatusBroken: 'टूटा',
+  promiseStatusBrokenPart: 'अंशतः भुगतान, टूटा',
+  promiseStuck: '{n} दिन से अटका',
+  promiseManagerAttention: 'दूसरा टूटा वादा — मैनेजर की नज़र',
+  promiseNotSynced: 'अभी सिंक नहीं हुआ',
+  promiseBrokenFollowup: 'फ़ॉलो-अप: टूटने के बाद कोई संपर्क नहीं',
+  promisesOfflineCache: 'वादों की सूची इस फ़ोन पर सेव है; 24 घंटे बाद हट जाएगी।'
 };
 
 export const dictionaries: Record<Lang, typeof en> = { en, hi };

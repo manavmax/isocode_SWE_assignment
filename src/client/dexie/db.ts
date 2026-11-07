@@ -45,11 +45,20 @@ export interface CachedAssignments {
   fetchedAt: number;
 }
 
+/** Offline promise-tracker cache (prompt 11 item 5) — same 24 h TTL and
+ *  logout wipe as the assignment cache. */
+export interface CachedPromises {
+  key: 'promises';
+  sections: import('../api.js').OfficerPromisesDto;
+  fetchedAt: number;
+}
+
 class CollectionsDb extends Dexie {
   outbox!: Table<OutboxItem, string>;
   meta!: Table<MetaRow, string>;
   revealCache!: Table<RevealCacheRow, string>;
   assignments!: Table<CachedAssignments, string>;
+  promises!: Table<CachedPromises, string>;
 
   constructor() {
     super('field-collections');
@@ -61,6 +70,13 @@ class CollectionsDb extends Dexie {
       meta: 'key',
       revealCache: 'loanId, expiresAt',
       assignments: 'key'
+    });
+    this.version(3).stores({
+      outbox: 'id, state, createdAt, notBefore',
+      meta: 'key',
+      revealCache: 'loanId, expiresAt',
+      assignments: 'key',
+      promises: 'key'
     });
   }
 }
@@ -78,6 +94,21 @@ export async function loadAssignments(): Promise<CachedAssignments | undefined> 
   if (!cached) return undefined;
   if (Date.now() - cached.fetchedAt > CACHE_TTL_MS) {
     await db.assignments.delete('assignments');
+    return undefined;
+  }
+  return cached;
+}
+
+/** Promise-tracker cache: same 24 h expiry and logout wipe as assignments. */
+export async function savePromises(sections: import('../api.js').OfficerPromisesDto, fetchedAt = Date.now()): Promise<void> {
+  await db.promises.put({ key: 'promises', sections, fetchedAt });
+}
+
+export async function loadPromises(): Promise<CachedPromises | undefined> {
+  const cached = await db.promises.get('promises');
+  if (!cached) return undefined;
+  if (Date.now() - cached.fetchedAt > CACHE_TTL_MS) {
+    await db.promises.delete('promises');
     return undefined;
   }
   return cached;
@@ -254,6 +285,7 @@ export async function clearCache(): Promise<void> {
     db.outbox.clear(),
     db.meta.clear(),
     db.revealCache.clear(),
-    db.assignments.clear()
+    db.assignments.clear(),
+    db.promises.clear()
   ]);
 }

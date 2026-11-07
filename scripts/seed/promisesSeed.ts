@@ -252,8 +252,11 @@ export function buildPromiseStory(input: PromiseSeedInput): PromiseSeedStory {
       resolvedAt: status === 'open' ? null : istWallClock(promiseDeadline(promisedDate, 1), 12, 0),
       // "Payments since creation" on IST date keys — never the UTC date of
       // the creation instant (a 05:00 IST violation event lands on the
-      // previous UTC day).
-      paidAmount: status === 'open' ? null : paidSince(loan.loanId, creationIst),
+      // previous UTC day). Written for EVERY status: the nightly job's
+      // canonical form carries paid_amount on open rows too, and the seed's
+      // stored state must equal it so the end-of-run consistency check
+      // proves idempotence on the first pass.
+      paidAmount: paidSince(loan.loanId, creationIst),
       createdAt
     };
     promises.push(row);

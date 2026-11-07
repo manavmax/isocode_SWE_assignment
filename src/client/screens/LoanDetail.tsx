@@ -2,18 +2,16 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { api, type LoanDetailDto } from '../api.js';
 import { formatRupeePaise } from '../../shared/money.js';
 import { isWithinContactWindow } from '../../shared/contactWindow.js';
-import { ruleSetFor } from '../../shared/contactWindow.js';
-import { CONTACT_WINDOW_RULE_CODE } from '../../shared/contactWindow.js';
 import { t as translate, type Lang } from '../i18n/dictionary.js';
 import { BucketChip, ErrorState, SkeletonList } from '../components/States.js';
 import { bucketLabel } from './Today.js';
 import type { OutcomeValue, KindValue } from '../components/OutcomeSheet.js';
 import { startGpsWatch } from '../gps.js';
 import type { GpsState } from '../gps.js';
+import { attemptBorrowerCall } from '../sync/call.js';
 import { buildContactEvent } from '../sync/buildEvent.js';
 import { correctedNowMs } from '../sync/engine.js';
 import { getSkew, setMeta, getMeta, META_KEYS, queueEvent, undoItem } from '../dexie/db.js';
-import { getBorrowerPhone } from '../sync/reveal.js';
 import { kick } from '../sync/scheduler.js';
 
 // The sheets only render on a tap, so they load on first open instead of
@@ -101,56 +99,26 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
 
   async function handleCallTap() {
     if (!loan) return;
-    const skew = await getSkew();
-    const corrected = correctedNowMs(Date.now(), skew);
-    if (!isWithinContactWindow(corrected)) {
-      // SPEC 7 layer (a): the button looks disabled but stays tappable —
-      // tapping opens the Blocked sheet AND records a BLOCKED attempt with
-      // the rule code (the rule-set version is stamped on sync, server-side).
-      const ruleCode = ruleSetFor(ruleSetDateKey(corrected)).id;
-      setBlockedRule(ruleCode);
-      setShowBlocked(true);
-      const payload = await buildContactEvent({
-        loanId,
-        kind: 'BLOCKED',
-        outcome: 'not_reachable',
-        gps,
-        note: CONTACT_WINDOW_RULE_CODE,
-        skewMs: skew
-      });
-      await queueEvent(payload);
-      void kick();
-      return;
-    }
-    setRevealError(null);
     setCallLoading(true);
-    const result = await getBorrowerPhone(loanId);
+    const outcome = await attemptBorrowerCall({ loanId, gps });
     setCallLoading(false);
-    if (result.offline) {
-      setRevealError(tr('revealOffline'));
-      return;
+    switch (outcome.kind) {
+      case 'blocked':
+        setBlockedRule(outcome.ruleCode);
+        setShowBlocked(true);
+        return;
+      case 'offline':
+        setRevealError(tr('revealOffline'));
+        return;
+      case 'revealError':
+        setRevealError(tr('revealOutsideWindow'));
+        return;
+      case 'noNumber':
+        setRevealError(tr('revealError'));
+        return;
+      default:
+        return; // dialling: the dialler has the number now
     }
-    if (result.error) {
-      setRevealError(tr('revealOutsideWindow'));
-      return;
-    }
-    if (!result.phone && !result.altPhone) {
-      setRevealError(tr('revealError'));
-      return;
-    }
-    // Record the dial attempt BEFORE opening the dialler (SPEC 6: outbox
-    // write precedes everything, and the attempt is the compliance record).
-    const payload = await buildContactEvent({
-      loanId,
-      kind: 'CALL',
-      outcome: 'dialled',
-      gps,
-      skewMs: skew
-    });
-    await queueEvent(payload);
-    void kick();
-    const number = result.phone ?? result.altPhone;
-    if (number) window.location.assign(`tel:${number}`);
   }
 
   async function handleOutcomeSave(data: {
@@ -304,11 +272,6 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
       )}
     </main>
   );
-}
-
-function ruleSetDateKey(correctedMs: number): string {
-  const shifted = new Date(correctedMs + 330 * 60_000);
-  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, '0')}-${String(shifted.getUTCDate()).padStart(2, '0')}`;
 }
 
 function factRow(label: string, value: string, money = false) {

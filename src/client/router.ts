@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 export type Route =
   | { name: 'login' }
   | { name: 'today' }
+  | { name: 'promises' }
   | { name: 'loan'; loanId: string }
   | { name: 'me' };
 
@@ -14,6 +15,7 @@ export function parsePath(path: string): Route {
   const trimmed = path.replace(/\/+$/, '') || '/';
   if (trimmed === '/login') return { name: 'login' };
   if (trimmed === '/today') return { name: 'today' };
+  if (trimmed === '/promises') return { name: 'promises' };
   if (trimmed === '/me') return { name: 'me' };
   const loanMatch = /^\/loans\/([^/]+)$/.exec(trimmed);
   if (loanMatch && loanMatch[1]) return { name: 'loan', loanId: decodeURIComponent(loanMatch[1]) };
@@ -26,6 +28,8 @@ export function pathFor(route: Route): string {
       return '/login';
     case 'today':
       return '/today';
+    case 'promises':
+      return '/promises';
     case 'me':
       return '/me';
     case 'loan':

@@ -18,7 +18,7 @@
 import { readdirSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { inArray } from 'drizzle-orm';
+import { inArray, sql } from 'drizzle-orm';
 import { closePool, getDb, getPool, withTx } from '../../src/server/db.js';
 import { contactEvents, promises as promisesTable, territory as territoryTable } from '../../src/server/db/schema.js';
 import { applyImport } from '../../src/server/import/applyImport.js';
@@ -383,7 +383,8 @@ async function main(): Promise<void> {
                  FROM payment p WHERE p.loan_id = l.loan_id) AS cleared_on
          FROM loan l
         WHERE l.status IN ('overdue', 'cleared')
-          AND COALESCE(l.assigned_officer_id, l.home_officer_id) IS NOT NULL`
+          AND COALESCE(l.assigned_officer_id, l.home_officer_id) IS NOT NULL
+        ORDER BY l.loan_id`
     )
   ).rows as Record<string, unknown>[];
   const paymentRows = (
@@ -430,14 +431,37 @@ async function main(): Promise<void> {
     await db.insert(contactEvents).values(story.events.slice(i, i + 250)).onConflictDoNothing();
   }
   for (let i = 0; i < story.promises.length; i += 250) {
-    await db.insert(promisesTable).values(story.promises.slice(i, i + 250)).onConflictDoNothing();
+    await db
+      .insert(promisesTable)
+      .values(story.promises.slice(i, i + 250))
+      .onConflictDoUpdate({
+        target: promisesTable.id,
+        // The demo story is rebased on reruns (A50 territory-repair
+        // precedent; promise has no append-only trigger): a real-clock
+        // recompute that ran between reseeds may have aged open demo rows
+        // to broken — the story wins back its state here. contact_event
+        // stays insert-only: immutable compliance records.
+        set: {
+          status: sql`excluded.status`,
+          promisedAmount: sql`excluded.promised_amount`,
+          promisedDate: sql`excluded.promised_date`,
+          graceDays: sql`excluded.grace_days`,
+          resolvedAt: sql`excluded.resolved_at`,
+          paidAmount: sql`excluded.paid_amount`,
+          officerId: sql`excluded.officer_id`,
+          sourceEventId: sql`excluded.source_event_id`
+        }
+      });
   }
   console.log('[seed] part 2: events and promises inserted (append-only trigger untouched)');
 
-  // Recompute as the nightly job would: the seed's stored statuses must
-  // already agree with the derivation, so this changes nothing — the live
-  // proof of the consistency contract.
-  const nightly = await recomputePromiseStatuses();
+  // Recompute as the nightly job would, graded at the AS-OF clock (the demo
+  // story is anchored there): the seed's stored statuses must already agree
+  // with the derivation, so this changes nothing — the live proof of the
+  // consistency contract. The real-clock cron ages the story afterwards;
+  // reseeding rebases it (A63).
+  const asOfNoonMs = Date.parse(`${asOf}T00:00:00Z`) + (12 * 60 - 330) * 60_000;
+  const nightly = await recomputePromiseStatuses(asOfNoonMs);
 
   const statusCounts = (
     await pool2.query(`SELECT status::text AS status, count(*)::int AS n FROM promise GROUP BY 1 ORDER BY 1`)
@@ -446,7 +470,7 @@ async function main(): Promise<void> {
     await pool2.query(
       `SELECT o.name AS officer, count(*)::int AS n
          FROM promise p JOIN officer o ON o.id = p.officer_id
-        WHERE p.status = 'open' AND p.promised_date = DATE ${asOf}
+        WHERE p.status = 'open' AND p.promised_date = DATE '${asOf}'
         GROUP BY 1 ORDER BY 2 DESC, 1`
     )
   ).rows as Record<string, unknown>[];

@@ -179,6 +179,44 @@ await offCtx.page.getByTestId('offline-banner').waitFor({ timeout: 15000 });
 await shoot(offCtx.page, 'today-offline-en');
 await offCtx.context.close();
 
+// --- promises (prompt 11 item 5): demo-officer-1 (Rahul) has a rich day ---
+const promCtx = await newPage('en');
+await login(promCtx.page, 'demo-officer-1');
+await promCtx.page.locator('nav.bottom-nav').getByRole('button', { name: /Promises|वादे/ }).click();
+await promCtx.page.waitForURL('**/promises', { timeout: 10000 });
+await promCtx.page.waitForTimeout(700);
+await shoot(promCtx.page, 'promises-due-en');
+// Log-outcome sheet on the first card (same sheet as the detail screen).
+await promCtx.page.locator('.promise-card .btn-accent').first().click();
+await promCtx.page.waitForSelector('dialog.outcome-sheet', { timeout: 10000 });
+await shoot(promCtx.page, 'promises-outcome-en');
+await promCtx.page.getByRole('button', { name: /Cancel|रद्द करें/ }).click();
+await promCtx.page.waitForSelector('dialog.outcome-sheet', { state: 'detached' });
+await promCtx.page.getByRole('tab', { name: 'Upcoming' }).click();
+await promCtx.page.waitForTimeout(300);
+await shoot(promCtx.page, 'promises-upcoming-en');
+await promCtx.page.getByRole('tab', { name: 'Broken' }).click();
+await promCtx.page.waitForTimeout(300);
+await shoot(promCtx.page, 'promises-broken-en');
+await promCtx.page.evaluate(() => window.localStorage.setItem('fc.lang', 'hi'));
+await promCtx.page.reload({ waitUntil: 'networkidle' });
+await promCtx.page.getByRole('tab', { name: 'आज देने हैं' }).waitFor({ timeout: 10000 });
+await promCtx.page.waitForTimeout(300);
+await shoot(promCtx.page, 'promises-due-hi');
+await promCtx.page.getByRole('tab', { name: 'टूटे' }).click();
+await promCtx.page.waitForTimeout(300);
+await shoot(promCtx.page, 'promises-broken-hi');
+await promCtx.context.close();
+
+// --- promises empty state: demo-officer-3, the territory-less joiner ---
+const promEmptyCtx = await newPage('hi');
+await login(promEmptyCtx.page, 'demo-officer-3');
+await promEmptyCtx.page.locator('nav.bottom-nav').getByRole('button', { name: /Promises|वादे/ }).click();
+await promEmptyCtx.page.waitForURL('**/promises', { timeout: 10000 });
+await promEmptyCtx.page.waitForTimeout(700);
+await shoot(promEmptyCtx.page, 'promises-empty-hi');
+await promEmptyCtx.context.close();
+
 await browser.close();
 api.kill();
 vite.kill();
