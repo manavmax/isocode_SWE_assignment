@@ -41,7 +41,26 @@ try {
   failNow(body?.db !== 'error', `expected db error, got ${body.db}`);
   failNow(typeof body?.time !== 'string' || body.time.length === 0, 'expected ISO time string');
 
-  console.log('smoke-api: plain-Node ESM load + { fetch } function shape + degraded health OK');
+  // Nested-path routing coverage (the Vercel NOT_FOUND class of failure):
+  // POST /api/auth/login is three segments deep. With no DATABASE_URL the
+  // route's own catch answers 503 JSON — proof the request reached the Hono
+  // app's handler. A router miss would answer Hono's plain-text 404 instead.
+  const loginRes = await withTimeout(
+    handler(
+      new Request('http://localhost/api/auth/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: 'smoke', pin: '1234' })
+      })
+    ),
+    5000
+  );
+  failNow(loginRes.status !== 503, `nested /api/auth/login expected our 503 degraded (no DB), got ${loginRes.status}`);
+  failNow(!(loginRes.headers.get('content-type') ?? '').includes('application/json'), 'nested /api/auth/login answered non-JSON (route miss, not our handler)');
+  const loginBody = await loginRes.json();
+  failNow(loginBody?.status !== 'degraded', `nested /api/auth/login expected degraded body, got ${JSON.stringify(loginBody)}`);
+
+  console.log('smoke-api: plain-Node ESM load + { fetch } function shape + degraded health + nested /api/auth/login routing OK');
 } catch (err) {
   failNow(true, err?.message);
 }
