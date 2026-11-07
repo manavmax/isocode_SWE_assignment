@@ -1,9 +1,12 @@
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { getDb } from './db.js';
-import { importBatches, importRowErrors, loans, users } from './db/schema.js';
+import { importBatches, importRowErrors, loans, promises, users } from './db/schema.js';
 import { maskPhone } from '../shared/phone.js';
 import type { LoanStatus } from '../shared/types.js';
 import { DEMO_ACCOUNTS } from './demo.js';
+import { addIstDays } from '../shared/promises.js';
+import { promiseDeadline } from '../shared/promiseState.js';
+import { isStuck } from './jobs/nightly.js';
 
 export interface Actor {
   userId: string;
@@ -274,15 +277,203 @@ export async function listOfficerAssignments(actor: Actor): Promise<AssignmentSu
     .from(loans)
     .where(and(eq(loans.assignedOfficerId, actor.officerId), eq(loans.status, 'overdue')))
     .orderBy(desc(loans.dpd), asc(loans.loanId));
-  return rows.map((row) => ({
-    loanId: row.loanId,
-    borrowerName: row.borrowerName,
-    pincode: row.pincode,
-    locality: row.locality,
-    dpd: row.dpd,
-    bucket: row.bucket,
-    outstanding: row.outstanding,
-    overdueAmount: row.overdueAmount,
-    mobileMasked: maskPhone(row.mobile)
-  }));
+    return rows.map((row) => ({
+      loanId: row.loanId,
+      borrowerName: row.borrowerName,
+      pincode: row.pincode,
+      locality: row.locality,
+      dpd: row.dpd,
+      bucket: row.bucket,
+      outstanding: row.outstanding,
+      overdueAmount: row.overdueAmount,
+      mobileMasked: maskPhone(row.mobile)
+    }));
+}
+
+/** SPEC 12 promise-tracker cards (prompt 11 item 3), officer-scoped by the
+ *  promises' officer. Three sections:
+ *  - dueToday: open promises whose promised date IS today (IST);
+ *  - upcoming: open promises due after today, soonest first;
+ *  - brokenNeedingFollowup: broken/broken_part promises with NO contact
+ *    event on the loan since the break was recorded — the follow-up queue.
+ *  Escalation is derived from data, no tasks table (SPEC 12): a loan with a
+ *  second broken promise flags manager attention; a promise two or more
+ *  days past its deadline with no officer action is STUCK (A62) — exposed
+ *  on the cards and reusable by the manager dashboard. */
+export interface PromiseCard {
+  promiseId: string;
+  loanId: string;
+  borrowerName: string;
+  /** Paise (A11). */
+  amountPaise: number;
+  promisedDate: string;
+  status: 'open' | 'broken' | 'broken_part';
+  loanCleared: boolean;
+}
+
+export interface BrokenPromiseCard extends PromiseCard {
+  deadline: string;
+  /** Whole IST days between the deadline and today (>= 1 for every row here). */
+  daysPastDue: number;
+  /** SPEC 12 escalation: this loan has a second broken promise. */
+  needsManagerAttention: boolean;
+  /** SPEC 12 stuck list: >= 2 days past due with no officer action. */
+  stuck: boolean;
+}
+
+export interface OfficerPromises {
+  dueToday: PromiseCard[];
+  upcoming: PromiseCard[];
+  brokenNeedingFollowup: BrokenPromiseCard[];
+}
+
+export async function listOfficerPromises(actor: Actor, todayIst: string): Promise<OfficerPromises> {
+  if (actor.role !== 'field_officer' || !actor.officerId) {
+    return { dueToday: [], upcoming: [], brokenNeedingFollowup: [] };
+  }
+  const db = getDb();
+  const cardColumns = {
+    promiseId: promises.id,
+    loanId: promises.loanId,
+    borrowerName: loans.borrowerName,
+    amountPaise: promises.promisedAmount,
+    promisedDate: promises.promisedDate,
+    status: promises.status,
+    loanCleared: sql<boolean>`(${loans.status} = 'cleared')`
+  };
+  const openRows = await db
+    .select(cardColumns)
+    .from(promises)
+    .innerJoin(loans, eq(loans.loanId, promises.loanId))
+    .where(
+      and(
+        eq(promises.officerId, actor.officerId),
+        eq(promises.status, 'open'),
+        sql`${promises.promisedDate} >= ${todayIst}`,
+        sql`${promises.promisedDate} <= ${addIstDays(todayIst, 30)}`
+      )
+    )
+    .orderBy(asc(promises.promisedDate));
+  const brokenRows = await db
+    .select({
+      ...cardColumns,
+      graceDays: promises.graceDays,
+      resolvedAt: promises.resolvedAt,
+      secondBreak: sql<boolean>`(
+        SELECT count(*) FROM promise p2
+        WHERE p2.loan_id = ${promises.loanId} AND p2.status IN ('broken', 'broken_part')
+      ) >= 2`,
+      actionedSinceBreak: sql<boolean>`EXISTS (
+        SELECT 1 FROM contact_event ce
+        WHERE ce.loan_id = ${promises.loanId}
+          AND ce.attempted_at_ist >= ${promises.resolvedAt}
+      )`
+    })
+    .from(promises)
+    .innerJoin(loans, eq(loans.loanId, promises.loanId))
+    .where(
+      and(
+        eq(promises.officerId, actor.officerId),
+        sql`${promises.status} IN ('broken', 'broken_part')`
+      )
+    )
+    .orderBy(desc(promises.resolvedAt))
+    .limit(50);
+
+  const dueToday: PromiseCard[] = [];
+  const upcoming: PromiseCard[] = [];
+  for (const row of openRows) {
+    const card: PromiseCard = {
+      promiseId: row.promiseId,
+      loanId: row.loanId,
+      borrowerName: row.borrowerName,
+      amountPaise: Number(row.amountPaise),
+      promisedDate: String(row.promisedDate),
+      status: 'open',
+      loanCleared: row.loanCleared
+    };
+    if (card.promisedDate === todayIst) {
+      dueToday.push(card);
+    } else {
+      upcoming.push(card);
+    }
+  }
+
+  const brokenNeedingFollowup: BrokenPromiseCard[] = [];
+  for (const row of brokenRows) {
+    if (row.actionedSinceBreak) {
+      continue;
+    }
+    const deadline = promiseDeadline(String(row.promisedDate), row.graceDays);
+    const daysPastDue = Math.max(
+      1,
+      Math.round((Date.parse(`${todayIst}T00:00:00Z`) - Date.parse(`${deadline}T00:00:00Z`)) / 86_400_000)
+    );
+    brokenNeedingFollowup.push({
+      promiseId: row.promiseId,
+      loanId: row.loanId,
+      borrowerName: row.borrowerName,
+      amountPaise: Number(row.amountPaise),
+      promisedDate: String(row.promisedDate),
+      status: row.status === 'broken_part' ? 'broken_part' : 'broken',
+      loanCleared: row.loanCleared,
+      deadline,
+      daysPastDue,
+      needsManagerAttention: row.secondBreak,
+      stuck: isStuck(daysPastDue)
+    });
+  }
+  return { dueToday, upcoming, brokenNeedingFollowup };
+}
+
+/** The manager dashboard's stuck-promise list (SPEC 12), company-wide —
+ *  the same definition as the officer cards' stuck flag (A62), exposed as
+ *  its own read so the dashboard view can consume it without re-deriving. */
+export async function listStuckPromises(todayIst: string): Promise<(BrokenPromiseCard & { officerName: string | null; branchId: string })[]> {
+  const db = getDb();
+  const rows = await db.execute(sql`
+    SELECT p.id::text AS promise_id,
+           p.loan_id,
+           l.borrower_name,
+           p.promised_amount::bigint AS amount_paise,
+           p.promised_date::text AS promised_date,
+           p.status::text AS status,
+           (l.status = 'cleared') AS loan_cleared,
+           (p.promised_date + p.grace_days)::text AS deadline,
+           o.name AS officer_name,
+           l.branch_id
+    FROM promise p
+    JOIN loan l ON l.loan_id = p.loan_id
+    LEFT JOIN officer o ON o.id = p.officer_id
+    WHERE p.status IN ('broken', 'broken_part')
+      AND (p.promised_date + p.grace_days) <= DATE ${todayIst} - 2
+      AND NOT EXISTS (
+        SELECT 1 FROM contact_event ce
+        WHERE ce.loan_id = p.loan_id AND ce.attempted_at_ist >= p.resolved_at
+      )
+    ORDER BY (p.promised_date + p.grace_days) ASC
+    LIMIT 100
+  `);
+  return (rows.rows as Record<string, unknown>[]).map((raw) => {
+    const deadline = String(raw.deadline).slice(0, 10);
+    const daysPastDue = Math.max(
+      1,
+      Math.round((Date.parse(`${todayIst}T00:00:00Z`) - Date.parse(`${deadline}T00:00:00Z`)) / 86_400_000)
+    );
+    return {
+      promiseId: String(raw.promise_id),
+      loanId: String(raw.loan_id),
+      borrowerName: String(raw.borrower_name),
+      amountPaise: Number(raw.amount_paise),
+      promisedDate: String(raw.promised_date).slice(0, 10),
+      status: String(raw.status) === 'broken_part' ? ('broken_part' as const) : ('broken' as const),
+      loanCleared: raw.loan_cleared === true,
+      deadline,
+      daysPastDue,
+      needsManagerAttention: false,
+      stuck: isStuck(daysPastDue),
+      officerName: raw.officer_name === null ? null : String(raw.officer_name),
+      branchId: String(raw.branch_id)
+    };
+  });
 }

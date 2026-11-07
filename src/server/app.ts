@@ -19,7 +19,9 @@ import { processEventBatch } from './events.js';
 import { revealBorrowerPhone } from './reveal.js';
 import { contactEventBatchSchema, MAX_EVENT_BATCH } from '../shared/sync/eventSchema.js';
 import { demoLoginAllowed, demoModeEnabled } from './demo.js';
-import { listDemoUsernames } from './dal.js';
+import { listDemoUsernames, listOfficerPromises } from './dal.js';
+import { cronSecretMatches, recomputePromiseStatuses } from './jobs/nightly.js';
+import { istDateKey } from '../shared/datetime.js';
 
 export const app = new Hono();
 
@@ -156,6 +158,43 @@ app.get('/api/me/assignments', async (c) => {
     }
     const assignments = await listOfficerAssignments(actor);
     return c.json({ assignments });
+  } catch {
+    return c.json({ status: 'degraded' }, 503);
+  }
+});
+
+/** SPEC 12 promise tracker (prompt 11 item 3): the officer's own promises in
+ *  three sections — due today, upcoming, broken needing follow-up — with the
+ *  data-derived escalation flags. Manager view arrives with the manager
+ *  dashboard; managers are refused for now, mirroring /api/me/assignments. */
+app.get('/api/me/promises', async (c) => {
+  try {
+    const actor = await resolveSessionActor(getCookie(c, SESSION_COOKIE));
+    if (!actor) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    if (actor.role !== 'field_officer' || !actor.officerId) {
+      return c.json({ error: 'forbidden' }, 403);
+    }
+    const sections = await listOfficerPromises(actor, istDateKey(Date.now()));
+    return c.json(sections);
+  } catch {
+    return c.json({ status: 'degraded' }, 503);
+  }
+});
+
+/** Nightly maintenance (SPEC 12/13, prompt 11 item 3): Vercel's cron calls
+ *  this daily with `Authorization: Bearer $CRON_SECRET` (set in the Vercel
+ *  dashboard; the repo carries only the name in .env.example). Recomputes
+ *  promise statuses from the payments feed — idempotent, a second call over
+ *  an unchanged database answers the same counts with updated 0. */
+app.post('/api/jobs/nightly', async (c) => {
+  if (!cronSecretMatches(c.req.header('authorization') ?? null, process.env.CRON_SECRET)) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  try {
+    const outcome = await recomputePromiseStatuses();
+    return c.json({ ok: true, ...outcome });
   } catch {
     return c.json({ status: 'degraded' }, 503);
   }

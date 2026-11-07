@@ -21,6 +21,7 @@ import { dpdBucketFor } from '../../shared/bucket.js';
 import { ASSIGNMENT_REASONS, type AssignmentReason } from '../../shared/assignment.js';
 import { runAssignment } from '../assignment/runAssignment.js';
 import { inferPaymentsFromDelta, istDayUtcRange, istNoonUtc } from './inferPayments.js';
+import { recomputePromiseStatuses } from '../jobs/nightly.js';
 
 export interface ImportActor {
   userId: string | null;
@@ -384,6 +385,21 @@ export async function applyImport(input: ApplyImportInput): Promise<ApplyImportO
     const assignment = await runAssignment(input.asOf, input.actor.username);
     const report = { ...outcome.report, assignment: assignment.outcomesByReason };
     await persistReport(outcome.batchId, report);
+    // Fresh payments just landed: re-derive the promise statuses now rather
+    // than waiting for the nightly cron (prompt 11 item 3). Non-fatal — the
+    // cron recomputes anyway; a failure is audited, never fails the import.
+    try {
+      await recomputePromiseStatuses();
+    } catch (err) {
+      await withTx(async (tx) => {
+        await tx.insert(auditLog).values({
+          actor: input.actor.username,
+          action: 'promise_nightly:failed',
+          subject: outcome.batchId,
+          detail: { asOf: input.asOf, message: err instanceof Error ? err.message : String(err) }
+        });
+      });
+    }
     return { status: outcome.status, batchId: outcome.batchId, report };
   } catch (err) {
     await auditAssignmentFailure(input, outcome, err);
