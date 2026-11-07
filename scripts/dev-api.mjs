@@ -19,7 +19,7 @@ rmSync(outdir, { recursive: true, force: true });
 
 await esbuild.build({ entryPoints: entries, outdir, outbase: '.', format: 'esm', logLevel: 'silent' });
 
-const entryModule = await import(pathToFileURL(path.join(outdir, 'api', '[[...route]].js')).href);
+const entryModule = await import(pathToFileURL(path.join(outdir, 'api', 'index.js')).href);
 const handler = entryModule.default.fetch;
 
 const server = http.createServer(async (req, res) => {

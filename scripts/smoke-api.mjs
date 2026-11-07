@@ -26,7 +26,7 @@ await esbuild.build({
 delete process.env.DATABASE_URL;
 
 try {
-  const entryModule = await import(pathToFileURL(path.join(outdir, 'api', '[[...route]].js')).href);
+  const entryModule = await import(pathToFileURL(path.join(outdir, 'api', 'index.js')).href);
 
   failNow(typeof entryModule.default === 'function', 'default export is a bare function; Vercel ignores returns there and hangs. Use the documented { fetch } object (or named method exports)');
   failNow(entryModule.default === null || typeof entryModule.default !== 'object', 'default export must be the documented { fetch } object');
