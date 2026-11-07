@@ -68,6 +68,9 @@ export interface StaffIds {
   officerIdByName: Record<string, string>;
   userIdByUsername: Record<string, string>;
   demoUsernames: string[];
+  /** The demo officers' own ids (A50): territory slices are written for them
+   *  too, so the demo worklist is never empty after a seed. */
+  demoOfficerIdByUsername: Record<string, string>;
 }
 
 /** Idempotent staff upsert: branches on code, officers by name lookup, users
@@ -146,5 +149,11 @@ export async function upsertStaff(db: NeonHttpDatabase, capacityPoints: number):
   const demo = await ensureDemoAccounts(db, 'UJJAIN');
   const demoUsernames = demo.usernames;
 
-  return { branchIdByCode, officerIdByName, userIdByUsername, demoUsernames };
+  return {
+    branchIdByCode,
+    officerIdByName,
+    userIdByUsername,
+    demoUsernames,
+    demoOfficerIdByUsername: demo.officerIdByUsername
+  };
 }

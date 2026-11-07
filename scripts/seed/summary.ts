@@ -29,6 +29,18 @@ export interface BucketRow {
   loans: number;
 }
 
+/** A50: one row per demo chip user, with the officer it acts as and its loan
+ *  counts. worklist = status='overdue' (what /api/me/assignments returns);
+ *  assignedAny counts every status, so a fully-cured worklist still names
+ *  itself. */
+export interface DemoAccountRow {
+  username: string;
+  role: 'field_officer' | 'branch_manager';
+  officerName: string | null;
+  worklist: number;
+  assignedAny: number;
+}
+
 /** Display SQL with the dates interpolated (both are resolveAsOf-validated
  *  YYYY-MM-DD strings, so interpolation is injection-safe). One row per
  *  branch plus a '(all branches)' footing row via GROUPING SETS. */
@@ -96,6 +108,25 @@ export function formatOfficerCounts(rows: readonly OfficerCountRow[], queued: nu
   }
   lines.push(`  ${'queue (no officer, branch manager)'.padEnd(40)} ${String(queued).padStart(5)}`);
   lines.push(`  ${'cleared by the end date (status=cleared)'.padEnd(40)} ${String(cleared).padStart(5)}`);
+  return lines;
+}
+
+export function formatDemoAccounts(rows: readonly DemoAccountRow[]): string[] {
+  const lines = ['  demo accounts (worklist = status=overdue):'];
+  lines.push('  username          officer             worklist  assigned');
+  for (const row of rows) {
+    const officer = row.officerName ?? '(NO OFFICER LINK)';
+    lines.push(`  ${row.username.padEnd(17)} ${officer.padEnd(19)} ${String(row.worklist).padStart(8)} ${String(row.assignedAny).padStart(9)}`);
+  }
+  // The manager legitimately has no officer and no worklist; only an officer
+  // account with an empty worklist is a failure.
+  const emptyWorklists = rows.filter((row) => row.role === 'field_officer' && row.worklist === 0);
+  if (emptyWorklists.length > 0) {
+    lines.push(
+      `  WARNING: empty demo worklist for ${emptyWorklists.map((row) => row.username).join(', ')} — ` +
+        'seed missing, demo account not linked to an officer, or the deployment points at a different database'
+    );
+  }
   return lines;
 }
 

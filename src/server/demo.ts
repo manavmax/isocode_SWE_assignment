@@ -48,6 +48,11 @@ export function demoModeEnabled(): boolean {
 export interface DemoAccountsSummary {
   branchId: string;
   usernames: string[];
+  /** Officer id each demo officer-user acts as (managers map to nothing). The
+   *  seed needs these to write the demo officers' territory slices — without
+   *  a territory row the planner can never route a loan to them and the demo
+   *  worklist stays empty (A50). */
+  officerIdByUsername: Record<string, string>;
 }
 
 /** Idempotent: safe to run again after a seed; users follow the branch and
@@ -99,5 +104,5 @@ export async function ensureDemoAccounts(db: NeonHttpDatabase, branchCode: strin
     usernames.push(account.username);
   }
 
-  return { branchId, usernames };
+  return { branchId, usernames, officerIdByUsername: Object.fromEntries(officerIds) };
 }

@@ -33,9 +33,11 @@ import {
   cohortSanitySql,
   formatBucketMix,
   formatCohortResults,
+  formatDemoAccounts,
   formatOfficerCounts,
   type BucketRow,
   type CohortRow,
+  type DemoAccountRow,
   type OfficerCountRow
 } from './summary.js';
 import { buildTerritoryRows } from './territory.js';
@@ -91,8 +93,12 @@ async function writeTerritory(
   config: ReturnType<typeof loadSeedConfigFile>,
   staff: Awaited<ReturnType<typeof upsertStaff>>
 ): Promise<number> {
-  const rows = buildTerritoryRows(config, staff.officerIdByName);
-  const officerIds = Object.values(staff.officerIdByName);
+  // A50: the map includes the demo officers — their territory slices are what
+  // lets the planner ever route a loan to them (an officer with no territory
+  // row receives nothing, which left the demo worklist empty).
+  const officerIdByName = { ...staff.officerIdByName, ...staff.demoOfficerIdByUsername };
+  const rows = buildTerritoryRows(config, officerIdByName);
+  const officerIds = Object.values(officerIdByName);
   // Idempotent repair without --reset: rows written by an earlier seed plan
   // for these officers are removed, then the current plan is inserted.
   if (officerIds.length > 0) {
@@ -103,7 +109,7 @@ async function writeTerritory(
       branchId: staff.branchIdByCode[row.branchCode]!,
       pincode: row.pincode,
       locality: row.locality,
-      officerId: staff.officerIdByName[row.officerName]!,
+      officerId: officerIdByName[row.officerName]!,
       rank: 1
     }))
   );
@@ -131,6 +137,7 @@ interface SummaryQueries {
   overdue: number;
   buckets: BucketRow[];
   cohortRows: CohortRow[];
+  demoRows: DemoAccountRow[];
 }
 
 async function readSummary(t0: string, asOf: string): Promise<SummaryQueries> {
@@ -157,6 +164,20 @@ async function readSummary(t0: string, asOf: string): Promise<SummaryQueries> {
     `SELECT bucket, count(*)::int AS loans FROM loan WHERE status IN ('overdue', 'queue') GROUP BY 1 ORDER BY 1`
   );
   const cohortResult = await pool.query(cohortSanitySql(t0, asOf));
+  // A50: the demo chips' officer link and worklist, printed explicitly so an
+  // empty demo officer account names itself instead of hiding in the table.
+  const demoResult = await pool.query(
+    `SELECT u.username, u.role,
+            COALESCE(o.name, '(NO OFFICER LINK)') AS officer_name,
+            count(l.loan_id) FILTER (WHERE l.status = 'overdue')::int AS worklist,
+            count(l.loan_id)::int AS assigned_any
+     FROM app_user u
+     LEFT JOIN officer o ON o.id = u.officer_id
+     LEFT JOIN loan l ON l.assigned_officer_id = u.officer_id
+     WHERE u.is_demo = true AND u.username IN ('demo-manager', 'demo-officer-1', 'demo-officer-2')
+     GROUP BY u.username, u.role, o.name
+     ORDER BY u.username`
+  );
   return {
     officerRows: officerRowSets.rows.map((row) => ({
       branch: String(row.branch),
@@ -173,6 +194,13 @@ async function readSummary(t0: string, asOf: string): Promise<SummaryQueries> {
       cured: Number(row.cured),
       stayed: Number(row.stayed),
       rolled: Number(row.rolled)
+    })),
+    demoRows: demoResult.rows.map((row) => ({
+      username: String(row.username),
+      role: String(row.role) as 'field_officer' | 'branch_manager',
+      officerName: String(row.officer_name),
+      worklist: Number(row.worklist),
+      assignedAny: Number(row.assigned_any)
     }))
   };
 }
@@ -197,6 +225,10 @@ function printSummary(
   console.log('==== seed summary ====');
   console.log('loans per branch and officer (status=overdue):');
   for (const line of formatOfficerCounts(queries.officerRows, queries.queued, queries.cleared)) {
+    console.log(line);
+  }
+  console.log('');
+  for (const line of formatDemoAccounts(queries.demoRows)) {
     console.log(line);
   }
   console.log('');

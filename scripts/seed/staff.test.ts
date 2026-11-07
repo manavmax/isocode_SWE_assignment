@@ -69,14 +69,18 @@ describe('staff specs (SPEC 20.1, A31, prompt-8 people row)', () => {
 describe('territory rows (SPEC 20.1, prompt-8 territory row, planner-fidelity)', () => {
   const config = loadSeedConfigFile(realFile);
   const officerIdFor = (name: string): string => `id-for-${name}`;
-  const ids: OfficerNameToId = Object.fromEntries(OFFICER_SPECS.map((officer) => [officer.name, officerIdFor(officer.name)]));
+  // The map main.ts builds: the 9 staff officers plus the two demo officers
+  // (A50) — without the demo ids the demo slices cannot resolve.
+  const ids: OfficerNameToId = Object.fromEntries(
+    [...OFFICER_SPECS.map((officer) => officer.name), 'Demo Officer 1', 'Demo Officer 2'].map((name) => [name, officerIdFor(name)])
+  );
 
-  it('builds 9 rows: Indore 4, Dewas 2, Ujjain 2, Ratlam 1 with Ratlam\'s row on the Ujjain branch', () => {
+  it('builds 11 rows: Indore 4, Dewas 2, Ujjain city 4 (incl. 2 demo slices), Ratlam 1 on the Ujjain branch', () => {
     const rows = buildTerritoryRows(config, ids);
-    expect(rows).toHaveLength(9);
+    expect(rows).toHaveLength(11);
     expect(rows.filter((row) => row.branchCode === 'IDR')).toHaveLength(4);
     expect(rows.filter((row) => row.branchCode === 'DWS')).toHaveLength(2);
-    expect(rows.filter((row) => row.branchCode === 'UJJAIN')).toHaveLength(3);
+    expect(rows.filter((row) => row.branchCode === 'UJJAIN')).toHaveLength(5);
     const ratlamRow = rows.find((row) => row.pincode === config.territory.ratlam_pincode);
     expect(ratlamRow).toBeDefined();
     expect(ratlamRow!.branchCode).toBe('UJJAIN');
@@ -86,10 +90,18 @@ describe('territory rows (SPEC 20.1, prompt-8 territory row, planner-fidelity)',
   it('splits shared pincodes by locality and resolves every loan address deterministically', () => {
     const rows = buildTerritoryRows(config, ids);
     const keyCount = new Set(rows.map((row) => `${row.branchCode}|${row.pincode}|${row.locality ?? ''}`)).size;
-    expect(keyCount).toBe(9); // unique (branch, pincode, locality) scope
+    expect(keyCount).toBe(11); // unique (branch, pincode, locality) scope
     const dewasRows = rows.filter((row) => row.branchCode === 'DWS');
     for (const locality of config.territory.dewas_localities) {
       expect(dewasRows.find((row) => row.locality === locality)).toBeDefined();
+    }
+    // The demo officers own one exact Ujjain slice each, never Freeganj (A50).
+    const demoLocalities = config.territory.ujjain_localities.slice(1, 3);
+    for (const locality of demoLocalities) {
+      const row = rows.find((entry) => entry.locality === locality);
+      expect(row).toBeDefined();
+      expect(['Demo Officer 1', 'Demo Officer 2']).toContain(row!.officerName);
+      expect(rows.find((entry) => entry.locality === config.territory.ujjain_localities[0])!.officerName).toBe('Trupti Girdhar');
     }
     // The defect pincode must fail every prefix tier inside each branch's rows:
     // 466001 shares no 5/4/3-digit prefix with 452xxx, 455xxx, 456xxx or 457xxx.

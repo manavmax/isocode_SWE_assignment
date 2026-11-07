@@ -5,6 +5,7 @@ import { buildLoanUniverse, BRIEF_LOAN_IDS } from './loans.js';
 import { mulberry32 } from './rng.js';
 import { buildTerritoryRows } from './territory.js';
 import { BRANCHES, OFFICER_SPECS } from './staff.js';
+import { DEMO_ACCOUNTS } from '../../src/server/demo.js';
 import { planAssignment } from '../../src/shared/assignment.js';
 import type { AssignmentLoan, AssignmentOfficer, AssignmentTerritory } from '../../src/shared/assignment.js';
 
@@ -16,10 +17,13 @@ const universe = buildLoanUniverse(mulberry32(20261105), config, 20261105);
  *  the brief-officer assertions need no database. Branch codes double as
  *  branch ids for the same reason, except the internal UJJ tag: the DB row is
  *  UJJAIN (A43), and the planner scopes candidates by branch-id equality, so
- *  loans are translated through the same mapping main.ts applies. */
-const officerIdFor: Record<string, string> = Object.fromEntries(
-  OFFICER_SPECS.map((officer) => [officer.name, `officer:${officer.username}`])
-);
+ *  loans are translated through the same mapping main.ts applies. The demo
+ *  officers ride in the same map (A50) — at runtime runAssignment reads them
+ *  from the officers table just like any other officer. */
+const officerIdFor: Record<string, string> = Object.fromEntries([
+  ...OFFICER_SPECS.map((officer) => [officer.name, `officer:${officer.username}`]),
+  ...DEMO_ACCOUNTS.filter((account) => account.officerUser).map((account) => [account.officerName!, `officer:${account.username}`])
+]);
 const dbBranchIdFor: Record<string, string> = { IDR: 'IDR', DWS: 'DWS', UJJ: 'UJJAIN' };
 
 const BRIEF_OFFICER: Record<string, string> = {
@@ -36,12 +40,16 @@ const territory: readonly AssignmentTerritory[] = buildTerritoryRows(config, off
   officerId: officerIdFor[row.officerName]!,
   rank: 1
 }));
-const officers: readonly AssignmentOfficer[] = OFFICER_SPECS.map((officer) => ({
-  id: officerIdFor[officer.name]!,
-  branchId: officer.branchCode,
-  active: true,
-  capacityPoints: config.people.officer_capacity_points
-}));
+const demoOfficerIds = DEMO_ACCOUNTS.filter((account) => account.officerUser).map((account) => officerIdFor[account.officerName!]!);
+const officers: readonly AssignmentOfficer[] = [
+  ...OFFICER_SPECS.map((officer) => ({
+    id: officerIdFor[officer.name]!,
+    branchId: officer.branchCode,
+    active: true,
+    capacityPoints: config.people.officer_capacity_points
+  })),
+  ...demoOfficerIds.map((id) => ({ id, branchId: 'UJJAIN', active: true, capacityPoints: 30 }))
+];
 
 /** All end-active loans at their end-date dpd, unassigned — one clean
  *  assignment run over the whole book, like the last file's runner pass. */
@@ -105,10 +113,10 @@ describe('the brief loans resolve to the officers the brief names, by territory 
     expect(BRIEF_LOAN_IDS.every((loanId) => byId.get(loanId)!.pincode !== config.territory.unmapped_defect_pincode)).toBe(true);
   });
 
-  it('keeps every officer inside their own branch plan (9 branches rows, 9 officers)', () => {
+  it('keeps every officer inside their own branch plan (11 territory rows, 11 officers incl. the demo pair)', () => {
     expect(BRANCHES).toHaveLength(3);
     expect(OFFICER_SPECS).toHaveLength(9);
-    expect(territory).toHaveLength(9);
+    expect(territory).toHaveLength(11);
     for (const row of territory) {
       expect(officers.find((officer) => officer.id === row.officerId)!.branchId).toBe(row.branchId);
     }

@@ -493,14 +493,30 @@ function applyTerritoryShapes(rng: Rng, config: SeedConfig, loans: GeneratedLoan
       }
       continue;
     }
-    // Ujjain branch: city loans split Freeganj/generic, ratlam loans 457001.
+    // Ujjain branch: one pinned end-overdue city loan per demo officer slice
+    // (A50) so the demo worklist is never empty, then the city loans split
+    // Freeganj/generic, ratlam loans 457001.
     const city = slice.filter((loan) => loan.subBranch === 'ujjain');
     const cityOrder = shuffled(rng, city.map((_, index) => index));
-    const cityCounts = allocateShareCounts(city.length, [config.territory.ujjain_city_locality_share, 1 - config.territory.ujjain_city_locality_share]);
-    let cityCursor = 0;
-    for (let i = 0; i < cityCounts.length; i += 1) {
-      for (let j = 0; j < cityCounts[i]!; j += 1) {
-        const loan = city[cityOrder[cityCursor++]!]!;
+    const demoLocalities = [config.territory.ujjain_localities[1]!, config.territory.ujjain_localities[2]!];
+    const pinnedDemoIds = new Set<string>();
+    for (const locality of demoLocalities) {
+      const index = cityOrder.find((i) => city[i]!.destiny !== 'cure' && !pinnedDemoIds.has(city[i]!.loanId));
+      const loan = index === undefined ? undefined : city[index]!;
+      if (!loan) {
+        throw new Error(`loans: no end-overdue ujjain city loan left to pin to the demo slice ${locality}`);
+      }
+      pinnedDemoIds.add(loan.loanId);
+      loan.pincode = config.territory.ujjain_pincode;
+      loan.locality = locality;
+    }
+    const rest = city.filter((loan) => !pinnedDemoIds.has(loan.loanId));
+    const restOrder = shuffled(rng, rest.map((_, index) => index));
+    const restCounts = allocateShareCounts(rest.length, [config.territory.ujjain_city_locality_share, 1 - config.territory.ujjain_city_locality_share]);
+    let restCursor = 0;
+    for (let i = 0; i < restCounts.length; i += 1) {
+      for (let j = 0; j < restCounts[i]!; j += 1) {
+        const loan = rest[restOrder[restCursor++]!]!;
         loan.pincode = config.territory.ujjain_pincode;
         loan.locality = i === 0 ? config.territory.ujjain_localities[0] ?? null : null;
       }

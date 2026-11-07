@@ -5,8 +5,10 @@
  * - Dewas 455001 is split strictly by locality between its two officers —
  *   there is NO generic row, so Dewas loan rows must carry one of the two
  *   configured localities (the generator guarantees that).
- * - Ujjain 456001: Trupti Girdhar owns the 'Freeganj' slice, the generic row
- *   (Arjun Verma) takes the rest.
+ * - Ujjain 456001: Trupti Girdhar owns the 'Freeganj' slice, the demo
+ *   officers own one slice each (Nanakheda, Dewasgate — A50, so the demo
+ *   worklist is never empty), and the generic row (Arjun Verma) takes the
+ *   rest.
  * - Ratlam 457001: single officer Imran Qureshi, no generic fallback beyond
  *   him, and the row's branch is UJJAIN (A3). Also the deliberate single-officer
  *   leave edge case for the later events/officer-absence work.
@@ -38,8 +40,12 @@ export function buildTerritoryRows(config: SeedConfig, officerIdFor: OfficerName
     // Dewas: pure locality split, two rows, no generic.
     { branchCode: 'DWS', pincode: config.territory.dewas_pincode, locality: config.territory.dewas_localities[0]!, officerName: 'Neha Solanki' },
     { branchCode: 'DWS', pincode: config.territory.dewas_pincode, locality: config.territory.dewas_localities[1]!, officerName: 'Murlidhar Garg' },
-    // Ujjain: one๊ slice + generic.
+    // Ujjain: three slices + generic. The demo officers' rows (A50) resolve
+    // only when the caller's map includes their ids (main.ts merges
+    // ensureDemoAccounts' officerIdByUsername into the staff map).
     { branchCode: 'UJJAIN', pincode: config.territory.ujjain_pincode, locality: config.territory.ujjain_localities[0]!, officerName: 'Trupti Girdhar' },
+    { branchCode: 'UJJAIN', pincode: config.territory.ujjain_pincode, locality: config.territory.ujjain_localities[1]!, officerName: 'Demo Officer 1' },
+    { branchCode: 'UJJAIN', pincode: config.territory.ujjain_pincode, locality: config.territory.ujjain_localities[2]!, officerName: 'Demo Officer 2' },
     { branchCode: 'UJJAIN', pincode: config.territory.ujjain_pincode, locality: null, officerName: 'Arjun Verma' },
     // Ratlam: single officer, whole pincode, UJJAIN branch row (A3).
     { branchCode: 'UJJAIN', pincode: config.territory.ratlam_pincode, locality: null, officerName: 'Imran Qureshi' }

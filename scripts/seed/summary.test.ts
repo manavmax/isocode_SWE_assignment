@@ -4,10 +4,12 @@ import {
   footingProblems,
   formatBucketMix,
   formatCohortResults,
+  formatDemoAccounts,
   formatOfficerCounts,
   rollPct,
   type BucketRow,
   type CohortRow,
+  type DemoAccountRow,
   type OfficerCountRow
 } from './summary.js';
 
@@ -89,6 +91,39 @@ describe('formatOfficerCounts', () => {
     expect(lines).toContain('  Indore  Rahul Chouhan           23');
     expect(lines).toContain('  queue (no officer, branch manager)           6');
     expect(lines).toContain('  cleared by the end date (status=cleared)    83');
+  });
+});
+
+describe('formatDemoAccounts (A50)', () => {
+  const rows: DemoAccountRow[] = [
+    { username: 'demo-manager', role: 'branch_manager', officerName: null, worklist: 0, assignedAny: 0 },
+    { username: 'demo-officer-1', role: 'field_officer', officerName: 'Demo Officer 1', worklist: 4, assignedAny: 5 },
+    { username: 'demo-officer-2', role: 'field_officer', officerName: 'Demo Officer 2', worklist: 0, assignedAny: 2 }
+  ];
+
+  it('prints each demo username with its officer name and loan counts', () => {
+    const lines = formatDemoAccounts(rows);
+    expect(lines[0]).toBe('  demo accounts (worklist = status=overdue):');
+    expect(lines[1]).toBe('  username          officer             worklist  assigned');
+    // '  ' + username.padEnd(17) + ' ' + officer.padEnd(19) + ' ' + worklist.padStart(8) + ' ' + assigned.padStart(9)
+    expect(lines).toContain('  demo-manager      (NO OFFICER LINK)          0         0');
+    expect(lines).toContain('  demo-officer-1    Demo Officer 1             4         5');
+  });
+
+  it('warns loudly when a demo officer account has an empty worklist, but never for the manager', () => {
+    const lines = formatDemoAccounts(rows);
+    expect(lines.at(-1)).toBe(
+      '  WARNING: empty demo worklist for demo-officer-2 — seed missing, demo account not linked to an officer, or the deployment points at a different database'
+    );
+  });
+
+  it('stays silent when every demo officer account has a worklist', () => {
+    const lines = formatDemoAccounts([
+      { username: 'demo-manager', role: 'branch_manager', officerName: null, worklist: 0, assignedAny: 0 },
+      { username: 'demo-officer-1', role: 'field_officer', officerName: 'Demo Officer 1', worklist: 4, assignedAny: 5 },
+      { username: 'demo-officer-2', role: 'field_officer', officerName: 'Demo Officer 2', worklist: 3, assignedAny: 3 }
+    ]);
+    expect(lines.some((line) => line.includes('WARNING'))).toBe(false);
   });
 });
 
