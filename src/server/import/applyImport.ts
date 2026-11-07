@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { and, desc, eq, inArray, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import { getDb, withTx, type PooledTx } from '../db.js';
 import {
   auditLog,
@@ -9,6 +9,7 @@ import {
   loanSnapshots,
   loans,
   officers,
+  payments,
   promises,
   territory
 } from '../db/schema.js';
@@ -19,6 +20,7 @@ import type { ImportLoan, RowIssue } from '../../shared/import/validateRow.js';
 import { dpdBucketFor } from '../../shared/bucket.js';
 import { ASSIGNMENT_REASONS, type AssignmentReason } from '../../shared/assignment.js';
 import { runAssignment } from '../assignment/runAssignment.js';
+import { inferPaymentsFromDelta, istDayUtcRange, istNoonUtc } from './inferPayments.js';
 
 export interface ImportActor {
   userId: string | null;
@@ -45,6 +47,9 @@ export interface StoredImportReport {
   gone: number;
   warnings: number;
   errors: number;
+  /** Payments inferred from the outstanding delta (prompt 11 item 2); absent
+   *  in reports written before the field existed. */
+  paymentsInferred?: number;
   /** Assignment outcomes by reason (A26); zeros until the runner has run. */
   assignment: Record<AssignmentReason, number>;
 }
@@ -102,7 +107,8 @@ function buildReport(
   plan: ImportPlan,
   parsed: { totalRows: number; rows: ImportLoan[]; dropped: number; skipped: number },
   warnings: number,
-  errors: number
+  errors: number,
+  paymentsInferred = 0
 ): StoredImportReport {
   return {
     totalRows: parsed.totalRows,
@@ -117,6 +123,7 @@ function buildReport(
     gone: plan.counts.gone,
     warnings,
     errors,
+    paymentsInferred,
     assignment: zeroAssignmentOutcomes()
   };
 }
@@ -299,7 +306,38 @@ export async function applyImport(input: ApplyImportInput): Promise<ApplyImportO
       );
     }
 
-    const report = buildReport(plan, parse, parse.warnings.length, parse.errors.length);
+    // Payments inferred from the LMS delta (prompt 11 item 2): an
+    // outstanding that fell against the previous snapshot is a payment, a
+    // loan that vanished was paid off. Idempotent by construction — the
+    // same-bytes noop path above returned before any write — and a same-as_of
+    // replace recomputes: this as_of's inferred rows are deleted before the
+    // fresh inference lands, all inside this transaction.
+    const inferredPayments = inferPaymentsFromDelta({
+      previous,
+      rows: parse.rows,
+      goneLoanIds: plan.gone.map((entry) => entry.loanId),
+      asOf: input.asOf
+    });
+    if (replacing) {
+      // A replace recomputes the delta for this as_of: the replaced file's
+      // inferred rows die even when the fresh inference is empty.
+      const range = istDayUtcRange(input.asOf);
+      await tx
+        .delete(payments)
+        .where(and(eq(payments.source, 'lms_delta'), gte(payments.postedAt, range.startUtc), lt(payments.postedAt, range.endUtc)));
+    }
+    if (inferredPayments.length > 0) {
+      await tx.insert(payments).values(
+        inferredPayments.map((payment) => ({
+          loanId: payment.loanId,
+          amount: payment.amountPaise,
+          postedAt: istNoonUtc(payment.postedOnIst),
+          source: 'lms_delta' as const
+        }))
+      );
+    }
+
+    const report = buildReport(plan, parse, parse.warnings.length, parse.errors.length, inferredPayments.length);
     const inserted = await tx
       .insert(importBatches)
       .values({
