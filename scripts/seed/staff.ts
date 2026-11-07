@@ -68,8 +68,10 @@ export interface StaffIds {
   officerIdByName: Record<string, string>;
   userIdByUsername: Record<string, string>;
   demoUsernames: string[];
-  /** The demo officers' own ids (A50): territory slices are written for them
-   *  too, so the demo worklist is never empty after a seed. */
+  /** The demo officers' own ids (A50), keyed by USERNAME exactly as
+   *  ensureDemoAccounts returns them: territory slices are written for them
+   *  too, so the demo worklist is never empty after a seed — territory.ts
+   *  rekeys these to officer names (territoryOfficerIds). */
   demoOfficerIdByUsername: Record<string, string>;
 }
 

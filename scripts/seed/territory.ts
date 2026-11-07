@@ -17,7 +17,9 @@
  * digit prefix with any listed pincode, so the planner's prefix-tier
  * fallback (assignment.ts) cannot rescue it: those loans queue (A24).
  */
+import { DEMO_ACCOUNTS } from '../../src/server/demo.js';
 import type { SeedConfig } from './config.js';
+import type { StaffIds } from './staff.js';
 
 export interface TerritoryPlanRow {
   branchCode: string;
@@ -28,6 +30,29 @@ export interface TerritoryPlanRow {
 }
 
 export type OfficerNameToId = Record<string, string>;
+
+/** The exact id map writeTerritory feeds buildTerritoryRows: the 9 staff
+ *  officers plus the two demo officers, all keyed by officer NAME (the plan's
+ *  officerName). ensureDemoAccounts keys its ids by USERNAME
+ *  (demo-officer-1/2), so those entries are rekeyed through DEMO_ACCOUNTS —
+ *  the join a plain object spread silently skipped, leaving 'Demo Officer
+ *  1/2' without ids and failing the live run inside buildTerritoryRows (A50
+ *  follow-up). A demo username with no officer name, or with no id, fails
+ *  the run instead of starving that officer's territory slice. */
+export function territoryOfficerIds(staff: StaffIds): OfficerNameToId {
+  const ids: OfficerNameToId = { ...staff.officerIdByName };
+  for (const [username, officerId] of Object.entries(staff.demoOfficerIdByUsername)) {
+    const account = DEMO_ACCOUNTS.find((entry) => entry.username === username);
+    if (!account?.officerName) {
+      throw new Error(`territory: demo account ${username} maps to no officer name`);
+    }
+    if (!officerId) {
+      throw new Error(`territory: demo account ${username} has no officer id`);
+    }
+    ids[account.officerName] = officerId;
+  }
+  return ids;
+}
 
 export function buildTerritoryRows(config: SeedConfig, officerIdFor: OfficerNameToId): readonly TerritoryPlanRow[] {
   const indoreMain = config.territory.indore_pincode_main;
@@ -41,8 +66,9 @@ export function buildTerritoryRows(config: SeedConfig, officerIdFor: OfficerName
     { branchCode: 'DWS', pincode: config.territory.dewas_pincode, locality: config.territory.dewas_localities[0]!, officerName: 'Neha Solanki' },
     { branchCode: 'DWS', pincode: config.territory.dewas_pincode, locality: config.territory.dewas_localities[1]!, officerName: 'Murlidhar Garg' },
     // Ujjain: three slices + generic. The demo officers' rows (A50) resolve
-    // only when the caller's map includes their ids (main.ts merges
-    // ensureDemoAccounts' officerIdByUsername into the staff map).
+    // only when the caller's map includes their ids rekeyed to names
+    // (territoryOfficerIds does that join from ensureDemoAccounts'
+    // username-keyed summary).
     { branchCode: 'UJJAIN', pincode: config.territory.ujjain_pincode, locality: config.territory.ujjain_localities[0]!, officerName: 'Trupti Girdhar' },
     { branchCode: 'UJJAIN', pincode: config.territory.ujjain_pincode, locality: config.territory.ujjain_localities[1]!, officerName: 'Demo Officer 1' },
     { branchCode: 'UJJAIN', pincode: config.territory.ujjain_pincode, locality: config.territory.ujjain_localities[2]!, officerName: 'Demo Officer 2' },

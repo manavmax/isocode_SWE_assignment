@@ -40,7 +40,7 @@ import {
   type DemoAccountRow,
   type OfficerCountRow
 } from './summary.js';
-import { buildTerritoryRows } from './territory.js';
+import { buildTerritoryRows, territoryOfficerIds } from './territory.js';
 import { decideRun, parseSeedArgs, resetDemoData, resolveAsOf, type DataOverview } from './gates.js';
 
 const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
@@ -95,8 +95,10 @@ async function writeTerritory(
 ): Promise<number> {
   // A50: the map includes the demo officers — their territory slices are what
   // lets the planner ever route a loan to them (an officer with no territory
-  // row receives nothing, which left the demo worklist empty).
-  const officerIdByName = { ...staff.officerIdByName, ...staff.demoOfficerIdByUsername };
+  // row receives nothing, which left the demo worklist empty). Their ids
+  // arrive keyed by username (ensureDemoAccounts) and are rekeyed to the
+  // officer names the plan uses — see territoryOfficerIds.
+  const officerIdByName = territoryOfficerIds(staff);
   const rows = buildTerritoryRows(config, officerIdByName);
   const officerIds = Object.values(officerIdByName);
   // Idempotent repair without --reset: rows written by an earlier seed plan
