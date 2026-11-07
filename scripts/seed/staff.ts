@@ -146,8 +146,9 @@ export async function upsertStaff(db: NeonHttpDatabase, capacityPoints: number):
     userIdByUsername[spec.username] = row.id;
   }
 
-  // SPEC 16 / A31 demo chips ride on the same run: ensureDemoAccounts is
-  // idempotent and only touches its own branch code UJJAIN + its trio.
+  // SPEC 16 / A31 demo chips ride on the same run (step 0.5): the chips LINK
+  // to the staff created above — Rahul Chouhan, Neha Solanki, Kavita Rathore —
+  // and only the joiner officer is created, on the demo branch UJJAIN.
   const demo = await ensureDemoAccounts(db, 'UJJAIN');
   const demoUsernames = demo.usernames;
 

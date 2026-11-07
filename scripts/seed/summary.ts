@@ -9,6 +9,7 @@
  * stayed (back at dpd 1-30) and rolled (dpd >= 31), and the three must foot
  * back to cohort_n.
  */
+import { DEMO_ACCOUNTS } from '../../src/server/demo.js';
 
 export interface CohortRow {
   branch: string;
@@ -118,13 +119,22 @@ export function formatDemoAccounts(rows: readonly DemoAccountRow[]): string[] {
     const officer = row.officerName ?? '(NO OFFICER LINK)';
     lines.push(`  ${row.username.padEnd(17)} ${officer.padEnd(19)} ${String(row.worklist).padStart(8)} ${String(row.assignedAny).padStart(9)}`);
   }
-  // The manager legitimately has no officer and no worklist; only an officer
-  // account with an empty worklist is a failure.
-  const emptyWorklists = rows.filter((row) => row.role === 'field_officer' && row.worklist === 0);
-  if (emptyWorklists.length > 0) {
+  // Step 0.5 demo bar: every chip carries its own minimum (officers 1/2 link
+  // to staff officers and must show a real worklist >= 10; the joiner
+  // demo-officer-3 and the manager legitimately sit at 0). A chip below its
+  // minimum names itself here instead of failing later in smoke:live.
+  const starved = rows.filter((row) => {
+    const account = DEMO_ACCOUNTS.find((entry) => entry.username === row.username);
+    return account ? row.worklist < account.minOverdueLoans : false;
+  });
+  if (starved.length > 0) {
     lines.push(
-      `  WARNING: empty demo worklist for ${emptyWorklists.map((row) => row.username).join(', ')} — ` +
-        'seed missing, demo account not linked to an officer, or the deployment points at a different database'
+      `  WARNING: demo worklist below the demo bar for ${starved
+        .map((row) => {
+          const min = DEMO_ACCOUNTS.find((entry) => entry.username === row.username)!.minOverdueLoans;
+          return `${row.username} (${row.worklist} < ${min})`;
+        })
+        .join(', ')} — seed missing, demo account not linked to its staff officer, or the deployment points at a different database`
     );
   }
   return lines;

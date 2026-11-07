@@ -94,35 +94,42 @@ describe('formatOfficerCounts', () => {
   });
 });
 
-describe('formatDemoAccounts (A50)', () => {
+describe('formatDemoAccounts (step 0.5: linked chips, the joiner, the demo bar)', () => {
   const rows: DemoAccountRow[] = [
-    { username: 'demo-manager', role: 'branch_manager', officerName: null, worklist: 0, assignedAny: 0 },
-    { username: 'demo-officer-1', role: 'field_officer', officerName: 'Demo Officer 1', worklist: 4, assignedAny: 5 },
-    { username: 'demo-officer-2', role: 'field_officer', officerName: 'Demo Officer 2', worklist: 0, assignedAny: 2 }
+    { username: 'demo-manager', role: 'branch_manager', officerName: 'kavita.rathore', worklist: 0, assignedAny: 0 },
+    { username: 'demo-officer-1', role: 'field_officer', officerName: 'Rahul Chouhan', worklist: 31, assignedAny: 34 },
+    { username: 'demo-officer-2', role: 'field_officer', officerName: 'Neha Solanki', worklist: 17, assignedAny: 19 },
+    { username: 'demo-officer-3', role: 'field_officer', officerName: 'Demo Officer 3', worklist: 0, assignedAny: 0 }
   ];
 
-  it('prints each demo username with its officer name and loan counts', () => {
+  it('prints each demo username with the person it acts as and its loan counts', () => {
     const lines = formatDemoAccounts(rows);
     expect(lines[0]).toBe('  demo accounts (worklist = status=overdue):');
     expect(lines[1]).toBe('  username          officer             worklist  assigned');
-    // '  ' + username.padEnd(17) + ' ' + officer.padEnd(19) + ' ' + worklist.padStart(8) + ' ' + assigned.padStart(9)
-    expect(lines).toContain('  demo-manager      (NO OFFICER LINK)          0         0');
-    expect(lines).toContain('  demo-officer-1    Demo Officer 1             4         5');
+    // The column contract: '  ' + username.padEnd(17) + ' ' + officer.padEnd(19) + ' ' + worklist.padStart(8) + ' ' + assigned.padStart(9)
+    const line = (username: string, officer: string, worklist: string, assigned: string): string =>
+      `  ${username.padEnd(17)} ${officer.padEnd(19)} ${worklist.padStart(8)} ${assigned.padStart(9)}`;
+    expect(lines).toContain(line('demo-manager', 'kavita.rathore', '0', '0'));
+    expect(lines).toContain(line('demo-officer-1', 'Rahul Chouhan', '31', '34'));
+    expect(lines).toContain(line('demo-officer-2', 'Neha Solanki', '17', '19'));
+    expect(lines).toContain(line('demo-officer-3', 'Demo Officer 3', '0', '0'));
   });
 
-  it('warns loudly when a demo officer account has an empty worklist, but never for the manager', () => {
-    const lines = formatDemoAccounts(rows);
+  it('warns when a linked chip sits below its demo bar (10) but never for the joiner or the manager', () => {
+    const starved: DemoAccountRow[] = [
+      { username: 'demo-manager', role: 'branch_manager', officerName: 'kavita.rathore', worklist: 0, assignedAny: 0 },
+      { username: 'demo-officer-1', role: 'field_officer', officerName: 'Rahul Chouhan', worklist: 9, assignedAny: 9 },
+      { username: 'demo-officer-2', role: 'field_officer', officerName: 'Neha Solanki', worklist: 17, assignedAny: 19 },
+      { username: 'demo-officer-3', role: 'field_officer', officerName: 'Demo Officer 3', worklist: 0, assignedAny: 0 }
+    ];
+    const lines = formatDemoAccounts(starved);
     expect(lines.at(-1)).toBe(
-      '  WARNING: empty demo worklist for demo-officer-2 — seed missing, demo account not linked to an officer, or the deployment points at a different database'
+      '  WARNING: demo worklist below the demo bar for demo-officer-1 (9 < 10) — seed missing, demo account not linked to its staff officer, or the deployment points at a different database'
     );
   });
 
-  it('stays silent when every demo officer account has a worklist', () => {
-    const lines = formatDemoAccounts([
-      { username: 'demo-manager', role: 'branch_manager', officerName: null, worklist: 0, assignedAny: 0 },
-      { username: 'demo-officer-1', role: 'field_officer', officerName: 'Demo Officer 1', worklist: 4, assignedAny: 5 },
-      { username: 'demo-officer-2', role: 'field_officer', officerName: 'Demo Officer 2', worklist: 3, assignedAny: 3 }
-    ]);
+  it('stays silent when every chip meets its demo bar', () => {
+    const lines = formatDemoAccounts(rows);
     expect(lines.some((line) => line.includes('WARNING'))).toBe(false);
   });
 });

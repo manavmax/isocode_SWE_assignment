@@ -4,9 +4,16 @@
  * a documented demo credential (docs/deployment.md), hashed at rest with the
  * same scrypt as real users — never a real secret (A31).
  *
- * Scope: this module creates ONLY its own branch, demo officers and demo
- * users; it never touches loans, territory, contacts or audit data. The full
- * seed (SPEC 13) will call ensureDemoAccounts with DEMO_MODE=true.
+ * Step 0.5: the demo chips no longer own officers of their own — each chip
+ * LINKS to seeded staff (resolved by name/username from the database, never
+ * fabricated): demo-officer-1 acts as Rahul Chouhan (Indore), demo-officer-2
+ * as Neha Solanki (Dewas), demo-officer-3 is a new-joiner officer with no
+ * territory rows (the empty-worklist state, deliberately), and demo-manager
+ * acts as the Indore branch manager Kavita Rathore (its user row follows her
+ * branch). Only the joiner officer is created here; a missing linked staff
+ * member fails loudly instead — the seed must run first. The module still
+ * owns branch code UJJAIN (the joiner's branch) and never touches loans,
+ * territory, contacts or audit data.
  */
 import { asc, eq } from 'drizzle-orm';
 import type { NeonHttpDatabase } from 'drizzle-orm/neon-http';
@@ -29,9 +36,46 @@ export const DEMO_BRANCH_CODE = 'UJJAIN';
 export const DEMO_BRANCH_NAME = 'Ujjain';
 
 export const DEMO_ACCOUNTS = [
-  { username: 'demo-manager', role: 'branch_manager', officerName: null, officerUser: false },
-  { username: 'demo-officer-1', role: 'field_officer', officerName: 'Demo Officer 1', officerUser: true },
-  { username: 'demo-officer-2', role: 'field_officer', officerName: 'Demo Officer 2', officerUser: true }
+  {
+    username: 'demo-manager',
+    role: 'branch_manager',
+    officerName: null,
+    officerUser: false,
+    /** The seeded branch manager this chip acts as — its user row follows that
+     *  manager's branch (resolved from the database, never fabricated). */
+    linkedManagerUsername: 'kavita.rathore',
+    createsOfficer: false,
+    minOverdueLoans: 0
+  },
+  {
+    username: 'demo-officer-1',
+    role: 'field_officer',
+    officerName: 'Rahul Chouhan',
+    officerUser: true,
+    linkedManagerUsername: null,
+    createsOfficer: false,
+    minOverdueLoans: 10
+  },
+  {
+    username: 'demo-officer-2',
+    role: 'field_officer',
+    officerName: 'Neha Solanki',
+    officerUser: true,
+    linkedManagerUsername: null,
+    createsOfficer: false,
+    minOverdueLoans: 10
+  },
+  {
+    username: 'demo-officer-3',
+    role: 'field_officer',
+    officerName: 'Demo Officer 3',
+    officerUser: true,
+    linkedManagerUsername: null,
+    // The new joiner: the only officer this module creates, with no territory
+    // rows, so the demo can show the empty-worklist state.
+    createsOfficer: true,
+    minOverdueLoans: 0
+  }
 ] as const;
 
 /** Login gate: demo accounts sign in only while DEMO_MODE is on (A31). Full
@@ -48,15 +92,17 @@ export function demoModeEnabled(): boolean {
 export interface DemoAccountsSummary {
   branchId: string;
   usernames: string[];
-  /** Officer id each demo officer-user acts as (managers map to nothing). The
-   *  seed needs these to write the demo officers' territory slices — without
-   *  a territory row the planner can never route a loan to them and the demo
-   *  worklist stays empty (A50). */
+  /** Officer id each demo officer-user acts as (managers map to nothing):
+   *  the linked staff officers' own ids plus the joiner's. The seed rekeys
+   *  these by officer name (territoryOfficerIds) for territory repair. */
   officerIdByUsername: Record<string, string>;
 }
 
-/** Idempotent: safe to run again after a seed; users follow the branch and
- * officer the config names, and their (hashed) PIN follows the config. */
+/** Idempotent: safe to run again after a seed. Officer chips link to the
+ *  seeded staff officer named on the account (same officer row, so the same
+ *  loans and worklist); only the joiner officer is created here, on the demo
+ *  branch. The manager chip follows the branch of the seeded manager named on
+ *  its account. Missing linked staff fails loudly — run the seed first. */
 export async function ensureDemoAccounts(db: NeonHttpDatabase, branchCode: string = DEMO_BRANCH_CODE): Promise<DemoAccountsSummary> {
   const passwordHash = hashPassword(DEMO_PIN);
 
@@ -74,6 +120,26 @@ export async function ensureDemoAccounts(db: NeonHttpDatabase, branchCode: strin
   }
   const branchId = branchRow.id;
 
+  // The manager chip follows the seeded manager it names (branch link — a
+  // branch manager has no officer row to point at).
+  const branchForUsername = new Map<string, string>();
+  for (const account of DEMO_ACCOUNTS) {
+    if (account.officerUser) {
+      continue;
+    }
+    const managerUsername = account.linkedManagerUsername;
+    const managerRow = (
+      await db
+        .select({ id: users.id, branchId: users.branchId, role: users.role })
+        .from(users)
+        .where(eq(users.username, managerUsername))
+        .limit(1)
+    )[0];
+    failUnless(managerRow, `demo: manager link '${managerUsername}' for ${account.username} not found — demo accounts link to seeded staff; run the seed first (pnpm seed)`);
+    failUnless(managerRow.role === 'branch_manager', `demo: manager link '${managerUsername}' is a ${managerRow.role}, not a branch_manager`);
+    branchForUsername.set(account.username, managerRow.branchId);
+  }
+
   const officerIds = new Map<string, string>();
   for (const account of DEMO_ACCOUNTS) {
     if (!account.officerUser) {
@@ -81,25 +147,39 @@ export async function ensureDemoAccounts(db: NeonHttpDatabase, branchCode: strin
     }
     const officerName = account.officerName!;
     let officerRow = (
-      await db.select({ id: officers.id }).from(officers).where(eq(officers.name, officerName)).orderBy(asc(officers.id)).limit(1)
+      await db
+        .select({ id: officers.id, branchId: officers.branchId })
+        .from(officers)
+        .where(eq(officers.name, officerName))
+        .orderBy(asc(officers.id))
+        .limit(1)
     )[0];
     if (!officerRow) {
-      const inserted = (await db.insert(officers).values({ branchId, name: officerName, active: true, capacityPoints: 30 }).returning({ id: officers.id }))[0];
+      failUnless(
+        account.createsOfficer,
+        `demo: officer '${officerName}' linked by ${account.username} does not exist — demo accounts link to seeded staff; run the seed first (pnpm seed)`
+      );
+      const inserted = (await db.insert(officers).values({ branchId, name: officerName, active: true, capacityPoints: 30 }).returning({ id: officers.id, branchId: officers.branchId }))[0];
       failUnless(inserted, `demo: officer insert for '${officerName}' returned no row`);
       officerRow = inserted;
     }
     officerIds.set(account.username, officerRow.id);
+    // The user row follows its officer's branch, so officer and user always
+    // sit in the same branch (Rahul -> IDR, Neha -> DWS, joiner -> UJJAIN).
+    branchForUsername.set(account.username, officerRow.branchId);
   }
 
   const usernames: string[] = [];
   for (const account of DEMO_ACCOUNTS) {
     const officerId = officerIds.get(account.username) ?? null;
+    const userBranchId = branchForUsername.get(account.username)!;
+    failUnless(userBranchId, `demo: no branch resolved for ${account.username}`);
     await db
       .insert(users)
-      .values({ username: account.username, passwordHash, role: account.role, branchId, officerId, active: true, isDemo: true })
+      .values({ username: account.username, passwordHash, role: account.role, branchId: userBranchId, officerId, active: true, isDemo: true })
       .onConflictDoUpdate({
         target: users.username,
-        set: { passwordHash, role: account.role, branchId, officerId, active: true, isDemo: true }
+        set: { passwordHash, role: account.role, branchId: userBranchId, officerId, active: true, isDemo: true }
       });
     usernames.push(account.username);
   }

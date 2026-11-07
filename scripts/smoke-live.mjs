@@ -90,18 +90,20 @@ if (sessionCookie.startsWith('fc_session=')) {
   }
 
   // 5. Assignments: nested three segments deep; phones must be masked AND the
-  // demo officer's worklist must be non-empty — in a demo deployment an empty
-  // worklist is a failure, not a state to skip over.
+  // demo officer's worklist must carry a real demo (step 0.5: demo-officer-1
+  // links to Rahul Chouhan — at least 10 assigned overdue loans; a thin
+  // worklist is a failure, not a state to skip over).
+  const DEMO_WORKLIST_MIN = 10;
   let loanId = null;
   {
     const { res, body, hint } = await call('assignments', '/api/me/assignments');
     const assignments = body?.assignments;
     const phonesMasked = Array.isArray(assignments) && assignments.every((a) => maskOk(a.mobileMasked));
     loanId = Array.isArray(assignments) ? (assignments.find((a) => a.loanId)?.loanId ?? null) : null;
-    const ok = res.status === 200 && Array.isArray(assignments) && assignments.length > 0 && phonesMasked;
-    report(ok, 'GET  /api/me/assignments', `${res.status} count=${assignments?.length ?? '?'} phones masked=${phonesMasked}${ok ? '' : hint}`);
-    if (res.status === 200 && Array.isArray(assignments) && assignments.length === 0) {
-      report(false, 'GET  /api/me/assignments (worklist)', 'demo officer has no assigned loans: seed missing, demo account not linked to an officer, or the deployment points at a different database');
+    const ok = res.status === 200 && Array.isArray(assignments) && assignments.length >= DEMO_WORKLIST_MIN && phonesMasked;
+    report(ok, 'GET  /api/me/assignments', `${res.status} count=${assignments?.length ?? '?'} (min ${DEMO_WORKLIST_MIN}) phones masked=${phonesMasked}${ok ? '' : hint}`);
+    if (res.status === 200 && Array.isArray(assignments) && assignments.length < DEMO_WORKLIST_MIN) {
+      report(false, 'GET  /api/me/assignments (demo worklist)', `demo-officer-1 must hold at least ${DEMO_WORKLIST_MIN} assigned overdue loans: seed missing/outdated, demo account not linked to its staff officer, or the deployment points at a different database`);
     }
   }
 

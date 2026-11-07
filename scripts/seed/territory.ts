@@ -5,10 +5,11 @@
  * - Dewas 455001 is split strictly by locality between its two officers —
  *   there is NO generic row, so Dewas loan rows must carry one of the two
  *   configured localities (the generator guarantees that).
- * - Ujjain 456001: Trupti Girdhar owns the 'Freeganj' slice, the demo
- *   officers own one slice each (Nanakheda, Dewasgate — A50, so the demo
- *   worklist is never empty), and the generic row (Arjun Verma) takes the
- *   rest.
+ * - Ujjain 456001: Trupti Girdhar owns the 'Freeganj' slice and the generic
+ *   row (Arjun Verma) takes the rest. There are NO demo slices since step
+ *   0.5: the demo officer chips link to seeded staff (Rahul, Neha) or are a
+ *   territory-less joiner (Demo Officer 3 — deliberately no row, so the demo
+ *   can show the empty worklist).
  * - Ratlam 457001: single officer Imran Qureshi, no generic fallback beyond
  *   him, and the row's branch is UJJAIN (A3). Also the deliberate single-officer
  *   leave edge case for the later events/officer-absence work.
@@ -32,13 +33,19 @@ export interface TerritoryPlanRow {
 export type OfficerNameToId = Record<string, string>;
 
 /** The exact id map writeTerritory feeds buildTerritoryRows: the 9 staff
- *  officers plus the two demo officers, all keyed by officer NAME (the plan's
- *  officerName). ensureDemoAccounts keys its ids by USERNAME
- *  (demo-officer-1/2), so those entries are rekeyed through DEMO_ACCOUNTS —
- *  the join a plain object spread silently skipped, leaving 'Demo Officer
- *  1/2' without ids and failing the live run inside buildTerritoryRows (A50
- *  follow-up). A demo username with no officer name, or with no id, fails
- *  the run instead of starving that officer's territory slice. */
+ *  officers keyed by NAME, extended with the demo chips' officers — also
+ *  keyed by NAME. ensureDemoAccounts keys its ids by USERNAME
+ *  (demo-officer-1/2/3), so those entries are rekeyed through DEMO_ACCOUNTS —
+ *  the join a plain object spread silently skipped, leaving 'Demo Officer 1'
+ *  without an id and failing the live run inside buildTerritoryRows (A50
+ *  follow-up). Since step 0.5 the demo officers 1/2 LINK to seeded staff
+ *  (Rahul Chouhan, Neha Solanki): a rekeyed id that disagrees with the staff
+ *  map for the same officer name means the demo lookup saw a different row —
+ *  that fails the run here instead of silently shadowing the staff officer.
+ *  The joiner (Demo Officer 3) contributes a fresh id with no plan row, so
+ *  writeTerritory's idempotent delete also clears any stray joiner territory
+ *  rows. A demo username with no officer name, or with no id, fails the run
+ *  instead of starving that officer. */
 export function territoryOfficerIds(staff: StaffIds): OfficerNameToId {
   const ids: OfficerNameToId = { ...staff.officerIdByName };
   for (const [username, officerId] of Object.entries(staff.demoOfficerIdByUsername)) {
@@ -48,6 +55,12 @@ export function territoryOfficerIds(staff: StaffIds): OfficerNameToId {
     }
     if (!officerId) {
       throw new Error(`territory: demo account ${username} has no officer id`);
+    }
+    const staffId = ids[account.officerName];
+    if (staffId !== undefined && staffId !== officerId) {
+      throw new Error(
+        `territory: demo account ${username} links to ${account.officerName} but staff recorded a different officer id — the demo lookup saw another row`
+      );
     }
     ids[account.officerName] = officerId;
   }
@@ -65,13 +78,10 @@ export function buildTerritoryRows(config: SeedConfig, officerIdFor: OfficerName
     // Dewas: pure locality split, two rows, no generic.
     { branchCode: 'DWS', pincode: config.territory.dewas_pincode, locality: config.territory.dewas_localities[0]!, officerName: 'Neha Solanki' },
     { branchCode: 'DWS', pincode: config.territory.dewas_pincode, locality: config.territory.dewas_localities[1]!, officerName: 'Murlidhar Garg' },
-    // Ujjain: three slices + generic. The demo officers' rows (A50) resolve
-    // only when the caller's map includes their ids rekeyed to names
-    // (territoryOfficerIds does that join from ensureDemoAccounts'
-    // username-keyed summary).
-    { branchCode: 'UJJAIN', pincode: config.territory.ujjain_pincode, locality: config.territory.ujjain_localities[0]!, officerName: 'Trupti Girdhar' },
-    { branchCode: 'UJJAIN', pincode: config.territory.ujjain_pincode, locality: config.territory.ujjain_localities[1]!, officerName: 'Demo Officer 1' },
-    { branchCode: 'UJJAIN', pincode: config.territory.ujjain_pincode, locality: config.territory.ujjain_localities[2]!, officerName: 'Demo Officer 2' },
+    // Ujjain: the Freeganj slice + generic. NO demo rows since step 0.5 —
+    // the demo officer chips act as Rahul/Neha (their rows above) or are the
+    // territory-less joiner, whose empty worklist is the demo's empty state.
+    { branchCode: 'UJJAIN', pincode: config.territory.ujjain_pincode, locality: config.territory.ujjain_localities, officerName: 'Trupti Girdhar' },
     { branchCode: 'UJJAIN', pincode: config.territory.ujjain_pincode, locality: null, officerName: 'Arjun Verma' },
     // Ratlam: single officer, whole pincode, UJJAIN branch row (A3).
     { branchCode: 'UJJAIN', pincode: config.territory.ratlam_pincode, locality: null, officerName: 'Imran Qureshi' }

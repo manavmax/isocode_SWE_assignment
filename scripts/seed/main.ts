@@ -142,7 +142,7 @@ interface SummaryQueries {
   demoRows: DemoAccountRow[];
 }
 
-async function readSummary(t0: string, asOf: string): Promise<SummaryQueries> {
+async function readSummary(t0: string, asOf: string, staff: Awaited<ReturnType<typeof upsertStaff>>): Promise<SummaryQueries> {
   const pool = getPool();
   const officerRowSets = await pool.query(
     `SELECT b.name AS branch, COALESCE(o.name, '(unassigned)') AS officer, count(*)::int AS loans
@@ -166,19 +166,33 @@ async function readSummary(t0: string, asOf: string): Promise<SummaryQueries> {
     `SELECT bucket, count(*)::int AS loans FROM loan WHERE status IN ('overdue', 'queue') GROUP BY 1 ORDER BY 1`
   );
   const cohortResult = await pool.query(cohortSanitySql(t0, asOf));
-  // A50: the demo chips' officer link and worklist, printed explicitly so an
-  // empty demo officer account names itself instead of hiding in the table.
+  // A50, step 0.5: the demo chips' officer/manager link and worklist, printed
+  // explicitly so a starved demo account names itself instead of hiding in
+  // the table. Both username lists come from the run's own staff wiring (the
+  // A50 lesson): the chips from ensureDemoAccounts, the manager-link pool
+  // from upsertStaff's manager users. The manager chip shows the seeded
+  // branch manager it follows (same branch); an officer chip shows its
+  // officer's name.
   const demoResult = await pool.query(
     `SELECT u.username, u.role,
-            COALESCE(o.name, '(NO OFFICER LINK)') AS officer_name,
+            COALESCE(o.name, mgr.linked_manager, '(NO OFFICER LINK)') AS officer_name,
             count(l.loan_id) FILTER (WHERE l.status = 'overdue')::int AS worklist,
             count(l.loan_id)::int AS assigned_any
      FROM app_user u
      LEFT JOIN officer o ON o.id = u.officer_id
+     LEFT JOIN LATERAL (
+       SELECT m.username AS linked_manager
+       FROM app_user m
+       WHERE m.branch_id = u.branch_id AND m.role = 'branch_manager' AND m.username <> u.username
+         AND m.username = ANY($1::text[])
+       ORDER BY m.username
+       LIMIT 1
+     ) mgr ON u.role = 'branch_manager'
      LEFT JOIN loan l ON l.assigned_officer_id = u.officer_id
-     WHERE u.is_demo = true AND u.username IN ('demo-manager', 'demo-officer-1', 'demo-officer-2')
-     GROUP BY u.username, u.role, o.name
-     ORDER BY u.username`
+     WHERE u.is_demo = true AND u.username = ANY($2::text[])
+     GROUP BY u.username, u.role, o.name, mgr.linked_manager
+     ORDER BY u.username`,
+    [Object.keys(staff.userIdByUsername), staff.demoUsernames]
   );
   return {
     officerRows: officerRowSets.rows.map((row) => ({
@@ -305,7 +319,7 @@ async function main(): Promise<void> {
   const db = getDb();
   const staff = await upsertStaff(db, config.people.officer_capacity_points);
   console.log(
-    `[seed] people: ${Object.keys(staff.branchIdByCode).length} branches · 9 officers · 3 managers · ` +
+    `[seed] people: ${Object.keys(staff.branchIdByCode).length} branches · 9 staff officers · 3 managers · ` +
       `demo chips ${staff.demoUsernames.length} (${staff.demoUsernames.join(', ')})`
   );
   const territoryCount = await writeTerritory(db, config, staff);
@@ -341,7 +355,7 @@ async function main(): Promise<void> {
   });
   console.log('[seed] import finished with zero aborts');
 
-  const queries = await readSummary(history.t0Date, asOf);
+  const queries = await readSummary(history.t0Date, asOf, staff);
   printSummary(outcome, history, queries, config.loans.total_end_active, asOf);
   console.log('');
   console.log(`[seed] done · branch codes ${Object.entries(staff.branchIdByCode).map(([code]) => code).join('/')} · ` +

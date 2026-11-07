@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { app } from './app.js';
 
 vi.mock('./dal.js', () => ({
-  listDemoUsernames: vi.fn(async () => ['demo-manager', 'demo-officer-1', 'demo-officer-2'])
+  listDemoUsernames: vi.fn(async () => ['demo-manager', 'demo-officer-1', 'demo-officer-2', 'demo-officer-3'])
 }));
 
 import { listDemoUsernames } from './dal.js';
@@ -20,7 +20,7 @@ describe('GET /api/demo-accounts (SPEC 16: demo chips gated by DEMO_MODE)', () =
     const res = await app.request('/api/demo-accounts');
     expect(res.status).toBe(200);
     const body = (await res.json()) as { usernames: unknown };
-    expect(body).toEqual({ usernames: ['demo-manager', 'demo-officer-1', 'demo-officer-2'] });
+    expect(body).toEqual({ usernames: ['demo-manager', 'demo-officer-1', 'demo-officer-2', 'demo-officer-3'] });
     expect(Object.keys(body)).toEqual(['usernames']);
     expect(mockedUsernames).toHaveBeenCalledTimes(1);
   });

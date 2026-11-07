@@ -32,8 +32,10 @@ export interface SeedConfig {
     dewas_pincode: string;
     dewas_localities: string[];
     ujjain_pincode: string;
-    ujjain_localities: string[];
-    ujjain_demo_locality_share: number;
+    /** The one exact Ujjain city slice (Trupti's); everything else in the
+     *  pincode is the generic row. A scalar since step 0.5 — there is only
+     *  Freeganj now that the demo-officer slices are gone. */
+    ujjain_localities: string;
     ratlam_pincode: string;
     unmapped_defect_pincode: string;
     indore_main_generic_share: number;
@@ -111,8 +113,7 @@ const EXPECTED_KEYS: Record<string, Record<string, 'scalar' | 'list'>> = {
     dewas_pincode: 'scalar',
     dewas_localities: 'list',
     ujjain_pincode: 'scalar',
-    ujjain_localities: 'list',
-    ujjain_demo_locality_share: 'scalar',
+    ujjain_localities: 'scalar',
     ratlam_pincode: 'scalar',
     unmapped_defect_pincode: 'scalar',
     indore_main_generic_share: 'scalar',
@@ -301,8 +302,7 @@ export function parseSeedConfig(text: string, source = 'seed_config.yaml'): Seed
       dewas_pincode: str('territory.dewas_pincode'),
       dewas_localities: list('territory.dewas_localities'),
       ujjain_pincode: str('territory.ujjain_pincode'),
-      ujjain_localities: list('territory.ujjain_localities'),
-      ujjain_demo_locality_share: num('territory.ujjain_demo_locality_share'),
+      ujjain_localities: str('territory.ujjain_localities'),
       ratlam_pincode: str('territory.ratlam_pincode'),
       unmapped_defect_pincode: str('territory.unmapped_defect_pincode'),
       indore_main_generic_share: num('territory.indore_main_generic_share'),
@@ -381,17 +381,6 @@ function validateCrossChecks(config: SeedConfig): void {
   }
   if (territory.ujjain_city_locality_share <= 0 || territory.ujjain_city_locality_share >= 1) {
     throw new Error('territory: ujjain_city_locality_share must sit strictly inside (0, 1)');
-  }
-  // A50: the two demo officers each own one exact Ujjain locality slice
-  // (ujjain_localities[1] and [2]); Freeganj [0] stays with its officer.
-  if (territory.ujjain_localities.length < 3) {
-    throw new Error('territory: ujjain_localities needs Freeganj plus one slice per demo officer (3 entries)');
-  }
-  if (territory.ujjain_demo_locality_share <= 0 || territory.ujjain_demo_locality_share >= 0.5) {
-    throw new Error('territory: ujjain_demo_locality_share must sit strictly inside (0, 0.5) — one slice per demo officer');
-  }
-  if (territory.ujjain_city_locality_share + 2 * territory.ujjain_demo_locality_share >= 1) {
-    throw new Error('territory: ujjain_city_locality_share + two demo slices must stay below 1 so the generic row keeps loans');
   }
   const loans = config.loans;
   if (loans.per_branch_indore + loans.per_branch_ujjain_branch + loans.per_branch_dewas !== loans.total_end_active) {

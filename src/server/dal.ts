@@ -224,11 +224,11 @@ export async function fetchLoanForActor(actor: Actor, loanId: string): Promise<L
   return maskLoan(loan as LoanRowData);
 }
 
-/** A34/A31: demo-account chips. Returns ONLY the A31 demo usernames
- * (demo-manager/demo-officer-1/demo-officer-2) that are active demo users;
- * nothing else (no ids, roles, hashes). Callers gate on demoModeEnabled().
- * The seeded synthetic officers are is_demo for the "(demo)" marker (A40)
- * but are NOT demo login chips. */
+/** A34/A31: demo-account chips. Returns ONLY the A31 demo chip usernames
+ * (DEMO_ACCOUNTS: demo-manager, demo-officer-1/2/3) that are active demo
+ * users; nothing else (no ids, roles, hashes). Callers gate on
+ * demoModeEnabled(). The seeded synthetic officers are is_demo for the
+ * "(demo)" marker (A40) but are NOT demo login chips. */
 export async function listDemoUsernames(): Promise<string[]> {
   const db = getDb();
   const rows = await db

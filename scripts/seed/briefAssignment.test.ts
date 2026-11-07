@@ -3,8 +3,9 @@ import { fileURLToPath } from 'node:url';
 import { loadSeedConfigFile } from './config.js';
 import { buildLoanUniverse, BRIEF_LOAN_IDS } from './loans.js';
 import { mulberry32 } from './rng.js';
-import { buildTerritoryRows } from './territory.js';
+import { buildTerritoryRows, territoryOfficerIds } from './territory.js';
 import { BRANCHES, OFFICER_SPECS } from './staff.js';
+import { realRunStaffIds } from './staffIdsFixture.js';
 import { DEMO_ACCOUNTS } from '../../src/server/demo.js';
 import { planAssignment } from '../../src/shared/assignment.js';
 import type { AssignmentLoan, AssignmentOfficer, AssignmentTerritory } from '../../src/shared/assignment.js';
@@ -13,18 +14,15 @@ const realFile = fileURLToPath(new URL('../../data/seed_config.yaml', import.met
 const config = loadSeedConfigFile(realFile);
 const universe = buildLoanUniverse(mulberry32(20261105), config, 20261105);
 
-/** Fake stable ids keyed by officer name — the planner only compares ids, so
- *  the brief-officer assertions need no database. Branch codes double as
- *  branch ids for the same reason, except the internal UJJ tag: the DB row is
- *  UJJAIN (A43), and the planner scopes candidates by branch-id equality, so
- *  loans are translated through the same mapping main.ts applies. The demo
- *  officers ride in the same map (A50) — at runtime runAssignment reads them
- *  from the officers table just like any other officer. */
-const officerIdFor: Record<string, string> = Object.fromEntries([
-  ...OFFICER_SPECS.map((officer) => [officer.name, `officer:${officer.username}`]),
-  ...DEMO_ACCOUNTS.filter((account) => account.officerUser).map((account) => [account.officerName!, `officer:${account.username}`])
-]);
-const dbBranchIdFor: Record<string, string> = { IDR: 'IDR', DWS: 'DWS', UJJ: 'UJJAIN' };
+/** Fake stable ids — the planner only compares ids, so the brief-officer
+ *  assertions need no database. The id map comes from the REAL run wiring
+ *  (the A50 lesson): StaffIds shaped as upsertStaff + ensureDemoAccounts
+ *  produce them, rekeyed by territoryOfficerIds exactly as writeTerritory
+ *  does. The demo chips ride in the same map — demo-officer-1/2 share the
+ *  Rahul/Neha officer rows, the joiner has a fresh id — and at runtime
+ *  runAssignment reads them from the officers table like any other officer. */
+const staffIds = realRunStaffIds();
+const officerIdFor = territoryOfficerIds(staffIds);
 
 const BRIEF_OFFICER: Record<string, string> = {
   'LN-10293': 'Rahul Chouhan',
@@ -34,21 +32,23 @@ const BRIEF_OFFICER: Record<string, string> = {
 
 /** End-state territory + officers exactly as the live run writes them. */
 const territory: readonly AssignmentTerritory[] = buildTerritoryRows(config, officerIdFor).map((row) => ({
-  branchId: row.branchCode,
+  branchId: staffIds.branchIdByCode[row.branchCode]!,
   pincode: row.pincode,
   locality: row.locality,
   officerId: officerIdFor[row.officerName]!,
   rank: 1
 }));
-const demoOfficerIds = DEMO_ACCOUNTS.filter((account) => account.officerUser).map((account) => officerIdFor[account.officerName!]!);
+const joinerIds = DEMO_ACCOUNTS.filter((account) => account.officerUser && account.createsOfficer).map(
+  (account) => officerIdFor[account.officerName!]!
+);
 const officers: readonly AssignmentOfficer[] = [
   ...OFFICER_SPECS.map((officer) => ({
     id: officerIdFor[officer.name]!,
-    branchId: officer.branchCode,
+    branchId: staffIds.branchIdByCode[officer.branchCode]!,
     active: true,
     capacityPoints: config.people.officer_capacity_points
   })),
-  ...demoOfficerIds.map((id) => ({ id, branchId: 'UJJAIN', active: true, capacityPoints: 30 }))
+  ...joinerIds.map((id) => ({ id, branchId: staffIds.branchIdByCode.UJJAIN!, active: true, capacityPoints: 30 }))
 ];
 
 /** All end-active loans at their end-date dpd, unassigned — one clean
@@ -59,7 +59,7 @@ function endStateLoans(): AssignmentLoan[] {
     .map((loan) => ({
       loanId: loan.loanId,
       borrowerName: loan.borrowerName,
-      branchId: dbBranchIdFor[loan.branchCode]!,
+      branchId: staffIds.branchIdByCode[loan.branchCode === 'UJJ' ? 'UJJAIN' : loan.branchCode]!,
       pincode: loan.pincode,
       locality: loan.locality,
       dpd: loan.destiny === 'stay' ? loan.reentryDayOffset + 1 : loan.entryDayOffset + 1,
@@ -113,10 +113,10 @@ describe('the brief loans resolve to the officers the brief names, by territory 
     expect(BRIEF_LOAN_IDS.every((loanId) => byId.get(loanId)!.pincode !== config.territory.unmapped_defect_pincode)).toBe(true);
   });
 
-  it('keeps every officer inside their own branch plan (11 territory rows, 11 officers incl. the demo pair)', () => {
+  it('keeps every officer inside their own branch plan (9 territory rows, 10 officers incl. the joiner)', () => {
     expect(BRANCHES).toHaveLength(3);
     expect(OFFICER_SPECS).toHaveLength(9);
-    expect(territory).toHaveLength(11);
+    expect(territory).toHaveLength(9);
     for (const row of territory) {
       expect(officers.find((officer) => officer.id === row.officerId)!.branchId).toBe(row.branchId);
     }
