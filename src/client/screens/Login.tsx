@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api.js';
 import { t as translate, type Lang } from '../i18n/dictionary.js';
+import { loginErrorMessage, loginErrorKind, type LoginErrorKind } from './loginError.js';
 
 export function Login({ lang, setLang, onSignedIn, sessionExpired }: { lang: Lang; setLang: (lang: Lang) => void; onSignedIn: () => void; sessionExpired?: boolean }) {
   const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
   const [demoUsernames, setDemoUsernames] = useState<string[]>([]);
-  const [errorKey, setErrorKey] = useState<'none' | 'invalid' | 'network' | 'throttled'>('none');
+  const [error, setError] = useState<{ kind: LoginErrorKind; retryAfterSeconds?: number } | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -27,16 +28,14 @@ export function Login({ lang, setLang, onSignedIn, sessionExpired }: { lang: Lan
   async function submit(): Promise<void> {
     if (submitting || username.length === 0 || pin.length === 0) return;
     setSubmitting(true);
-    setErrorKey('none');
+    setError(null);
     const result = await api.login(username.trim(), pin);
     setSubmitting(false);
     if (result.ok) {
       onSignedIn();
       return;
     }
-    if (result.error.kind === 'network') setErrorKey('network');
-    else if (result.error.kind === 'throttled') setErrorKey('throttled');
-    else setErrorKey('invalid');
+    setError({ kind: loginErrorKind(result.error), retryAfterSeconds: result.error.retryAfterSeconds });
   }
 
   return (
@@ -84,19 +83,9 @@ export function Login({ lang, setLang, onSignedIn, sessionExpired }: { lang: Lan
             onChange={(event) => setPin(event.target.value.replace(/\D/g, ''))}
           />
         </div>
-        {errorKey === 'invalid' ? (
+        {error !== null ? (
           <p className="state-body" role="alert" style={{ color: 'var(--status-danger)' }}>
-            {tr('loginInvalid')}
-          </p>
-        ) : null}
-        {errorKey === 'throttled' ? (
-          <p className="state-body" role="alert" style={{ color: 'var(--status-danger)' }}>
-            {tr('loginThrottled')}
-          </p>
-        ) : null}
-        {errorKey === 'network' ? (
-          <p className="state-body" role="alert" style={{ color: 'var(--status-danger)' }}>
-            {tr('loginNetwork')}
+            {loginErrorMessage(error.kind, lang, error.retryAfterSeconds)}
           </p>
         ) : null}
         {sessionExpired ? (

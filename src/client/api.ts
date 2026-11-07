@@ -37,7 +37,12 @@ export interface LoanDetailDto {
   altMobileMasked: string | null;
 }
 
-export type ApiError = { kind: 'unauthorized' | 'forbidden' | 'notFound' | 'server' | 'network' | 'throttled'; status: number };
+export type ApiError = {
+  kind: 'unauthorized' | 'forbidden' | 'notFound' | 'server' | 'network' | 'throttled';
+  status: number;
+  /** Seconds from the server's Retry-After header (429 only). */
+  retryAfterSeconds?: number;
+};
 
 async function request<T>(path: string, init?: RequestInit): Promise<{ ok: true; data: T } | { ok: false; error: ApiError }> {
   let response: Response;
@@ -49,7 +54,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<{ ok: true;
   if (response.status === 401) return { ok: false, error: { kind: 'unauthorized', status: 401 } };
   if (response.status === 403) return { ok: false, error: { kind: 'forbidden', status: 403 } };
   if (response.status === 404) return { ok: false, error: { kind: 'notFound', status: 404 } };
-  if (response.status === 429) return { ok: false, error: { kind: 'throttled', status: 429 } };
+  if (response.status === 429) {
+    const retryAfterSeconds = Number.parseInt(response.headers.get('retry-after') ?? '', 10);
+    return {
+      ok: false,
+      error: {
+        kind: 'throttled',
+        status: 429,
+        ...(Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0 ? { retryAfterSeconds } : {})
+      }
+    };
+  }
   if (!response.ok) return { ok: false, error: { kind: 'server', status: response.status } };
   return { ok: true, data: (await response.json()) as T };
 }
