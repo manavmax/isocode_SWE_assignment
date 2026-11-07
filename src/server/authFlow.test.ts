@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { hashPassword, verifyPassword } from './auth.js';
 
 /**
@@ -295,8 +295,7 @@ describe('POST /api/auth/logout', () => {
 });
 
 describe('login failure-reason logs (runtime logs only, never in the response)', () => {
-  const spyOnLog = () => vi.spyOn(console, 'log');
-  let logSpy: ReturnType<typeof spyOnLog>;
+  let logSpy: MockInstance<typeof console.log>;
 
   beforeEach(() => {
     h.queue.length = 0;
