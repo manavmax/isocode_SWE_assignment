@@ -86,3 +86,18 @@ defects:
   missing_alt_mobile_rate: 0.08
   missing_business_name_rate: 0.05
   unmapped_pincode_rate: 0.03
+
+promises:
+  broken_per_loan_lambda: "0.6"
+  broken_per_loan_cap: "4"
+  kept_rate_b1: "0.68"
+  kept_rate_b2: "0.58"
+  kept_rate_b3: "0.45"
+  violation_share: "0.03"
+  blocked_events: "12"
+  hindi_note_share: "0.35"
+  demo_due_today: "12"
+  demo_within_three_days: "15"
+  demo_in_grace: "8"
+  demo_broken_last_seven: "14"
+  demo_kept_history: "40"

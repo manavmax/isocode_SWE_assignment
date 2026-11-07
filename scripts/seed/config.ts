@@ -92,6 +92,22 @@ export interface SeedConfig {
     missing_business_name_rate: number;
     unmapped_pincode_rate: number;
   };
+  /** Seed part 2 (SPEC 12/14, prompt 11 item 4): contact events + promises. */
+  promises: {
+    broken_per_loan_lambda: number;
+    broken_per_loan_cap: number;
+    kept_rate_b1: number;
+    kept_rate_b2: number;
+    kept_rate_b3: number;
+    violation_share: number;
+    blocked_events: number;
+    hindi_note_share: number;
+    demo_due_today: number;
+    demo_within_three_days: number;
+    demo_in_grace: number;
+    demo_broken_last_seven: number;
+    demo_kept_history: number;
+  };
 }
 
 const EXPECTED_KEYS: Record<string, Record<string, 'scalar' | 'list'>> = {
@@ -165,7 +181,22 @@ const EXPECTED_KEYS: Record<string, Record<string, 'scalar' | 'list'>> = {
     reentry_wait_min_days: 'scalar',
     reentry_wait_max_days: 'scalar'
   },
-  defects: { missing_alt_mobile_rate: 'scalar', missing_business_name_rate: 'scalar', unmapped_pincode_rate: 'scalar' }
+  defects: { missing_alt_mobile_rate: 'scalar', missing_business_name_rate: 'scalar', unmapped_pincode_rate: 'scalar' },
+  promises: {
+    broken_per_loan_lambda: 'scalar',
+    broken_per_loan_cap: 'scalar',
+    kept_rate_b1: 'scalar',
+    kept_rate_b2: 'scalar',
+    kept_rate_b3: 'scalar',
+    violation_share: 'scalar',
+    blocked_events: 'scalar',
+    hindi_note_share: 'scalar',
+    demo_due_today: 'scalar',
+    demo_within_three_days: 'scalar',
+    demo_in_grace: 'scalar',
+    demo_broken_last_seven: 'scalar',
+    demo_kept_history: 'scalar'
+  }
 };
 
 /** Raw text -> { section: { key: rawValue } }. Quotes are stripped and lists
@@ -358,6 +389,21 @@ export function parseSeedConfig(text: string, source = 'seed_config.yaml'): Seed
       missing_alt_mobile_rate: num('defects.missing_alt_mobile_rate'),
       missing_business_name_rate: num('defects.missing_business_name_rate'),
       unmapped_pincode_rate: num('defects.unmapped_pincode_rate')
+    },
+    promises: {
+      broken_per_loan_lambda: num('promises.broken_per_loan_lambda'),
+      broken_per_loan_cap: num('promises.broken_per_loan_cap'),
+      kept_rate_b1: num('promises.kept_rate_b1'),
+      kept_rate_b2: num('promises.kept_rate_b2'),
+      kept_rate_b3: num('promises.kept_rate_b3'),
+      violation_share: num('promises.violation_share'),
+      blocked_events: num('promises.blocked_events'),
+      hindi_note_share: num('promises.hindi_note_share'),
+      demo_due_today: num('promises.demo_due_today'),
+      demo_within_three_days: num('promises.demo_within_three_days'),
+      demo_in_grace: num('promises.demo_in_grace'),
+      demo_broken_last_seven: num('promises.demo_broken_last_seven'),
+      demo_kept_history: num('promises.demo_kept_history')
     }
   };
 
@@ -439,6 +485,36 @@ function validateCrossChecks(config: SeedConfig): void {
   }
   if (history.max_cures_per_day >= 60) {
     throw new Error('history: max_cures_per_day must stay far below the vanished_over_40pct abort threshold');
+  }
+
+  // Seed part 2 (prompt 11 item 4): promise + contact-event distributions.
+  const promiseCfg = config.promises;
+  if (promiseCfg.broken_per_loan_lambda <= 0 || promiseCfg.broken_per_loan_cap < 1) {
+    throw new Error('promises: broken_per_loan_lambda must be positive and the cap at least 1');
+  }
+  for (const [key, rate] of [
+    ['kept_rate_b1', promiseCfg.kept_rate_b1],
+    ['kept_rate_b2', promiseCfg.kept_rate_b2],
+    ['kept_rate_b3', promiseCfg.kept_rate_b3]
+  ] as const) {
+    if (rate <= 0 || rate >= 1) {
+      throw new Error(`promises: ${key} must sit strictly inside (0, 1)`);
+    }
+  }
+  if (!(promiseCfg.kept_rate_b1 > promiseCfg.kept_rate_b2 && promiseCfg.kept_rate_b2 > promiseCfg.kept_rate_b3)) {
+    throw new Error('promises: kept rates must fall with the DPD band (b1 > b2 > b3)');
+  }
+  if (promiseCfg.violation_share <= 0 || promiseCfg.violation_share >= 0.2) {
+    throw new Error('promises: violation_share must sit strictly inside (0, 0.2)');
+  }
+  if (promiseCfg.blocked_events < 1 || promiseCfg.hindi_note_share <= 0 || promiseCfg.hindi_note_share >= 1) {
+    throw new Error('promises: blocked_events >= 1 and hindi_note_share inside (0, 1)');
+  }
+  if (promiseCfg.demo_due_today < 1 || promiseCfg.demo_within_three_days < 1 || promiseCfg.demo_in_grace < 1) {
+    throw new Error('promises: the demo story needs at least one promise in each live section');
+  }
+  if (promiseCfg.demo_broken_last_seven < 1 || promiseCfg.demo_kept_history < 1) {
+    throw new Error('promises: the demo story needs broken and kept history counts');
   }
 }
 

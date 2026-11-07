@@ -292,7 +292,8 @@ export async function listOfficerAssignments(actor: Actor): Promise<AssignmentSu
 
 /** SPEC 12 promise-tracker cards (prompt 11 item 3), officer-scoped by the
  *  promises' officer. Three sections:
- *  - dueToday: open promises whose promised date IS today (IST);
+ *  - dueToday: open promises still actionable today — promised date today OR
+ *    still inside grace (deadline >= today, the demo story's "in grace");
  *  - upcoming: open promises due after today, soonest first;
  *  - brokenNeedingFollowup: broken/broken_part promises with NO contact
  *    event on the loan since the break was recorded — the follow-up queue.
@@ -349,7 +350,9 @@ export async function listOfficerPromises(actor: Actor, todayIst: string): Promi
       and(
         eq(promises.officerId, actor.officerId),
         eq(promises.status, 'open'),
-        sql`${promises.promisedDate} >= ${todayIst}`,
+        // Still actionable: the deadline (promised_date + grace) has not
+        // passed, and the promise is not ancient (30-day visibility cap).
+        sql`${promises.promisedDate} + ${promises.graceDays} >= ${todayIst}`,
         sql`${promises.promisedDate} <= ${addIstDays(todayIst, 30)}`
       )
     )
@@ -392,8 +395,8 @@ export async function listOfficerPromises(actor: Actor, todayIst: string): Promi
       status: 'open',
       loanCleared: row.loanCleared
     };
-    if (card.promisedDate === todayIst) {
-      dueToday.push(card);
+    if (card.promisedDate <= todayIst) {
+      dueToday.push(card); // due today or inside grace — both actionable now
     } else {
       upcoming.push(card);
     }

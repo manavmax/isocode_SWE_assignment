@@ -20,7 +20,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inArray } from 'drizzle-orm';
 import { closePool, getDb, getPool, withTx } from '../../src/server/db.js';
-import { territory as territoryTable } from '../../src/server/db/schema.js';
+import { contactEvents, promises as promisesTable, territory as territoryTable } from '../../src/server/db/schema.js';
 import { applyImport } from '../../src/server/import/applyImport.js';
 import { demoModeEnabled } from '../../src/server/demo.js';
 import { loadSeedConfigFile } from './config.js';
@@ -28,6 +28,8 @@ import { buildHistory, dateAtOffset, type HistoryResult } from './history.js';
 import { buildLoanUniverse, briefLoanDefinitions, BRANCH_NAMES } from './loans.js';
 import { importAllHistory, type ImportAllOutcome } from './importAll.js';
 import { mulberry32 } from './rng.js';
+import { buildPromiseStory, type SeedLoanRow, type SeedPayment } from './promisesSeed.js';
+import { recomputePromiseStatuses } from '../../src/server/jobs/nightly.js';
 import { upsertStaff } from './staff.js';
 import {
   cohortSanitySql,
@@ -357,6 +359,133 @@ async function main(): Promise<void> {
 
   const queries = await readSummary(history.t0Date, asOf, staff);
   printSummary(outcome, history, queries, config.loans.total_end_active, asOf);
+
+  // ---- seed part 2 (SPEC 12 + 14, prompt 11 item 4) ----
+  // Contact events + promises for the whole history, consistent with the
+  // loan simulation: the generator reads the loans and the lms_delta
+  // payments the import just wrote (the same truth the nightly recompute
+  // will see) and DERIVES every status instead of rolling dice, so a stored
+  // status is the one the job reproduces. Insert-only into contact_event —
+  // the append-only trigger stays on — and idempotent via ON CONFLICT DO
+  // NOTHING (same rng, same ids, so a rerun without --reset adds nothing).
+  console.log('[seed] part 2: contact events + promises…');
+  const pool2 = getPool();
+  const loanRows = (
+    await pool2.query(
+      `SELECT l.loan_id,
+              COALESCE(l.assigned_officer_id, l.home_officer_id) AS officer_id,
+              l.borrower_name,
+              l.overdue_amount,
+              l.outstanding,
+              l.bucket,
+              l.status::text AS status,
+              (SELECT max((p.posted_at AT TIME ZONE 'Asia/Kolkata')::date)::text
+                 FROM payment p WHERE p.loan_id = l.loan_id) AS cleared_on
+         FROM loan l
+        WHERE l.status IN ('overdue', 'cleared')
+          AND COALESCE(l.assigned_officer_id, l.home_officer_id) IS NOT NULL`
+    )
+  ).rows as Record<string, unknown>[];
+  const paymentRows = (
+    await pool2.query(
+      `SELECT loan_id, (posted_at AT TIME ZONE 'Asia/Kolkata')::date::text AS date_key, amount
+         FROM payment WHERE source = 'lms_delta'`
+    )
+  ).rows as Record<string, unknown>[];
+  const paymentsByLoan = new Map<string, SeedPayment[]>();
+  for (const row of paymentRows) {
+    const loanId = String(row.loan_id);
+    const list = paymentsByLoan.get(loanId) ?? [];
+    list.push({ dateKey: String(row.date_key), amountPaise: Number(row.amount) });
+    paymentsByLoan.set(loanId, list);
+  }
+  const seedLoans: SeedLoanRow[] = loanRows.map((row) => ({
+    loanId: String(row.loan_id),
+    officerId: String(row.officer_id),
+    borrowerName: String(row.borrower_name),
+    overdueAmount: Number(row.overdue_amount),
+    outstanding: Number(row.outstanding),
+    bucket: String(row.bucket),
+    status: String(row.status) === 'cleared' ? 'cleared' : 'overdue',
+    ...(row.cleared_on ? { clearedOn: String(row.cleared_on) } : {})
+  }));
+  const demoOfficerIds = [staff.officerIdByName['Rahul Chouhan'], staff.officerIdByName['Neha Solanki']].filter(
+    (id): id is string => Boolean(id)
+  );
+  const story = buildPromiseStory({
+    loans: seedLoans,
+    paymentsByLoan,
+    windowStart,
+    asOf,
+    rng: mulberry32(args.seed + 2),
+    config: config.promises,
+    demoOfficerIds
+  });
+  console.log(
+    `[seed] part 2: story built · ${story.events.length} events · ${story.promises.length} promises ` +
+      `(open ${story.counts.open}, kept ${story.counts.kept}, broken ${story.counts.broken}, broken_part ${story.counts.brokenPart}) · ` +
+      `violations ${story.counts.violations} · blocked ${story.counts.blocked} · hindi notes ${story.counts.hindiNotes}`
+  );
+  for (let i = 0; i < story.events.length; i += 250) {
+    await db.insert(contactEvents).values(story.events.slice(i, i + 250)).onConflictDoNothing();
+  }
+  for (let i = 0; i < story.promises.length; i += 250) {
+    await db.insert(promisesTable).values(story.promises.slice(i, i + 250)).onConflictDoNothing();
+  }
+  console.log('[seed] part 2: events and promises inserted (append-only trigger untouched)');
+
+  // Recompute as the nightly job would: the seed's stored statuses must
+  // already agree with the derivation, so this changes nothing — the live
+  // proof of the consistency contract.
+  const nightly = await recomputePromiseStatuses();
+
+  const statusCounts = (
+    await pool2.query(`SELECT status::text AS status, count(*)::int AS n FROM promise GROUP BY 1 ORDER BY 1`)
+  ).rows as Record<string, unknown>[];
+  const dueTodayByOfficer = (
+    await pool2.query(
+      `SELECT o.name AS officer, count(*)::int AS n
+         FROM promise p JOIN officer o ON o.id = p.officer_id
+        WHERE p.status = 'open' AND p.promised_date = DATE ${asOf}
+        GROUP BY 1 ORDER BY 2 DESC, 1`
+    )
+  ).rows as Record<string, unknown>[];
+  const orphanEvents = Number(
+    (await pool2.query(`SELECT count(*)::int AS n FROM promise p LEFT JOIN contact_event e ON e.id = p.source_event_id WHERE e.id IS NULL`)).rows[0]!.n
+  );
+  const missingLoans = Number(
+    (await pool2.query(`SELECT count(*)::int AS n FROM promise p LEFT JOIN loan l ON l.loan_id = p.loan_id WHERE l.loan_id IS NULL`)).rows[0]!.n
+  );
+  const eventsWithoutLoan = Number(
+    (await pool2.query(`SELECT count(*)::int AS n FROM contact_event e LEFT JOIN loan l ON l.loan_id = e.loan_id WHERE l.loan_id IS NULL`)).rows[0]!.n
+  );
+
+  console.log('');
+  console.log('==== seed part 2 summary (promises + events) ====');
+  console.log('  promise counts by status:');
+  for (const row of statusCounts) {
+    console.log(`    ${String(row.status).padEnd(12)} ${String(row.n).padStart(6)}`);
+  }
+  console.log('  due-today promises per officer:');
+  for (const row of dueTodayByOfficer) {
+    console.log(`    ${String(row.officer).padEnd(22)} ${String(row.n).padStart(4)}`);
+  }
+  console.log(
+    `  consistency: orphan promises (no source event) ${orphanEvents} · promises without a loan ${missingLoans} · ` +
+      `events without a loan ${eventsWithoutLoan}`
+  );
+  console.log(
+    `  nightly recompute over the seeded data: examined ${nightly.examined}, updated ${nightly.updated} ` +
+      `(must be 0 — stored statuses already agree), kept ${nightly.kept}, broken ${nightly.broken}, ` +
+      `broken_part ${nightly.brokenPart}, kept rate ${nightly.keptRate === null ? 'n/a' : (100 * nightly.keptRate).toFixed(1) + '%'}`
+  );
+  if (orphanEvents > 0 || missingLoans > 0 || eventsWithoutLoan > 0) {
+    throw new Error('part 2 consistency check failed: dangling promise/event rows');
+  }
+  if (nightly.updated !== 0) {
+    throw new Error(`part 2 consistency check failed: the nightly recompute would change ${nightly.updated} seeded statuses`);
+  }
+
   console.log('');
   console.log(`[seed] done · branch codes ${Object.entries(staff.branchIdByCode).map(([code]) => code).join('/')} · ` +
     `branch names ${Object.values(BRANCH_NAMES).join('/')}`);
