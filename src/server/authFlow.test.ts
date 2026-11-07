@@ -294,6 +294,85 @@ describe('POST /api/auth/logout', () => {
   });
 });
 
+describe('login failure-reason logs (runtime logs only, never in the response)', () => {
+  const spyOnLog = () => vi.spyOn(console, 'log');
+  let logSpy: ReturnType<typeof spyOnLog>;
+
+  beforeEach(() => {
+    h.queue.length = 0;
+    h.writes.length = 0;
+    h.counters.deletes = 0;
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    logSpy.mockRestore();
+    delete process.env.DEMO_MODE;
+  });
+
+  function loggedEvents(): Array<Record<string, unknown>> {
+    return logSpy.mock.calls
+      .map((args) => {
+        try {
+          return JSON.parse(String(args[0])) as Record<string, unknown>;
+        } catch {
+          return null;
+        }
+      })
+      .filter((event): event is Record<string, unknown> => event !== null);
+  }
+
+  it('an unknown username logs user_not_found and answers only the generic body', async () => {
+    h.queue.push([]);
+    h.queue.push([]);
+    const res = await login('nobody', 'pin-7777');
+    expect(res.status).toBe(401);
+    expect(await res.text()).toBe('{"error":"wrong username or PIN"}');
+    expect(loggedEvents()).toEqual([
+      expect.objectContaining({ event: 'login_failed', reason: 'user_not_found', username: 'nobody' })
+    ]);
+  });
+
+  it('an inactive row logs user_not_found', async () => {
+    h.queue.push([]);
+    h.queue.push(fieldOfficerRow({ active: false }));
+    const res = await login('ss-officer', 'pin-7777');
+    expect(res.status).toBe(401);
+    expect(loggedEvents()[0]).toMatchObject({ reason: 'user_not_found', username: 'ss-officer' });
+  });
+
+  it('a demo account with the switch off logs demo_disabled', async () => {
+    h.queue.push([]);
+    h.queue.push(fieldOfficerRow({ isDemo: true, passwordHash: hashPassword(DEMO_PIN) }));
+    const res = await login('demo-officer-1', DEMO_PIN);
+    expect(res.status).toBe(401);
+    expect(loggedEvents()[0]).toMatchObject({ reason: 'demo_disabled', username: 'demo-officer-1' });
+  });
+
+  it('a wrong PIN logs bad_pin (the scrypt verify ran and failed)', async () => {
+    h.queue.push([]);
+    h.queue.push(fieldOfficerRow());
+    const res = await login('ss-officer', 'pin-0000');
+    expect(res.status).toBe(401);
+    expect(loggedEvents()[0]).toMatchObject({ reason: 'bad_pin', username: 'ss-officer' });
+  });
+
+  it('a locked key logs rate_limited without ever probing the user', async () => {
+    h.queue.push(attemptRow(5, NOW + 60_000));
+    const res = await login('ss-officer', 'pin-7777');
+    expect(res.status).toBe(429);
+    expect(loggedEvents()).toEqual([expect.objectContaining({ reason: 'rate_limited', username: 'ss-officer' })]);
+    expect(h.queue).toHaveLength(0);
+  });
+
+  it('a successful login logs nothing', async () => {
+    h.queue.push([]);
+    h.queue.push(fieldOfficerRow());
+    const res = await login('ss-officer', 'pin-7777');
+    expect(res.status).toBe(200);
+    expect(loggedEvents()).toEqual([]);
+  });
+});
+
 describe('POST /api/import through a cookie session', () => {
   beforeEach(() => {
     h.queue.length = 0;

@@ -42,6 +42,15 @@ function clientIp(c: Context): string {
   return forwarded?.split(',')[0]?.trim() || 'unknown';
 }
 
+export type LoginFailureReason = 'user_not_found' | 'demo_disabled' | 'bad_pin' | 'rate_limited';
+
+/** Ops telemetry for failed sign-ins, emitted ONLY to the runtime logs
+ * (Vercel captures console output) — the HTTP response stays the generic,
+ * enumeration-proof text so reason codes never leak to clients. */
+function logLoginFailure(reason: LoginFailureReason, username: string, ip: string): void {
+  console.log(JSON.stringify({ event: 'login_failed', reason, username, ip, time: new Date().toISOString() }));
+}
+
 app.post('/api/auth/login', async (c) => {
   try {
     let body: unknown;
@@ -58,10 +67,12 @@ app.post('/api/auth/login', async (c) => {
 
     // A30: throttle per username + client IP before any password work; the
     // counter lives in the login_attempt table so it holds across instances.
-    const throttleKey = loginThrottleKey(username, clientIp(c));
+    const ip = clientIp(c);
+    const throttleKey = loginThrottleKey(username, ip);
     const now = Date.now();
     const throttle = throttleDecision(await findLoginAttempts(throttleKey), now);
     if (throttle.blocked) {
+      logLoginFailure('rate_limited', username, ip);
       return c.json({ error: 'too many login attempts; try again later' }, 429, {
         'Retry-After': String(Math.ceil(throttle.retryAfterMs / 1000))
       });
@@ -69,17 +80,26 @@ app.post('/api/auth/login', async (c) => {
 
     // Failed attempt = unknown user, inactive row, demo account with the
     // off-switch set, or a wrong PIN — same generic text and same failure
-    // record for all of them, so nothing is enumerable (A30/A31).
+    // record for all of them, so nothing is enumerable (A30/A31). The exact
+    // reason goes to the runtime logs only.
     const user = await findLoginUser(username);
-    if (!user || !user.active || !demoLoginAllowed(user.isDemo, demoModeEnabled()) || !verifyPassword(user.passwordHash, pin)) {
+    const failureReason: LoginFailureReason | null = !user || !user.active
+      ? 'user_not_found'
+      : !demoLoginAllowed(user.isDemo, demoModeEnabled())
+        ? 'demo_disabled'
+        : !verifyPassword(user.passwordHash, pin)
+          ? 'bad_pin'
+          : null;
+    if (failureReason) {
       await recordLoginFailure(throttleKey, now);
+      logLoginFailure(failureReason, username, ip);
       return c.json({ error: 'wrong username or PIN' }, 401);
     }
 
-    const session = await createSession(user.id);
+    const session = await createSession(user!.id);
     setCookie(c, SESSION_COOKIE, session.token, sessionCookieOptions(Math.ceil(SESSION_TTL_MS / 1000)));
     await clearLoginFailures(throttleKey);
-    return c.json({ user: { username: user.username, role: user.role, branchId: user.branchId, officerId: user.officerId ?? null } });
+    return c.json({ user: { username: user!.username, role: user!.role, branchId: user!.branchId, officerId: user!.officerId ?? null } });
   } catch {
     return c.json({ status: 'degraded' }, 503);
   }
