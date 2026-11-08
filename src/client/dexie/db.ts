@@ -263,13 +263,15 @@ export async function queueEvent(payload: ContactEventInput, holdMs = 0): Promis
 }
 
 export async function getPendingItems(limit: number, nowFn: () => number): Promise<OutboxItem[]> {
+  // Read-all + filter: the outbox is tiny (<= 20 items) and this keeps the
+  // pending selection on the same store read as getOutboxCounts, so the
+  // counts on the Me screen can never disagree with what a flush sends.
   const now = nowFn();
-  const items = await db.outbox
-    .where('state')
-    .equals('pending')
-    .and((item) => item.notBefore <= now)
-    .sortBy('createdAt');
-  return items.slice(0, limit);
+  const all = await db.outbox.toArray();
+  return all
+    .filter((item) => item.state === 'pending' && item.notBefore <= now)
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .slice(0, limit);
 }
 
 export async function getOutboxCounts(): Promise<{ pending: number; failed: number; synced: number }> {
@@ -318,7 +320,10 @@ export async function setBackoff(id: string, notBefore: number, attempts: number
 
 export async function cleanupSynced(keepMs: number): Promise<void> {
   const cutoff = Date.now() - keepMs;
-  await db.outbox.where('state').equals('synced').and((i) => (i.syncedAt ?? 0) < cutoff).delete();
+  const stale = (await db.outbox.toArray()).filter(
+    (item) => item.state === 'synced' && (item.syncedAt ?? 0) < cutoff
+  );
+  await Promise.all(stale.map((item) => db.outbox.delete(item.id)));
 }
 
 export async function clearCache(): Promise<void> {
