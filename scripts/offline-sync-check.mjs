@@ -129,48 +129,47 @@ const deepLink = await page.evaluate(() => ({
 report('offline detail via deep link renders from cache', deepLink.stickyBar && !deepLink.errorState, JSON.stringify(deepLink));
 
 // ---- 6. offline: outbox shows exactly 1 pending ----
-const pendingOffline = await page.evaluate(async () => {
-  const mod = await import('/src/client/dexie/db.ts').catch(() => null);
-  return null; // direct module import needs the bundler; read via the UI instead
-});
 await page.locator('nav.bottom-nav').getByRole('button', { name: /मेरी जानकारी|Me/ }).first().click();
 await page.waitForTimeout(1500);
-const pendingText = await page.evaluate(() => {
-  const body = document.body.innerText;
-  const pending = body.match(/(\d+)\s*Pending|(\d+)\s*लंबित/);
-  return pending ? Number(pending[1] ?? pending[2]) : null;
+const pendingOffline = await page.evaluate(() => {
+  const counts = [...document.querySelectorAll('.sync-count')].map((el) => ({
+    label: el.querySelector('.sync-count-chip')?.textContent ?? '',
+    value: Number(el.querySelector('.sync-count-value')?.textContent ?? 0)
+  }));
+  const pending = counts.find((c) => /pending|बाकी/i.test(c.label));
+  return pending ? pending.value : null;
 });
-report('offline outbox shows 1 pending', pendingText === 1, `pending indicator = ${pendingText}`);
+report('offline outbox shows 1 pending', pendingOffline === 1, `pending indicator = ${pendingOffline}`);
 
-// ---- 7. online: reconnect, sync twice, assert exactly one event on the server ----
+// ---- 7. online: reconnect, reload (app-start flush #1), then a manual
+// sync-now (flush #2) — the item must sync exactly once, no duplicate. ----
 await context.setOffline(false);
 await page.waitForTimeout(500);
-// flush #1: tap the sync pill / kick the scheduler by visiting Today
-await page.locator('nav.bottom-nav').getByRole('button', { name: /आज|Today/ }).first().click();
-await page.waitForTimeout(6000); // scheduler flush cycle
-// flush #2: explicit second sync via the Me screen sync button if present
+await page.reload({ waitUntil: 'networkidle' }).catch(() => {});
+await page.waitForTimeout(5000); // app-start flush cycle
+// flush #2: explicit second sync via the Me screen's Sync now button.
 await page.locator('nav.bottom-nav').getByRole('button', { name: /मेरी जानकारी|Me/ }).first().click();
 await page.waitForTimeout(800);
 const syncBtn = page.locator('button', { hasText: /Sync now|अभी सिंक करें/ }).first();
 if (await syncBtn.count()) await syncBtn.click().catch(() => {});
-await page.waitForTimeout(6000);
-const outboxAfter = await page.evaluate(async () => {
-  // read the outbox via the app's own module (same bundler context)
-  const mod = await import(await window.__dexieDbUrl ?? '');
-  return null;
-}).catch(() => null);
-// The reliable client check: the Sync section shows the item as Synced (not pending, not failed).
-const syncSection = await page.evaluate(() => {
-  const body = document.body.innerText;
-  const synced = body.match(/(\d+)\s*Synced|(\d+)\s*सिंक/);
-  const pending = body.match(/(\d+)\s*Pending|(\d+)\s*लंबित/);
-  const failed = body.match(/(\d+)\s*Failed|(\d+)\s*विफल/);
-  return {
-    synced: synced ? Number(synced[1] ?? synced[2]) : null,
-    pending: pending ? Number(pending[1] ?? pending[2]) : null,
-    failed: failed ? Number(failed[1] ?? failed[2]) : null
-  };
-});
+await page.waitForTimeout(3000);
+// Poll the Me screen's sync counts for up to 75 s: the engine applies
+// exponential backoff after the offline flush attempts, so the item clears
+// when its not_before passes and the scheduler's flush runs. Break only
+// when the item actually synced (the VALUES, not the labels).
+let syncSection = null;
+for (let i = 0; i < 15; i += 1) {
+  await page.waitForTimeout(5000);
+  syncSection = await page.evaluate(() => {
+    const counts = [...document.querySelectorAll('.sync-count')].map((el) => ({
+      label: el.querySelector('.sync-count-chip')?.textContent ?? '',
+      value: Number(el.querySelector('.sync-count-value')?.textContent ?? 0)
+    }));
+    const find = (pattern) => counts.find((c) => new RegExp(pattern, 'i').test(c.label))?.value ?? null;
+    return { pending: find('pending|बाकी'), failed: find('failed|विफल'), synced: find('synced|सिंक हुआ') };
+  });
+  if (syncSection.pending === 0 && (syncSection.synced ?? 0) >= 1) break;
+}
 report('online: outbox synced exactly once (client)', syncSection.synced >= 1 && syncSection.pending === 0 && (syncSection.failed === 0 || syncSection.failed === null), JSON.stringify(syncSection));
 
 // server-side duplicate check: manager activity feed for the officer
