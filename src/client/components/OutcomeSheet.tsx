@@ -76,7 +76,7 @@ export function nextWorkingDay(dateKey: string): string {
 }
 
 /**
- * layout contract (bottom sheet): segmented -> chips -> fields (promise
+ * layout contract ("sheet", bottom sheet): segmented -> chips -> fields (promise
  * date/amount when Promise is selected) -> note (optional) -> save. The
  * sheet carries data-section="sheet"; the full-width black Save pill is
  * the section's primary action.

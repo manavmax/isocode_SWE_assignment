@@ -156,14 +156,14 @@ export function App() {
             ) : route.name === 'dashboard' ? (
               <ManagerDashboard onOpenActivity={(officerId) => navigate({ name: 'activity', officerId })} onOpenImport={() => navigate({ name: 'import' })} onOpenActivityRoute={() => navigate({ name: 'activity', officerId: 'first' })} />
             ) : route.name === 'import' ? (
-              <ManagerImport />
+              <ManagerImport onOpenOverview={() => navigate({ name: 'dashboard' })} onOpenActivityRoute={() => navigate({ name: 'activity', officerId: 'first' })} />
             ) : route.name === 'activity' ? (
               <OfficerActivity officerId={route.officerId} onBack={() => navigate({ name: 'dashboard' })} />
             ) : (
               <Today lang={lang} onOpenLoan={(loanId) => navigate({ name: 'loan', loanId })} />
             )}
           </Suspense>
-          <nav className="bottom-nav" aria-label={t('appName')}>
+          <nav className="bottom-nav" aria-label={t('appName')} data-section="nav">
             {user?.role === 'branch_manager' ? (
               <>
                 <button type="button" className="nav-item" aria-current={route.name === 'dashboard' ? 'page' : undefined} onClick={() => navigate({ name: 'dashboard' })}>

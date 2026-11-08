@@ -11,6 +11,9 @@ import { ErrorState, OfflineBanner, SkeletonList } from '../components/States.js
 
 type Load = 'loading' | 'ready' | 'error';
 
+/**
+ * layout contract ("activity"): top-bar -> table (the officer's last 50 events).
+ */
 export function OfficerActivity({ officerId, onBack }: { officerId: string; onBack: () => void }) {
   const [load, setLoad] = useState<Load>('loading');
   const [rows, setRows] = useState<ActivityRowDto[]>([]);
@@ -38,11 +41,12 @@ export function OfficerActivity({ officerId, onBack }: { officerId: string; onBa
 
   return (
     <main className="screen manager-screen">
-      <div className="topbar">
-        <button type="button" className="btn btn-ghost" onClick={onBack}>
-          ‹ Dashboard
+      <div className="topbar" data-section="top-bar">
+        <button type="button" className="topbar-icon" aria-label="Back" onClick={onBack}>
+          ‹
         </button>
-        <span className="topbar-title">Officer activity — last 50 contact events</span>
+        <span className="topbar-title">Activity</span>
+        <span className="topbar-spacer" aria-hidden="true" />
       </div>
       {offline ? <OfflineBanner text="You're offline. Showing the last loaded data only." /> : null}
       {load === 'loading' ? <SkeletonList rows={6} /> : null}
@@ -53,7 +57,7 @@ export function OfficerActivity({ officerId, onBack }: { officerId: string; onBa
         rows.length === 0 ? (
           <p className="screen-subtitle">No contact events for this officer yet.</p>
         ) : (
-          <table className="manager-table">
+          <table className="manager-table" data-section="table">
             <thead>
               <tr>
                 <th>When (IST)</th>

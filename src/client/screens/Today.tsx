@@ -11,7 +11,7 @@ import { syncNow } from '../sync/scheduler.js';
 type Load = 'loading' | 'empty' | 'error' | 'ready';
 
 /**
- * layout contract: top-bar -> heading -> hero -> summary -> segmented ->
+ * layout contract ("today"): top-bar -> heading -> hero -> summary -> segmented ->
  * cards -> nav (floating pill). Each section carries a data-section
  * attribute; layoutContracts.test.ts and the audits assert the order.
  */
@@ -124,12 +124,6 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
     const now = new Date();
     const shifted = new Date(now.getTime() + 330 * 60_000);
     return shifted.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'UTC' });
-  }
-
-  function syncPillLabel(): string {
-    if (counts.failed > 0) return `${counts.failed} ${tr('pillFailed')}`;
-    if (counts.pending > 0) return `${counts.pending} ${tr('pillPending')}`;
-    return tr('pillSynced');
   }
 
   return (

@@ -27,7 +27,7 @@ const UndoToast = lazy(() => import('../components/UndoToast.js').then((m) => ({
 type Load = 'loading' | 'ready' | 'error' | 'notFound';
 
 /**
- * layout contract: top-bar -> hero -> facts -> why -> history -> actions
+ * layout contract ("detail"): top-bar -> hero -> facts -> why -> history -> actions
  * (floating pill bar). data-section attributes mark each section.
  */
 export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: string; onBack: () => void }) {
@@ -196,6 +196,22 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
             </p>
           </div>
 
+          <div className="detail-card" data-section="facts">
+            <div className="facts">
+              {factRow(tr('factOutstanding'), formatLakhCrore(loan.outstanding / 100), true)}
+              {loan.emiAmount !== null ? factRow(tr('factEmi'), formatRupeePaise(loan.emiAmount), true) : null}
+              {factRow(tr('factLastContact'), loan.lastContactDays === null ? '—' : (loan.lastContactDays === 0 ? tr('todayLabelShort') : tr('daysAgo', { n: loan.lastContactDays })))}
+              {factRow(tr('factPromise'), loan.openPromiseDue ?? '—')}
+              {factRow(tr('factDpd'), String(loan.dpd))}
+              {factRow(tr('factStatus'), statusLabel(lang, loan.status))}
+              {loan.product ? factRow(tr('factProduct'), loan.product) : null}
+              {factRow(tr('factPincode'), loan.pincode ?? '—')}
+              {loan.address ? factRow(tr('factAddress'), loan.address) : null}
+              {factRow(tr('factPhone'), loan.mobileMasked ?? '—', true)}
+              {factRow(tr('factAltPhone'), loan.altMobileMasked ?? '—', true)}
+            </div>
+          </div>
+
           {loan.score !== null ? (
             <div className="score-panel detail-card" data-section="why">
               <p className="score-inline">
@@ -219,22 +235,6 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
               <p className="score-how">{tr('scoreAdvisoryLine')}</p>
             </div>
           ) : null}
-
-          <div className="detail-card" data-section="facts">
-            <div className="facts">
-              {factRow(tr('factOutstanding'), formatLakhCrore(loan.outstanding / 100), true)}
-              {loan.emiAmount !== null ? factRow(tr('factEmi'), formatRupeePaise(loan.emiAmount), true) : null}
-              {factRow(tr('factLastContact'), loan.lastContactDays === null ? '—' : (loan.lastContactDays === 0 ? tr('todayLabelShort') : tr('daysAgo', { n: loan.lastContactDays })))}
-              {factRow(tr('factPromise'), loan.openPromiseDue ?? '—')}
-              {factRow(tr('factDpd'), String(loan.dpd))}
-              {factRow(tr('factStatus'), statusLabel(lang, loan.status))}
-              {loan.product ? factRow(tr('factProduct'), loan.product) : null}
-              {factRow(tr('factPincode'), loan.pincode ?? '—')}
-              {loan.address ? factRow(tr('factAddress'), loan.address) : null}
-              {factRow(tr('factPhone'), loan.mobileMasked ?? '—', true)}
-              {factRow(tr('factAltPhone'), loan.altMobileMasked ?? '—', true)}
-            </div>
-          </div>
 
           {revealError && (
             <div className="reveal-error">

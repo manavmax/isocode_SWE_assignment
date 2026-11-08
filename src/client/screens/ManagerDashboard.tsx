@@ -71,6 +71,12 @@ function MigrationBars({ rows }: { rows: { openingBucket: string; cohortN: numbe
   );
 }
 
+/**
+ * layout contract ("manager"): top-bar -> segmented -> kpis -> chart -> tables ->
+ * nav (floating pill). data-section attributes mark each section; the
+ * tables section bundles the officer/migration/broken/exceptions/stuck
+ * white cards.
+ */
 export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityRoute }: { onOpenActivity: (officerId: string) => void; onOpenImport: () => void; onOpenActivityRoute: () => void }) {
   const [load, setLoad] = useState<Load>('loading');
   const [data, setData] = useState<ManagerDashboardDto | null>(null);
@@ -111,8 +117,17 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
 
   return (
     <main className="screen manager-screen" data-auto-centered="true">
-      <h1 className="screen-title">Branch dashboard — {data?.branchName ?? ''}</h1>
-      <nav className="manager-seg" aria-label="Manager sections">
+      <div className="topbar" data-section="top-bar">
+        <span className="topbar-spacer" aria-hidden="true" />
+        <span className="topbar-title">{data?.branchName ?? 'Dashboard'}</span>
+        <button type="button" className="topbar-icon" aria-label="Refresh" onClick={() => void refresh()}>
+          <svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20">
+            <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4" />
+          </svg>
+        </button>
+      </div>
+      <h1 className="screen-title">Branch dashboard</h1>
+      <nav className="manager-seg" aria-label="Manager sections" data-section="segmented">
         <button type="button" aria-current="page" onClick={() => undefined}>Overview</button>
         <button type="button" onClick={onOpenImport}>Import</button>
         <button type="button" onClick={onOpenActivityRoute}>Activity</button>
@@ -127,7 +142,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
             <p className="screen-subtitle">No completed 30-day window yet — the roll rate shows "pending", never zero.</p>
           ) : (
             <>
-            <div className="tile-grid">
+            <div className="tile-grid" data-section="kpis">
               <div className="tile gradient-b1" data-hero>
                 <span className="tile-label">Roll B1→B2, count (target 16%)</span>
                 <span className="tile-value num">{pct(data.tiles.rollRateCount)}</span>
@@ -164,19 +179,19 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
               : footnote}
           </p>
 
-          <section className="panel">
+          <section className="panel detail-card" data-section="chart">
             <h2 className="panel-title">Roll-rate trend ({data.trendWindowsAvailable} completed windows)</h2>
             <DotMatrixChart trend={data.trend} />
             <p className="footnote">{footnote}</p>
           </section>
 
-          <section className="panel">
+          <section className="panel detail-card">
             <h2 className="panel-title">Migration table (latest completed window)</h2>
             <MigrationBars rows={data.migrationTable} />
             <p className="footnote">Rows: opening DPD bucket at the window start. Shares of the opening cohort: cured (left the book or DPD 0), stayed (same bucket), rolled (next bucket up). Sum to 1 per row. Synthetic data.</p>
           </section>
 
-          <section className="panel">
+          <section className="panel detail-card" data-section="tables">
             <h2 className="panel-title">Officers (roll rate by opening attribution)</h2>
             <table className="manager-table">
               <thead>
@@ -213,7 +228,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
             <p className="footnote">Greyed rows have n &lt; 30 (SPEC 13). Kept rate = kept / (kept + broken + broken_part) over the officer's own promises. Workload = currently assigned overdue loans. Synthetic data.</p>
           </section>
 
-          <section className="panel">
+          <section className="panel detail-card">
             <h2 className="panel-title">Broken promises (oldest break first)</h2>
             {data.brokenPromises.length === 0 ? (
               <p className="screen-subtitle">None — nothing to escalate.</p>
@@ -250,7 +265,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
             <p className="footnote">Amount = the promised amount (paise to lakh/crore). Age = days since the break was recorded. Pin sends the loan to the top of its officer's Today list. Synthetic data.</p>
           </section>
 
-          <section className="panel">
+          <section className="panel detail-card">
             <h2 className="panel-title">Exceptions: 25–30 DPD, no promise, no contact in 5 days</h2>
             {data.exceptions.length === 0 ? (
               <p className="screen-subtitle">No exceptions today.</p>
@@ -287,7 +302,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
             <p className="footnote">Numerator: branch loans 25–30 DPD with no open promise and no CALL/VISIT/MESSAGE in the last 5 IST days. Denominator: the branch overdue book. Synthetic data.</p>
           </section>
 
-          <section className="panel">
+          <section className="panel detail-card">
             <h2 className="panel-title">Stuck promises (nightly list)</h2>
             {data.stuckPromises.length === 0 ? (
               <p className="screen-subtitle">No stuck promises — nothing 2+ days past due without action.</p>

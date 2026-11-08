@@ -35,7 +35,11 @@ const REASON_LABELS: Record<string, string> = {
   queue_data_fix: 'Queued: data fix (no phone AND no address)'
 };
 
-export function ManagerImport() {
+/**
+ * layout contract ("import"): top-bar -> segmented -> upload -> queue -> batches ->
+ * nav (floating pill).
+ */
+export function ManagerImport({ onOpenOverview, onOpenActivityRoute }: { onOpenOverview: () => void; onOpenActivityRoute: () => void }) {
   const [load, setLoad] = useState<Load>('ready');
   const [asOf, setAsOf] = useState<string>(lastWorkingDay());
   const [file, setFile] = useState<File | null>(null);
@@ -115,11 +119,25 @@ export function ManagerImport() {
 
   return (
     <main className="screen manager-screen">
+      <div className="topbar" data-section="top-bar">
+        <span className="topbar-spacer" aria-hidden="true" />
+        <span className="topbar-title">Import</span>
+        <button type="button" className="topbar-icon" aria-label="Refresh" onClick={() => void refresh()}>
+          <svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20">
+            <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4" />
+          </svg>
+        </button>
+      </div>
       <h1 className="screen-title">Daily CSV import</h1>
+      <nav className="manager-seg" aria-label="Manager sections" data-section="segmented">
+        <button type="button" onClick={onOpenOverview}>Overview</button>
+        <button type="button" aria-current="page" onClick={() => undefined}>Import</button>
+        <button type="button" onClick={onOpenActivityRoute}>Activity</button>
+      </nav>
       {offline ? <OfflineBanner text="You're offline. Uploads need a connection." /> : null}
       <p className="screen-subtitle">Full list of every loan with DPD &ge; 1 for the date. Re-importing the same file is a no-op; the same date with different bytes replaces it.</p>
 
-      <div className="import-form">
+      <div className="import-form" data-section="upload">
         <label className="import-label">
           CSV file
           <input type="file" accept=".csv,text/csv" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
@@ -179,7 +197,7 @@ export function ManagerImport() {
         </section>
       ) : null}
 
-      <section className="panel">
+      <section className="panel detail-card" data-section="queue">
         <h2 className="panel-title">Queued loans and why ({queue.length})</h2>
         {queue.length === 0 ? (
           <p className="screen-subtitle">Nothing queued for this branch.</p>
@@ -205,7 +223,7 @@ export function ManagerImport() {
         <p className="footnote">A24: unrouted newly-imported loans queue for the branch manager. Reason is derived from the data: no territory row for the pincode, or the row had no usable phone and no address. Synthetic data.</p>
       </section>
 
-      <section className="panel">
+      <section className="panel detail-card" data-section="batches">
         <h2 className="panel-title">Past batches</h2>
         {batches.length === 0 ? (
           <SkeletonList rows={2} />
