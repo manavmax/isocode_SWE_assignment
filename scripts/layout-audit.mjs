@@ -76,7 +76,8 @@ async function login(page, username) {
   await page.fill('#username', username);
   await page.fill('#pin', '1234');
   await page.getByRole('button', { name: /Sign in|साइन इन/ }).click();
-  await page.waitForURL('**/today', { timeout: 15000 });
+  // Managers land on /dashboard (SPEC 2), officers on /today.
+  await page.waitForURL(/\/(today|dashboard)/, { timeout: 15000 });
   await page.waitForTimeout(400);
 }
 
@@ -147,6 +148,34 @@ for (const lang of ['hi', 'en']) {
   await page.locator('nav.bottom-nav').getByRole('button', { name: /Me|मेरी जानकारी/ }).click();
   await page.waitForTimeout(500);
   await auditPage(`me-${lang}`, page);
+  await context.close();
+}
+
+// Manager screens (prompt 13, A67: English only) — desktop and phone, and
+// the officer activity table. demo-manager is the Indore branch manager.
+for (const [name, viewport] of [['desktop', { width: 1280, height: 800 }], ['phone', { width: 390, height: 844 }]]) {
+  const context = await browser.newContext({ viewport });
+  const page = await context.newPage();
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
+  await page.evaluate(() => window.localStorage.setItem('fc.lang', 'en'));
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(300);
+  await login(page, 'demo-manager');
+  await page.waitForURL('**/dashboard', { timeout: 15000 });
+  await page.waitForSelector('.tile-grid', { timeout: 15000 });
+  await auditPage(`manager-dashboard-${name}`, page);
+  await page.locator('nav.bottom-nav').getByRole('button', { name: 'Import' }).click();
+  await page.waitForURL('**/import', { timeout: 10000 });
+  await page.waitForTimeout(500);
+  await auditPage(`manager-import-${name}`, page);
+  if (name === 'desktop') {
+    await page.locator('nav.bottom-nav').getByRole('button', { name: 'Dashboard' }).click();
+    await page.waitForURL('**/dashboard', { timeout: 10000 });
+    await page.getByRole('button', { name: /Last 50 events/ }).first().click();
+    await page.waitForURL('**/manager/officers/**', { timeout: 10000 });
+    await page.waitForTimeout(600);
+    await auditPage('manager-activity-desktop', page);
+  }
   await context.close();
 }
 

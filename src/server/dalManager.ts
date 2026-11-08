@@ -87,8 +87,10 @@ export async function managerDashboard(actor: { branchId: string }, todayIst: st
   }[];
 
   const branchRows = rollRows.filter((row) => row.is_branch_row);
-  const officerRows = rollRows.filter((row) => !row.is_branch_row);
   const latest = branchRows[0] ?? null;
+  // The officer table shows the LATEST completed window only; the trend
+  // carries the history.
+  const officerRows = latest ? rollRows.filter((row) => !row.is_branch_row && row.t1 === latest.t1) : [];
 
   // The officer table needs the kept rate and the workload per officer.
   const officerStats = (
@@ -214,7 +216,7 @@ export async function managerDashboard(actor: { branchId: string }, todayIst: st
   const keptRow = (
     await db.execute(sql`
       SELECT count(*)::int AS made,
-             count(*) FILTER (WHERE status = 'kept')::int AS kept
+             count(*) FILTER (WHERE p.status = 'kept')::int AS kept
       FROM promise p JOIN loan l ON l.loan_id = p.loan_id
       WHERE l.branch_id = ${actor.branchId}::uuid AND p.status IN ('kept','broken','broken_part')
     `)
@@ -483,7 +485,7 @@ export async function importBatchesForBranch(actor: { branchId: string }): Promi
   const rows = (
     await db.execute(sql`
       SELECT ib.id::text AS batch_id, ib.as_of::text AS as_of, ib.filename, ib.status,
-             ib.row_count_json, ib.created_at
+             ib.row_counts_json, ib.created_at
       FROM import_batch ib
       JOIN loan l ON l.branch_id = ${actor.branchId}::uuid
       JOIN loan_snapshot ls ON ls.loan_id = l.loan_id AND ls.as_of = ib.as_of
@@ -493,7 +495,7 @@ export async function importBatchesForBranch(actor: { branchId: string }): Promi
     `)
   ).rows as unknown as Record<string, unknown>[];
   return rows.map((row) => {
-    const counts = (row.row_count_json ?? {}) as Record<string, number | undefined>;
+    const counts = (row.row_counts_json ?? {}) as Record<string, number | undefined>;
     return {
       batchId: String(row.batch_id),
       asOf: String(row.as_of),

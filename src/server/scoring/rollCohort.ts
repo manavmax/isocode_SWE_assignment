@@ -28,9 +28,11 @@ export async function writeRollCohortCache(latestBatchDate: string): Promise<Rol
   for (const window of windows) {
     const t0Rows = (
       await db.execute(sql`
-        SELECT s.loan_id::text AS loan_id, s.branch_id::text AS branch_id, s.officer_id::text AS officer_id,
+        SELECT s.loan_id::text AS loan_id, s.branch_id::text AS branch_id,
+               COALESCE(s.officer_id, l.assigned_officer_id)::text AS officer_id,
                s.dpd, s.outstanding
         FROM loan_snapshot s
+        JOIN loan l ON l.loan_id = s.loan_id
         WHERE s.as_of = ${window.t0}::date AND s.dpd BETWEEN 1 AND 30
         ORDER BY s.loan_id
       `)

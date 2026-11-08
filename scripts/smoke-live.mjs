@@ -80,6 +80,113 @@ function maskOk(value) {
   sessionCookie = cookie;
 }
 
+// 6b. Officer-scoped reads that must work for an officer: promises with the
+// three sections, and the assignments response carrying the scorecard mode
+// with exactly three top reasons on the first loan (SPEC 8/12 checks the
+// user pinned to smoke:live).
+let managerCookie = '';
+if (sessionCookie.startsWith('fc_session=')) {
+  const promisesRes = await call('promises', '/api/me/promises');
+  const p = promisesRes.body;
+  const promisesOk =
+    promisesRes.res.status === 200 &&
+    Array.isArray(p?.dueToday) &&
+    Array.isArray(p?.upcoming) &&
+    Array.isArray(p?.brokenNeedingFollowup);
+  report(promisesOk, 'GET  /api/me/promises', `${promisesRes.res.status} due=${p?.dueToday?.length ?? '?'} upcoming=${p?.upcoming?.length ?? '?'} broken=${p?.brokenNeedingFollowup?.length ?? '?'}`);
+
+  const scoredRes = await call('assignments-scored', '/api/me/assignments');
+  const s = scoredRes.body;
+  const first = s?.assignments?.[0];
+  const scoringOk =
+    scoredRes.res.status === 200 &&
+    (s?.scoringMode === 'scorecard' || s?.scoringMode === 'fallback') &&
+    first?.score !== null &&
+    Array.isArray(first?.topReasons) &&
+    first.topReasons.length === 3;
+  report(
+    scoringOk,
+    'GET  /api/me/assignments (scoring)',
+    `${scoredRes.res.status} mode=${s?.scoringMode ?? '?'} first score=${first?.score ?? '?'} reasons=${first?.topReasons?.length ?? 0}`
+  );
+
+  // 7. Officers are refused on every manager endpoint (403, no db work).
+  const officerForbidden = await call('manager-as-officer', '/api/manager/dashboard');
+  report(officerForbidden.res.status === 403, 'GET  /api/manager/dashboard (as officer) — 403', `${officerForbidden.res.status} ${officerForbidden.body?.error ?? ''}`);
+
+  // Manager login: a second session for the manager endpoints.
+  const managerLogin = await call('manager-login', '/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username: 'demo-manager', pin: '1234' })
+  });
+  managerCookie = (managerLogin.res.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
+  report(
+    managerLogin.res.status === 200 && managerCookie.startsWith('fc_session=') && managerLogin.body?.user?.role === 'branch_manager',
+    'POST /api/auth/login (demo-manager)',
+    `${managerLogin.res.status} role=${managerLogin.body?.user?.role ?? '?'}${managerCookie ? ' cookie set' : ' NO cookie'}`
+  );
+} else {
+  report(false, 'GET /api/me/promises + manager login', 'skipped — no officer session');
+}
+
+// Manager endpoints (SPEC 13): dashboard, queue, import batches, pin +
+// unpin round-trip, officer activity. All manager-only (demo-manager).
+if (managerCookie.startsWith('fc_session=')) {
+  const prevCookie = sessionCookie;
+  sessionCookie = managerCookie;
+
+  const dash = await call('manager-dashboard', '/api/manager/dashboard');
+  const d = dash.body;
+  const dashOk =
+    dash.res.status === 200 &&
+    typeof d?.branchName === 'string' &&
+    typeof d?.queueCount === 'number' &&
+    Array.isArray(d?.officerTable) &&
+    Array.isArray(d?.exceptions) &&
+    Array.isArray(d?.brokenPromises);
+  report(dashOk, 'GET  /api/manager/dashboard', `${dash.res.status} branch=${d?.branchName ?? '?'} windows=${d?.trendWindowsAvailable ?? '?'} officers=${d?.officerTable?.length ?? '?'}${dashOk ? '' : ''}`);
+
+  const queueRes = await call('manager-queue', '/api/manager/queue');
+  report(queueRes.res.status === 200 && Array.isArray(queueRes.body?.queue), 'GET  /api/manager/queue', `${queueRes.res.status} queued=${queueRes.body?.queue?.length ?? '?'}`);
+
+  const batchesRes = await call('manager-batches', '/api/manager/import-batches');
+  report(batchesRes.res.status === 200 && Array.isArray(batchesRes.body?.batches), 'GET  /api/manager/import-batches', `${batchesRes.res.status} batches=${batchesRes.body?.batches?.length ?? '?'}`);
+
+  const exception = d?.exceptions?.[0];
+  const broken = d?.brokenPromises?.[0];
+  const pinTarget = exception ?? broken;
+  if (pinTarget && (exception ? d.officerTable.some((o) => o.officerName === (exception.officerName ?? '')) : d.officerTable.some((o) => o.officerName === (broken.officerName ?? '')))) {
+    const officerId = d.officerTable.find((o) => o.officerName === pinTarget.officerName)?.officerId;
+    const pinRes = await call('manager-pin', '/api/manager/priority', {
+      method: 'POST',
+      body: JSON.stringify({ loanId: pinTarget.loanId, officerId })
+    });
+    report(pinRes.res.status === 200 && pinRes.body?.ok === true, 'POST /api/manager/priority (pin exception loan)', `${pinRes.res.status} loan=${pinTarget.loanId}`);
+    const unpinRes = await call('manager-unpin', `/api/manager/priority/${encodeURIComponent(pinTarget.loanId)}`, { method: 'DELETE' });
+    report(unpinRes.res.status === 200 && unpinRes.body?.ok === true, `DELETE /api/manager/priority/${pinTarget.loanId}`, `${unpinRes.res.status}`);
+  } else {
+    report(false, 'POST /api/manager/priority', 'no exception/broken row with an officer to pin — seed the demo story');
+  }
+
+  const officerId = d?.officerTable?.[0]?.officerId;
+  if (officerId) {
+    const activity = await call('manager-activity', `/api/manager/officers/${officerId}/activity`);
+    report(activity.res.status === 200 && Array.isArray(activity.body?.activity), 'GET  /api/manager/officers/:id/activity', `${activity.res.status} events=${activity.body?.activity?.length ?? '?'}`);
+  }
+
+  // A manager cannot pin or read another branch's data: pin to a loan the
+  // manager's branch does not own must answer 403.
+  const crossPin = await call('manager-pin-cross', '/api/manager/priority', {
+    method: 'POST',
+    body: JSON.stringify({ loanId: 'LN-99999999', officerId: d?.officerTable?.[0]?.officerId })
+  });
+  report(crossPin.res.status === 403, 'POST /api/manager/priority (foreign loan) — 403', `${crossPin.res.status}`);
+
+  sessionCookie = prevCookie;
+} else {
+  report(false, 'Manager endpoints', 'skipped — no manager session');
+}
+
 // Everything below needs the session cookie.
 if (sessionCookie.startsWith('fc_session=')) {
   // 4. Me (nested under /api, two segments deep).

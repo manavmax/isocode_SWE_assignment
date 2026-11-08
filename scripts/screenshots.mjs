@@ -60,7 +60,7 @@ async function login(page, username) {
   await page.fill('#username', username);
   await page.fill('#pin', '1234');
   await page.getByRole('button', { name: /Sign in|साइन इन/ }).click();
-  await page.waitForURL('**/today', { timeout: 15000 });
+  await page.waitForURL(/\/(today|dashboard)/, { timeout: 15000 });
   await page.getByTestId('skeleton').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {});
   await page.waitForTimeout(300);
 }
@@ -216,6 +216,45 @@ await promEmptyCtx.page.waitForURL('**/promises', { timeout: 10000 });
 await promEmptyCtx.page.waitForTimeout(700);
 await shoot(promEmptyCtx.page, 'promises-empty-hi');
 await promEmptyCtx.context.close();
+
+// --- manager screens (prompt 13): dashboard desktop+phone, import, activity ---
+const mgrCtx = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
+const mgrPage = await mgrCtx.newPage();
+await mgrPage.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
+await mgrPage.evaluate(() => window.localStorage.setItem('fc.lang', 'en'));
+await mgrPage.reload({ waitUntil: 'networkidle' });
+await mgrPage.fill('#username', 'demo-manager');
+await mgrPage.fill('#pin', '1234');
+await mgrPage.getByRole('button', { name: /Sign in/ }).click();
+await mgrPage.waitForURL('**/dashboard', { timeout: 15000 });
+await mgrPage.waitForSelector('.tile-grid', { timeout: 15000 });
+await mgrPage.waitForTimeout(500);
+await shoot(mgrPage, 'manager-dashboard-desktop');
+await mgrPage.locator('nav.bottom-nav').getByRole('button', { name: 'Import' }).click();
+await mgrPage.waitForURL('**/import', { timeout: 10000 });
+await mgrPage.waitForTimeout(500);
+await shoot(mgrPage, 'manager-import-desktop');
+await mgrPage.locator('nav.bottom-nav').getByRole('button', { name: 'Dashboard' }).click();
+await mgrPage.waitForURL('**/dashboard', { timeout: 10000 });
+await mgrPage.getByRole('button', { name: /Last 50 events/ }).first().click();
+await mgrPage.waitForURL('**/manager/officers/**', { timeout: 10000 });
+await mgrPage.waitForTimeout(600);
+await shoot(mgrPage, 'manager-activity-desktop');
+await mgrCtx.close();
+
+const mgrPhoneCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+const mgrPhone = await mgrPhoneCtx.newPage();
+await mgrPhone.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
+await mgrPhone.evaluate(() => window.localStorage.setItem('fc.lang', 'en'));
+await mgrPhone.reload({ waitUntil: 'networkidle' });
+await mgrPhone.fill('#username', 'demo-manager');
+await mgrPhone.fill('#pin', '1234');
+await mgrPhone.getByRole('button', { name: /Sign in/ }).click();
+await mgrPhone.waitForURL('**/dashboard', { timeout: 15000 });
+await mgrPhone.waitForSelector('.tile-grid', { timeout: 15000 });
+await mgrPhone.waitForTimeout(500);
+await shoot(mgrPhone, 'manager-dashboard-phone');
+await mgrPhoneCtx.close();
 
 await browser.close();
 api.kill();
