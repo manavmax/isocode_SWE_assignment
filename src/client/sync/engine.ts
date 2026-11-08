@@ -51,7 +51,11 @@ export interface EngineDeps {
 }
 
 const DEFAULTS: Required<EngineDeps> = {
-  fetch: fetch,
+  // bound: the engine calls d().fetch(...) as a method of the deps object,
+  // and the native fetch throws Illegal invocation unless its receiver is
+  // the window (prompt 19: every in-browser flush failed on this and the
+  // outbox never synced — unit tests missed it because they inject fetch).
+  fetch: fetch.bind(globalThis),
   now: Date.now,
   random: () => Math.random(),
   batchSize: 20,
@@ -156,7 +160,9 @@ async function _doFlush(): Promise<SyncResult> {
       signal: AbortSignal.timeout(d().timeoutMs)
     });
   } catch (err) {
-    const kind = err instanceof Error && err.name === 'AbortError' ? 'timeout' : 'network';
+    const kind = err instanceof Error && (err.name === 'AbortError' || err.name === 'TimeoutError')
+      ? 'timeout'
+      : 'network';
     await _handleNetworkError(items, kind, now);
     return { kind: 'network', sent: items.length, failed: 0, serverNow: null };
   }

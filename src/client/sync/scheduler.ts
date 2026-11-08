@@ -17,13 +17,13 @@ const KICK_DELAY_MS = 5_250; // 5 s undo hold + 250 ms slack
 export function startSyncScheduler(): () => void {
   const onOnline = () => {
     resetBackoff();
-    void flush();
+    void flush().catch((err) => console.error('[sync] scheduler flush failed:', String(err).slice(0, 300)));
   };
 
   const onVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
       resetBackoff();
-      void flush();
+      void flush().catch((err) => console.error('[sync] scheduler flush failed:', String(err).slice(0, 300)));
     }
   };
 
@@ -42,7 +42,7 @@ export function startSyncScheduler(): () => void {
   // App start is a flush trigger too (SPEC 6.3): anything queued since the
   // last session goes out as soon as the shell is up. Honours not_before, so
   // 5 s undo holds are never violated by this first attempt.
-  void flush();
+  void flush().catch((err) => console.error('[sync] scheduler flush failed:', String(err).slice(0, 300)));
 
   return () => {
     window.removeEventListener('online', onOnline);
@@ -63,9 +63,9 @@ export function startSyncScheduler(): () => void {
  * whose not_before has passed. */
 export function kick(): void {
   if (_kickTimeout !== null) return; // already scheduled
-  _kickTimeout = setTimeout(async () => {
+  _kickTimeout = setTimeout(() => {
     _kickTimeout = null;
-    await flush();
+    void flush().catch((err) => console.error('[sync] kick flush failed:', String(err).slice(0, 300)));
   }, KICK_DELAY_MS);
 }
 
@@ -75,5 +75,9 @@ export async function syncNow(): Promise<void> {
     clearTimeout(_kickTimeout);
     _kickTimeout = null;
   }
-  await flush();
+  try {
+    await flush();
+  } catch (err) {
+    console.error('[sync] syncNow flush failed:', String(err).slice(0, 300));
+  }
 }
