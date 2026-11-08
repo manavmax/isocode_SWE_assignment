@@ -399,6 +399,10 @@ export async function listOfficerAssignments(actor: Actor, todayIst: string): Pr
              sl.model_version,
              (CASE WHEN sl.p_roll IS NOT NULL AND sl.p_roll < ${weights.lowLaneMaxPRoll}
                AND (SELECT count(*) FROM promise p WHERE p.loan_id = l.loan_id AND p.status IN ('broken', 'broken_part')) = 0
+               AND NOT EXISTS (SELECT 1 FROM promise p
+                                WHERE p.loan_id = l.loan_id AND p.status = 'open'
+                                  AND p.promised_date <= ${todayIst}::date
+                                  AND p.promised_date + p.grace_days >= ${todayIst}::date)
               THEN true ELSE false END) AS low_lane,
              EXISTS (SELECT 1 FROM promise p
                       WHERE p.loan_id = l.loan_id AND p.status = 'open'
@@ -429,6 +433,10 @@ export async function listOfficerAssignments(actor: Actor, todayIst: string): Pr
                    AND p.promised_date + p.grace_days >= ${todayIst}::date) DESC,
         (CASE WHEN sl.p_roll IS NOT NULL AND sl.p_roll < ${weights.lowLaneMaxPRoll}
                AND (SELECT count(*) FROM promise p WHERE p.loan_id = l.loan_id AND p.status IN ('broken', 'broken_part')) = 0
+               AND NOT EXISTS (SELECT 1 FROM promise p
+                                WHERE p.loan_id = l.loan_id AND p.status = 'open'
+                                  AND p.promised_date <= ${todayIst}::date
+                                  AND p.promised_date + p.grace_days >= ${todayIst}::date)
               THEN 1 ELSE 0 END) ASC,
         sl.rupees_at_risk DESC NULLS LAST,
         broken_count DESC,
