@@ -75,6 +75,12 @@ export function nextWorkingDay(dateKey: string): string {
   return k;
 }
 
+/**
+ * layout contract (bottom sheet): segmented -> chips -> fields (promise
+ * date/amount when Promise is selected) -> note (optional) -> save. The
+ * sheet carries data-section="sheet"; the full-width black Save pill is
+ * the section's primary action.
+ */
 export function OutcomeSheet({
   lang,
   defaultKind,
@@ -169,13 +175,14 @@ export function OutcomeSheet({
     <dialog
       open
       className="outcome-sheet"
+      data-section="sheet"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="sheet-content">
         <div className="sheet-handle" aria-hidden="true" />
         <p className="sheet-title">{tr('outcomeSheetTitle')}</p>
 
-        <div className="kind-toggle chip-row" role="group" aria-label={tr('kindToggle')}>
+        <div className="kind-toggle chip-row" role="group" aria-label={tr('kindToggle')} data-section="segmented">
           <button
             type="button"
             className={`chip ${kind === 'CALL' ? 'chip-selected' : ''}`}
@@ -192,7 +199,7 @@ export function OutcomeSheet({
           </button>
         </div>
 
-        <div className="chip-row" role="group" aria-label={tr('outcomeLabel')}>
+        <div className="chip-row" role="group" aria-label={tr('outcomeLabel')} data-section="chips">
           {OUTCOME_CHIPS.map(({ value, key }) => (
             <button
               key={value}
@@ -206,7 +213,7 @@ export function OutcomeSheet({
         </div>
 
         {showPromise && promiseDate !== null && (
-          <div className="promise-fields">
+          <div className="promise-fields" data-section="fields">
             <p className="promise-amount-label">{tr('promiseAmountLabel')}</p>
             <input
               type="number"
@@ -240,7 +247,7 @@ export function OutcomeSheet({
         )}
 
         {showNote ? (
-          <div className="field">
+          <div className="field" data-section="note">
             <textarea
               className="note-input"
               rows={3}
@@ -260,7 +267,7 @@ export function OutcomeSheet({
           </button>
         )}
 
-        <div className="sheet-actions">
+        <div className="sheet-actions" data-section="save">
           <button type="button" className="btn btn-secondary" onClick={onClose}>
             {tr('cancel')}
           </button>

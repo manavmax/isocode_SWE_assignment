@@ -26,6 +26,10 @@ const UndoToast = lazy(() => import('../components/UndoToast.js').then((m) => ({
 
 type Load = 'loading' | 'ready' | 'error' | 'notFound';
 
+/**
+ * layout contract: top-bar -> hero -> facts -> why -> history -> actions
+ * (floating pill bar). data-section attributes mark each section.
+ */
 export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: string; onBack: () => void }) {
   const [load, setLoad] = useState<Load>('loading');
   const [loan, setLoan] = useState<LoanDetailDto | null>(null);
@@ -158,11 +162,18 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
 
   return (
     <main className="screen">
-      <div className="topbar">
-        <button type="button" className="btn btn-ghost" onClick={onBack}>
-          ‹ {tr('back')}
+      <div className="topbar" data-section="top-bar">
+        <button type="button" className="topbar-icon" aria-label={tr('back')} onClick={onBack}>
+          ‹
         </button>
         <span className="topbar-title">{tr('detailTitle')}</span>
+        <button type="button" className="topbar-icon" aria-label="More options">
+          <svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20">
+            <circle cx="12" cy="5" r="1.6" />
+            <circle cx="12" cy="12" r="1.6" />
+            <circle cx="12" cy="19" r="1.6" />
+          </svg>
+        </button>
       </div>
 
       {load === 'loading' ? <SkeletonList rows={2} /> : null}
@@ -175,7 +186,7 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
 
       {load === 'ready' && loan ? (
         <>
-          <div className={`detail-hero gradient-b${bucketIndex(loan.bucket)}`} data-hero>
+          <div className={`detail-hero gradient-b${bucketIndex(loan.bucket)}`} data-hero data-section="hero">
             <p className="bucket-name num">{bucketLabel(lang, loan.bucket)}</p>
             <h1 className="card-name">{loan.borrowerName}</h1>
             {loan.businessName ? <p className="business">{loan.businessName}</p> : null}
@@ -186,7 +197,7 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
           </div>
 
           {loan.score !== null ? (
-            <div className="score-panel detail-card">
+            <div className="score-panel detail-card" data-section="why">
               <p className="score-inline">
                 {tr('scoreAdvisory')}: <span className="num">{loan.score}</span> ·{' '}
                 {translate(lang, loan.band === 'high' ? 'scoreBandHigh' : loan.band === 'medium' ? 'scoreBandMedium' : 'scoreBandLow')}
@@ -209,7 +220,7 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
             </div>
           ) : null}
 
-          <div className="detail-card">
+          <div className="detail-card" data-section="facts">
             <div className="facts">
               {factRow(tr('factOutstanding'), formatLakhCrore(loan.outstanding / 100), true)}
               {loan.emiAmount !== null ? factRow(tr('factEmi'), formatRupeePaise(loan.emiAmount), true) : null}
@@ -234,7 +245,27 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
             </div>
           )}
 
-          <div className="sticky-bar" data-float>
+          <div className="detail-card" data-section="history">
+            <h2 className="score-reasons-title">{tr('historyTitle')}</h2>
+            <ul className="history-list">
+              <li>
+                <span>{tr('factLastContact')}</span>
+                <span className="num">
+                  {loan.lastContactDays === null ? '—' : loan.lastContactDays === 0 ? tr('todayLabelShort') : tr('daysAgo', { n: loan.lastContactDays })}
+                </span>
+              </li>
+              <li>
+                <span>{tr('factPromise')}</span>
+                <span className="num">{loan.openPromiseDue ?? '—'}</span>
+              </li>
+              <li>
+                <span>{tr('factStatus')}</span>
+                <span>{statusLabel(lang, loan.status)}</span>
+              </li>
+            </ul>
+          </div>
+
+          <div className="sticky-bar" data-float data-section="actions">
             <div className="sticky-side">
               <button
                 type="button"

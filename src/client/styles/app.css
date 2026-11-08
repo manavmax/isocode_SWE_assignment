@@ -108,6 +108,25 @@
   align-items: center;
   justify-content: center;
   justify-self: end;
+  font-size: var(--font-size-18);
+}
+
+.history-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  min-height: 48px;
+  border-bottom: var(--hairline);
+  font-size: var(--font-size-16);
+}
+
+.history-list li:last-child {
+  border-bottom: none;
+}
+
+.history-list li span:last-child {
+  color: var(--text-secondary);
 }
 
 .today-heading {
@@ -843,10 +862,14 @@
 }
 
 .sheet-actions {
-  display: grid;
-  grid-template-columns: 1fr 2fr;
+  display: flex;
+  flex-direction: column;
   gap: var(--sp-2);
   margin-top: var(--sp-2);
+}
+
+.sheet-actions .btn {
+  width: 100%;
 }
 
 /* ---------- undo toast ---------- */
