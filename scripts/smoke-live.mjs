@@ -50,6 +50,21 @@ function maskOk(value) {
   return value === null || MASKED.test(value);
 }
 
+// 0. Security headers (prompt 14a item 7): every check below reads the
+// health response's headers — the app and the API must both carry them.
+{
+  const { res, hint } = await call('headers', '/api/health');
+  const h = (name) => res.headers.get(name) ?? '';
+  const headerOk =
+    h('strict-transport-security').includes('max-age=31536000') &&
+    h('x-content-type-options') === 'nosniff' &&
+    (h('x-frame-options') === 'DENY' || h('content-security-policy').includes("frame-ancestors 'none'")) &&
+    h('referrer-policy') === 'strict-origin-when-cross-origin' &&
+    h('content-security-policy').includes("frame-ancestors 'none'") &&
+    h('content-security-policy').includes("default-src 'self'");
+  report(headerOk, 'Security headers on /api/health', `hsts=${Boolean(h('strict-transport-security'))} nosniff=${h('x-content-type-options') === 'nosniff'} frame-ancestors=${h('content-security-policy').includes("frame-ancestors 'none'")} referrer=${h('referrer-policy') || 'MISSING'}${headerOk ? '' : ` hint(${res.status})`}`);
+}
+
 // 1. Health: our JSON 200 with db ok (a Vercel plain-text 404 fails here).
 {
   const { res, body, hint } = await call('health', '/api/health');

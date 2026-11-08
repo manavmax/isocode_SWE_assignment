@@ -10,6 +10,8 @@ import {
   db,
   CACHE_TTL_MS,
   saveAssignments,
+  loadPromises,
+  savePromises,
   loadAssignments,
   getMeta,
   setMeta,
@@ -221,16 +223,18 @@ describe('meta (SPEC 7 skew, last sync, persistence)', () => {
 });
 
 describe('logout wipe and assignment cache TTL (SPEC 16)', () => {
-  it('clearCache wipes outbox, meta, reveal cache and the assignment cache', async () => {
+  it('clearCache wipes outbox, meta, reveal cache, the assignment cache and the promise cache', async () => {
     await queueEvent(payload('x1'));
     await setMeta(META_KEYS.SKEW_ESTIMATE_MS, 1_000);
     await setCachedReveal('LN-1', '9876543210', null);
     await saveAssignments([], Date.now());
+    await savePromises({ dueToday: [], upcoming: [], brokenNeedingFollowup: [] }, Date.now());
     await clearCache();
     expect(await getOutboxCounts()).toEqual({ pending: 0, failed: 0, synced: 0 });
     expect(await getSkew()).toBe(0);
     expect(await db.revealCache.count()).toBe(0);
     expect(await loadAssignments()).toBeUndefined();
+    expect(await loadPromises()).toBeUndefined(); // the promise cache dies with the session too
   });
 
   it('the assignment cache keeps its own 24 h expiry, independent of the wipe', async () => {

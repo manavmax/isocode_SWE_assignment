@@ -4,7 +4,7 @@ import type { Context } from 'hono';
 import { applyImport } from './import/applyImport.js';
 import { validateAsOf, validateUploadFile } from './import/uploadMeta.js';
 import { buildErrorsCsv } from './errorsCsv.js';
-import { fetchBatchWithRowErrors, fetchLoanForActor, findLoginUser, isManager, listOfficerAssignments, probeDb } from './dal.js';
+import { auditErrorsDownload, auditLoginSuccess, fetchBatchWithRowErrors, fetchLoanForActor, findLoginUser, isManager, listOfficerAssignments, probeDb } from './dal.js';
 import { verifyPassword } from './auth.js';
 import {
   createSession,
@@ -27,6 +27,25 @@ import { writeRollCohortCache } from './scoring/rollCohort.js';
 import { istDateKey } from '../shared/datetime.js';
 
 export const app = new Hono();
+
+/** Security headers on every API response (prompt 14a item 1). The static
+ *  app gets the same set from vercel.json; this middleware covers /api so
+ *  the two layers cannot drift. CSP: everything is same-origin (self-hosted
+ *  fonts, bundled scripts); styles need 'unsafe-inline' for React's inline
+ *  style props; frame-ancestors 'none' + X-Frame-Options DENY keep the app
+ *  out of frames. */
+app.use('*', async (c, next) => {
+  await next();
+  c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  c.header('X-Content-Type-Options', 'nosniff');
+  c.header('X-Frame-Options', 'DENY');
+  c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+  c.header(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+  );
+  c.header('Permissions-Policy', 'geolocation=(self), camera=(), microphone=()');
+});
 
 app.get('/api/health', async (c) => {
   try {
@@ -104,6 +123,7 @@ app.post('/api/auth/login', async (c) => {
     const session = await createSession(user!.id);
     setCookie(c, SESSION_COOKIE, session.token, sessionCookieOptions(Math.ceil(SESSION_TTL_MS / 1000)));
     await clearLoginFailures(throttleKey);
+    await auditLoginSuccess({ username: user!.username, userId: user!.id, role: user!.role });
     return c.json({ user: { username: user!.username, role: user!.role, branchId: user!.branchId, officerId: user!.officerId ?? null } });
   } catch {
     return c.json({ status: 'degraded' }, 503);
@@ -294,6 +314,7 @@ app.get('/api/import/:id/errors.csv', async (c) => {
       return c.json({ error: 'not found' }, 404);
     }
     const csv = buildErrorsCsv(found.rows);
+    await auditErrorsDownload(actor, found.batch.id, found.rows.length);
     return new Response(csv, {
       status: 200,
       headers: {

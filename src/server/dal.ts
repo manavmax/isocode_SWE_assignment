@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { getDb } from './db.js';
-import { importBatches, importRowErrors, loans, promises, users } from './db/schema.js';
+import { auditLog, importBatches, importRowErrors, loans, promises, users } from './db/schema.js';
 import { maskPhone } from '../shared/phone.js';
 import type { LoanStatus } from '../shared/types.js';
 import { DEMO_ACCOUNTS } from './demo.js';
@@ -274,6 +274,29 @@ export async function fetchLoanForActor(actor: Actor, loanId: string): Promise<L
  * users; nothing else (no ids, roles, hashes). Callers gate on
  * demoModeEnabled(). The seeded synthetic officers are is_demo for the
  * "(demo)" marker (A40) but are NOT demo login chips. */
+/** Audit-log writers for app.ts (the route file holds no driver imports —
+ *  routeDbGuard). Successful logins and errors.csv downloads are audited;
+ *  failed logins are already captured durably in login_attempt (A30). */
+export async function auditLoginSuccess(actor: { username: string; userId: string; role: string }): Promise<void> {
+  const db = getDb();
+  await db.insert(auditLog).values({
+    actor: actor.username,
+    action: 'auth:login',
+    subject: actor.userId,
+    detail: { role: actor.role }
+  });
+}
+
+export async function auditErrorsDownload(actor: Actor, batchId: string, rows: number): Promise<void> {
+  const db = getDb();
+  await db.insert(auditLog).values({
+    actor: actor.username,
+    action: 'import:errors_download',
+    subject: batchId,
+    detail: { rows }
+  });
+}
+
 export async function listDemoUsernames(): Promise<string[]> {
   const db = getDb();
   const rows = await db

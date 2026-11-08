@@ -69,9 +69,9 @@ vi.mock('./db.js', () => ({
     throw new Error('getPool is not used by auth flow tests');
   },
   getPooledDb: () => h.fakeDb,
-  withTx: async () => {
-    throw new Error('withTx is not used by auth flow tests');
-  },
+  // The login success path writes one auth:login audit row (prompt 14a);
+  // the fake tx runs against the same permissive fake db.
+  withTx: async (fn: (tx: unknown) => Promise<unknown>) => fn(h.fakeDb),
   closePool: async () => undefined
 }));
 
