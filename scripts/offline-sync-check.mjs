@@ -61,7 +61,12 @@ const hi = async () => { /* default lang is hi */ };
 
 // ---- 1. online: login, Today, count cards, capture Dexie state ----
 await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
-await page.waitForTimeout(1500); // SW install
+// Deterministic SW readiness: the offline legs only work once the service
+// worker is active (install = precache complete) and controlling the page.
+// A fixed sleep raced the install on the live origin and produced an empty
+// offline reload.
+await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
+await page.waitForFunction(() => navigator.serviceWorker.controller !== null, { timeout: 30000 });
 await hi();
 await page.fill('#username', 'demo-officer-1');
 await page.fill('#pin', '1234');
