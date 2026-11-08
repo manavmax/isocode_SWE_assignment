@@ -1,0 +1,40 @@
+{
+  "modelVersion": "scorecard-v1-priors",
+  "centerRate": 0.22,
+  "betas": {
+    "dpd": 0.55,
+    "bounces": 0.4,
+    "broken90": 0.45,
+    "keptRate": -0.4,
+    "daysSinceContact": 0.2,
+    "overdueEmiMultiples": 0.25,
+    "logOutstanding": 0.15,
+    "vintageMonths": -0.15
+  },
+  "outcomeGroupBetas": {
+    "unreachable": 0.5,
+    "refused": 0.55,
+    "promised": -0.4,
+    "part_paid": -0.6
+  },
+  "caps": {
+    "bounces": 4,
+    "broken90": 3
+  },
+  "keptRateShrinkage": {
+    "addedKept": 2,
+    "addedMade": 3
+  },
+  "featureOrder": [
+    "broken90",
+    "bounces",
+    "daysSinceContact",
+    "dpd",
+    "overdueEmiMultiples",
+    "lastOutcomeGroup",
+    "keptRate",
+    "logOutstanding",
+    "vintageMonths"
+  ],
+  "lowLaneMaxPRoll": 0.1
+}
