@@ -195,7 +195,7 @@ if (managerCookie.startsWith('fc_session=')) {
   const officerId = d?.officerTable?.[0]?.officerId;
   if (officerId) {
     const activity = await call('manager-activity', `/api/manager/officers/${officerId}/activity`);
-    report(activity.res.status === 200 && Array.isArray(activity.body?.activity), 'GET  /api/manager/officers/:id/activity', `${activity.res.status} events=${activity.body?.activity?.length ?? '?'}`);
+    report(activity.res.status === 200 && Array.isArray(activity.body?.activity) && activity.body.activity.length >= 1, 'GET  /api/manager/officers/:id/activity', `${activity.res.status} rows=${activity.body?.activity?.length ?? '?'}`);
   }
 
   // A manager cannot pin or read another branch's data: pin to a loan the

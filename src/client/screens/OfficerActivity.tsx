@@ -18,10 +18,29 @@ export function OfficerActivity({ officerId, onBack }: { officerId: string; onBa
   const [load, setLoad] = useState<Load>('loading');
   const [rows, setRows] = useState<ActivityRowDto[]>([]);
   const [offline, setOffline] = useState(false);
+  const [officerName, setOfficerName] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setOffline(false);
-    const result = await api.officerActivity(officerId);
+    // The Activity tile routes carry the sentinel 'first' (no officer is
+    // selected there): default to the first officer of the manager's branch.
+    let target = officerId;
+    if (target === 'first') {
+      const dash = await api.managerDashboard();
+      if (!dash.ok) {
+        setOffline(dash.error.kind === 'network');
+        setLoad('error');
+        return;
+      }
+      const first = dash.data.officerTable[0];
+      if (!first) {
+        setLoad('error');
+        return;
+      }
+      target = first.officerId;
+      setOfficerName(first.officerName);
+    }
+    const result = await api.officerActivity(target);
     if (result.ok) {
       setRows(result.data.activity);
       setLoad('ready');
@@ -45,7 +64,7 @@ export function OfficerActivity({ officerId, onBack }: { officerId: string; onBa
         <button type="button" className="topbar-icon" aria-label="Back" onClick={onBack}>
           ‹
         </button>
-        <span className="topbar-title">Activity</span>
+        <span className="topbar-title">{officerName ? `Activity · ${officerName}` : 'Activity'}</span>
         <span className="topbar-spacer" aria-hidden="true" />
       </div>
       {offline ? <OfflineBanner text="You're offline. Showing the last loaded data only." /> : null}
