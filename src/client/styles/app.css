@@ -88,6 +88,61 @@
   margin-bottom: var(--sp-3);
 }
 
+.topbar {
+  display: grid;
+  grid-template-columns: 48px 1fr 48px;
+  align-items: center;
+  margin: 0 calc(-1 * var(--sp-4)) var(--sp-2);
+}
+
+.topbar-spacer {
+  width: 48px;
+}
+
+.topbar-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: end;
+}
+
+.today-heading {
+  font-size: var(--font-size-28);
+  font-weight: 400;
+  margin: 0 0 var(--sp-3);
+}
+
+.summary-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+
+.summary-card {
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.summary-value {
+  font-size: var(--font-size-22);
+  font-weight: 600;
+}
+
+.summary-value .tile-unit {
+  font-size: var(--font-size-14);
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
 .today-hero .today-date {
   font-size: var(--font-size-12);
   color: rgba(255, 255, 255, 0.85);

@@ -10,6 +10,11 @@ import { syncNow } from '../sync/scheduler.js';
 
 type Load = 'loading' | 'empty' | 'error' | 'ready';
 
+/**
+ * layout contract: top-bar -> heading -> hero -> summary -> segmented ->
+ * cards -> nav (floating pill). Each section carries a data-section
+ * attribute; layoutContracts.test.ts and the audits assert the order.
+ */
 export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: string) => void }) {
   const [load, setLoad] = useState<Load>('loading');
   const [loans, setLoans] = useState<AssignmentCard[]>([]);
@@ -21,6 +26,8 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
   const counts = useOutboxCounts();
   const [promisesDue, setPromisesDue] = useState(0);
   const [doneToday, setDoneToday] = useState(0);
+  const [segment, setSegment] = useState<'all' | 'promises' | 'low'>('all');
+  const [promisesSections, setPromisesSections] = useState<{ dueToday: { promisedDate: string }[] } | null>(null);
 
   const tr = (key: Parameters<typeof translate>[1], params?: Record<string, string | number>) => translate(lang, key, params);
 
@@ -86,6 +93,7 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
       const result = await api.promises();
       if (result.ok) {
         setPromisesDue(result.data.dueToday.length);
+        setPromisesSections({ dueToday: result.data.dueToday });
         await savePromises(result.data, Date.now());
       }
       const items = await getOutboxItems(100);
@@ -102,7 +110,13 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
   // never re-sorts; it renders the low lane behind a quiet divider.
   const sorted = loans;
   const visitCount = sorted.length;
-  const firstLowIndex = sorted.findIndex((loan) => loan.lowLane);
+  const overdueTotal = sorted.reduce((sum, loan) => sum + loan.overdueAmount, 0);
+  const dueDates = promisesSections
+    ? promisesSections.dueToday.map((card) => card.promisedDate).sort()
+    : [];
+  const soonestDue = dueDates[0] ?? null;
+  const firstLowIndex = segment === 'all' ? sorted.findIndex((loan) => loan.lowLane) : -1;
+  const visible = segment === 'all' ? sorted : segment === 'promises' ? sorted.filter((loan) => loan.duePromise) : sorted.filter((loan) => loan.lowLane);
 
   function todayLabel(): string {
     // "Sunday, 8 Nov" on the corrected IST clock (device clock is fine for a
@@ -120,30 +134,58 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
 
   return (
     <main className="screen">
-      <header className="today-hero gradient-b1" data-hero>
-        <div className="today-hero-row">
-          <p className="today-date">{todayLabel()}</p>
-          <button
-            type="button"
-            className="sync-pill"
-            onClick={() => void syncNow()}
-            title={tr('syncNow')}
-            aria-live="polite"
-          >
-            <span className={`sync-dot ${counts.failed > 0 ? 'sync-dot-fail' : counts.pending > 0 ? 'sync-dot-pending' : 'sync-dot-ok'}`} aria-hidden="true" />
-            {syncPillLabel()}
-          </button>
-        </div>
-        <h1 className="today-headline num">
+      <div className="topbar" data-section="top-bar">
+        <span className="topbar-spacer" aria-hidden="true" />
+        <span className="topbar-title">{tr('todayTitle')}</span>
+        <button
+          type="button"
+          className="topbar-icon"
+          onClick={() => void syncNow()}
+          title={tr('syncNow')}
+          aria-live="polite"
+        >
+          <span className={`sync-dot ${counts.failed > 0 ? 'sync-dot-fail' : counts.pending > 0 ? 'sync-dot-pending' : 'sync-dot-ok'}`} aria-hidden="true" />
+        </button>
+      </div>
+      <header className="screen-header" data-section="heading">
+        <h1 className="today-heading num">{todayLabel()}</h1>
+      </header>
+      <section className="today-hero gradient-b1" data-hero data-section="hero">
+        <p className="today-date">{tr('todayHeroLabel')}</p>
+        <p className="today-headline num">
           {visitCount === 1 ? tr('todayVisitsTodayOne') : tr('todayVisitsToday', { n: visitCount })}
-        </h1>
+        </p>
         {promisesDue > 0 ? <p className="today-sub num">{tr('promisesDueToday', { n: promisesDue })}</p> : null}
         <div className="dot-strip" aria-hidden="true">
-          {sorted.map((loan) => (
-            <span key={loan.loanId} className={doneToday > 0 && sorted.indexOf(loan) < doneToday ? 'done' : ''} />
+          {sorted.map((loan, index) => (
+            <span key={loan.loanId} className={index < doneToday ? 'done' : ''} />
           ))}
         </div>
-      </header>
+      </section>
+      <section className="summary-row" data-section="summary">
+        <div className="summary-card">
+          <span className="tile-label">{tr('summaryPromisesDue')}</span>
+          <span className="summary-value num">
+            {promisesDue}
+            {promisesDue > 0 && soonestDue ? <span className="tile-unit"> · {soonestDue}</span> : null}
+          </span>
+        </div>
+        <div className="summary-card">
+          <span className="tile-label">{tr('summaryOverdueTotal')}</span>
+          <span className="summary-value num">{formatLakhCrore(overdueTotal / 100)}</span>
+        </div>
+      </section>
+      <nav className="segment-row" data-section="segmented" aria-label={tr('todayTitle')}>
+        <button type="button" className={`segment ${segment === 'all' ? 'segment-active' : ''}`} aria-pressed={segment === 'all'} onClick={() => setSegment('all')}>
+          {tr('segmentAll')}
+        </button>
+        <button type="button" className={`segment ${segment === 'promises' ? 'segment-active' : ''}`} aria-pressed={segment === 'promises'} onClick={() => setSegment('promises')}>
+          {tr('segmentPromises')}
+        </button>
+        <button type="button" className={`segment ${segment === 'low' ? 'segment-active' : ''}`} aria-pressed={segment === 'low'} onClick={() => setSegment('low')}>
+          {tr('segmentLow')}
+        </button>
+      </nav>
       {offline || !online ? <OfflineBanner text={tr('offlineBanner')} /> : null}
       {scoringMode === 'fallback' && load === 'ready' ? <OfflineBanner text={tr('scoreStandardOrder')} /> : null}
       {load === 'loading' ? <SkeletonList /> : null}
@@ -154,11 +196,12 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
         <ErrorState title={tr('stateErrorTitle')} body={tr('stateErrorBody')} onRetry={() => void refresh()} retryLabel={tr('stateRetry')} />
       ) : null}
       {load === 'ready' && fromCache && offline ? <p className="cached-note">{tr('meOfflineCache')}</p> : null}
+      
       {load === 'ready' ? (
-        <div className="card-list">
-          {sorted.map((loan, index) => (
+        <div className="card-list" data-section="cards">
+          {visible.map((loan, index) => (
             <>
-              {index === firstLowIndex ? <p className="lane-divider">Low priority</p> : null}
+              {segment === 'all' && index === firstLowIndex ? <p className="lane-divider">{tr('segmentLow')}</p> : null}
               <button
               type="button"
               key={loan.loanId}

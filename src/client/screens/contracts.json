@@ -1,0 +1,8 @@
+{
+  "today": ["top-bar", "heading", "hero", "summary", "segmented", "cards", "nav"],
+  "detail": ["top-bar", "hero", "facts", "why", "history", "actions"],
+  "sheet": ["segmented", "chips", "fields", "note", "save"],
+  "manager": ["top-bar", "segmented", "kpis", "chart", "tables", "nav"],
+  "import": ["top-bar", "segmented", "upload", "queue", "batches", "nav"],
+  "activity": ["top-bar", "table"]
+}

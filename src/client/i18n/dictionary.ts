@@ -172,7 +172,13 @@ const en = {
   promisesDueToday: '{n} promises due',
   daysOverdue: '{n} days overdue',
   daysOverdueOne: '1 day overdue',
-  promiseDueLabel: 'Promise due today'
+  promiseDueLabel: 'Promise due today',
+  todayHeroLabel: 'Today',
+  summaryPromisesDue: 'Promises due',
+  summaryOverdueTotal: 'Overdue in list',
+  segmentAll: 'All',
+  segmentPromises: 'Promises',
+  segmentLow: 'Low priority'
 };
 
 const hi: typeof en = {
@@ -337,7 +343,13 @@ const hi: typeof en = {
   promisesDueToday: '{n} वादे आज देने हैं',
   daysOverdue: '{n} दिन अतीत देय',
   daysOverdueOne: '1 दिन अतीत देय',
-  promiseDueLabel: 'आज वादा देना है'
+  promiseDueLabel: 'आज वादा देना है',
+  todayHeroLabel: 'आज',
+  summaryPromisesDue: 'वादे आज',
+  summaryOverdueTotal: 'सूची में बकाया',
+  segmentAll: 'सभी',
+  segmentPromises: 'वादे',
+  segmentLow: 'कम प्राथमिकता'
 };
 
 export const dictionaries: Record<Lang, typeof en> = { en, hi };
