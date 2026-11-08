@@ -402,10 +402,17 @@ export async function applyImport(input: ApplyImportInput): Promise<ApplyImportO
       });
     }
     // And re-score the book for this as_of (prompt 12 item 5): fresh
-    // balances/contacts move the priority score. Non-fatal on the same
-    // pattern — the nightly cron re-runs it.
+    // balances/contacts move the priority score. Only the NEWEST batch
+    // scores — a seed replaying 78 historical files must not score each
+    // historical book. Non-fatal on the same pattern — the nightly cron
+    // re-runs it.
     try {
-      await runScoring(input.asOf);
+      const maxBatch = (await withTx(async (tx) =>
+        (await tx.execute(sql`SELECT max(as_of)::text AS latest FROM import_batch`)).rows[0] as { latest: string }
+      )).latest.slice(0, 10);
+      if (input.asOf >= maxBatch) {
+        await runScoring(input.asOf);
+      }
     } catch (err) {
       await withTx(async (tx) => {
         await tx.insert(auditLog).values({
