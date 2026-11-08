@@ -8,6 +8,9 @@ export type Route =
   | { name: 'login' }
   | { name: 'today' }
   | { name: 'promises' }
+  | { name: 'dashboard' }
+  | { name: 'import' }
+  | { name: 'activity'; officerId: string }
   | { name: 'loan'; loanId: string }
   | { name: 'me' };
 
@@ -16,6 +19,10 @@ export function parsePath(path: string): Route {
   if (trimmed === '/login') return { name: 'login' };
   if (trimmed === '/today') return { name: 'today' };
   if (trimmed === '/promises') return { name: 'promises' };
+  if (trimmed === '/dashboard') return { name: 'dashboard' };
+  if (trimmed === '/import') return { name: 'import' };
+  const activityMatch = /^\/manager\/officers\/([^/]+)\/activity$/.exec(trimmed);
+  if (activityMatch && activityMatch[1]) return { name: 'activity', officerId: decodeURIComponent(activityMatch[1]) };
   if (trimmed === '/me') return { name: 'me' };
   const loanMatch = /^\/loans\/([^/]+)$/.exec(trimmed);
   if (loanMatch && loanMatch[1]) return { name: 'loan', loanId: decodeURIComponent(loanMatch[1]) };
@@ -30,6 +37,12 @@ export function pathFor(route: Route): string {
       return '/today';
     case 'promises':
       return '/promises';
+    case 'dashboard':
+      return '/dashboard';
+    case 'import':
+      return '/import';
+    case 'activity':
+      return `/manager/officers/${encodeURIComponent(route.officerId)}/activity`;
     case 'me':
       return '/me';
     case 'loan':

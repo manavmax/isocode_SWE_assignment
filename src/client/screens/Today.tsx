@@ -130,6 +130,7 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
             <button type="button" key={loan.loanId} className="card" onClick={() => onOpenLoan(loan.loanId)}>
               <span className="card-name">
                 {loan.borrowerName}
+                {loan.pinned ? <span className="chip chip-warn">{tr('pinnedByManager')}</span> : null}
                 {loan.score !== null ? (
                   <span className={`score-chip score-band-${loan.band}`}>
                     {loan.score} · {translate(lang, loan.band === 'high' ? 'scoreBandHigh' : loan.band === 'medium' ? 'scoreBandMedium' : 'scoreBandLow')}

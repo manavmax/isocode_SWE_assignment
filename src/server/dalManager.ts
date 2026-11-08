@@ -421,3 +421,90 @@ export async function unpinLoan(actor: { branchId: string; username: string }, l
 function rowsExistingEmpty(rows: unknown[]): boolean {
   return rows.length === 0;
 }
+
+export interface QueueLoan {
+  loanId: string;
+  borrowerName: string;
+  branchName: string;
+  dpd: number;
+  overdueAmount: number;
+  pincode: string | null;
+  reason: 'unmapped_pincode' | 'data_fix';
+}
+
+/** The branch's queued loans with the reason they queued (A24): no
+ *  territory row matched (unmapped pincode) or the row had no usable phone
+ *  AND no address (data fix). Manager-only, branch-scoped. */
+export async function managerQueue(actor: { branchId: string }): Promise<QueueLoan[]> {
+  const db = getDb();
+  const rows = (
+    await db.execute(sql`
+      SELECT l.loan_id, l.borrower_name, b.name AS branch_name, l.dpd, l.overdue_amount, l.pincode,
+             l.mobile, l.alt_mobile, l.address,
+             NOT EXISTS (SELECT 1 FROM territory t WHERE t.pincode = l.pincode) AS unmapped
+      FROM loan l JOIN branch b ON b.id = l.branch_id
+      WHERE l.branch_id = ${actor.branchId}::uuid AND l.status = 'queue'
+      ORDER BY l.overdue_amount DESC
+      LIMIT 50
+    `)
+  ).rows as unknown as Record<string, unknown>[];
+  return rows.map((row) => {
+    const hasPhone = Boolean(row.mobile) || Boolean(row.alt_mobile);
+    const hasAddress = Boolean(row.address);
+    const dataFix = !hasPhone && !hasAddress;
+    return {
+      loanId: String(row.loan_id),
+      borrowerName: String(row.borrower_name),
+      branchName: String(row.branch_name),
+      dpd: Number(row.dpd),
+      overdueAmount: Number(row.overdue_amount),
+      pincode: row.pincode === null ? null : String(row.pincode),
+      reason: dataFix && row.unmapped !== true ? 'data_fix' : row.unmapped === true ? 'unmapped_pincode' : 'unmapped_pincode'
+    };
+  });
+}
+
+export interface BatchRow {
+  batchId: string;
+  asOf: string;
+  filename: string;
+  status: string;
+  totalRows: number;
+  imported: number;
+  dropped: number;
+  errors: number;
+  warnings: number;
+  createdAt: string;
+}
+
+/** Past import batches, newest first (SPEC 11's audit trail view). */
+export async function importBatchesForBranch(actor: { branchId: string }): Promise<BatchRow[]> {
+  const db = getDb();
+  const rows = (
+    await db.execute(sql`
+      SELECT ib.id::text AS batch_id, ib.as_of::text AS as_of, ib.filename, ib.status,
+             ib.row_count_json, ib.created_at
+      FROM import_batch ib
+      JOIN loan l ON l.branch_id = ${actor.branchId}::uuid
+      JOIN loan_snapshot ls ON ls.loan_id = l.loan_id AND ls.as_of = ib.as_of
+      GROUP BY ib.id
+      ORDER BY ib.as_of DESC, ib.created_at DESC
+      LIMIT 60
+    `)
+  ).rows as unknown as Record<string, unknown>[];
+  return rows.map((row) => {
+    const counts = (row.row_count_json ?? {}) as Record<string, number | undefined>;
+    return {
+      batchId: String(row.batch_id),
+      asOf: String(row.as_of),
+      filename: String(row.filename ?? ''),
+      status: String(row.status ?? ''),
+      totalRows: Number(counts.totalRows ?? 0),
+      imported: Number(counts.imported ?? 0),
+      dropped: Number(counts.dropped ?? 0),
+      errors: Number(counts.errors ?? 0),
+      warnings: Number(counts.warnings ?? 0),
+      createdAt: new Date(row.created_at as string).toISOString()
+    };
+  });
+}

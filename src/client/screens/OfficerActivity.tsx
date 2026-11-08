@@ -1,0 +1,94 @@
+import { useCallback, useEffect, useState } from 'react';
+import { api, type ActivityRowDto } from '../api.js';
+import { formatIstTime } from '../../shared/datetime.js';
+import { ErrorState, OfflineBanner, SkeletonList } from '../components/States.js';
+
+/**
+ * Manager view of an officer's last 50 contact events (prompt 13 item 4).
+ * English only (A67). Read-only table: IST time, loan, outcome, window
+ * flag, violation badge, GPS status and accuracy. No map.
+ */
+
+type Load = 'loading' | 'ready' | 'error';
+
+export function OfficerActivity({ officerId, onBack }: { officerId: string; onBack: () => void }) {
+  const [load, setLoad] = useState<Load>('loading');
+  const [rows, setRows] = useState<ActivityRowDto[]>([]);
+  const [offline, setOffline] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setOffline(false);
+    const result = await api.officerActivity(officerId);
+    if (result.ok) {
+      setRows(result.data.activity);
+      setLoad('ready');
+    } else if (result.error.kind === 'network') {
+      setOffline(true);
+      setLoad('error');
+    } else {
+      setLoad('error');
+    }
+  }, [officerId]);
+
+  useEffect(() => {
+    void (async () => {
+      await refresh();
+    })();
+  }, [refresh]);
+
+  return (
+    <main className="screen manager-screen">
+      <div className="topbar">
+        <button type="button" className="btn btn-ghost" onClick={onBack}>
+          ‹ Dashboard
+        </button>
+        <span className="topbar-title">Officer activity — last 50 contact events</span>
+      </div>
+      {offline ? <OfflineBanner text="You're offline. Showing the last loaded data only." /> : null}
+      {load === 'loading' ? <SkeletonList rows={6} /> : null}
+      {load === 'error' ? (
+        <ErrorState title="Couldn't reach server" body="Check your connection and try again." onRetry={() => void refresh()} retryLabel="Retry" />
+      ) : null}
+      {load === 'ready' ? (
+        rows.length === 0 ? (
+          <p className="screen-subtitle">No contact events for this officer yet.</p>
+        ) : (
+          <table className="manager-table">
+            <thead>
+              <tr>
+                <th>When (IST)</th>
+                <th>Loan</th>
+                <th>Kind</th>
+                <th>Outcome</th>
+                <th>Window</th>
+                <th>GPS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.eventId}>
+                  <td className="num">{formatIstTime(Date.parse(row.attemptedAtIst))}</td>
+                  <td className="num">{row.loanId}</td>
+                  <td>{row.kind}</td>
+                  <td>{row.outcome ?? '—'}</td>
+                  <td>
+                    {row.complianceStatus === 'VIOLATION_DETECTED' ? (
+                      <span className="chip chip-warn">Violation</span>
+                    ) : (
+                      <span className="chip">{row.withinWindow ? 'In window' : 'Out'}</span>
+                    )}
+                  </td>
+                  <td className="num">
+                    {row.gpsStatus ?? '—'}
+                    {row.accuracyM !== null ? ` ±${row.accuracyM}m` : ''}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      ) : null}
+      <p className="footnote">Read-only. Time shown is the skew-corrected attempt instant in IST. Window flag: 08:00–19:00 IST contact rule; a violation is recorded, never discarded (SPEC 7). GPS: device accuracy at the attempt. Synthetic data.</p>
+    </main>
+  );
+}

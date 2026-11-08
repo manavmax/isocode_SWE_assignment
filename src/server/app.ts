@@ -22,7 +22,7 @@ import { demoLoginAllowed, demoModeEnabled } from './demo.js';
 import { listDemoUsernames, listOfficerPromises } from './dal.js';
 import { cronSecretMatches, recomputePromiseStatuses } from './jobs/nightly.js';
 import { runScoring } from './scoring/runScoring.js';
-import { managerDashboard, officerActivity, pinLoan, unpinLoan } from './dalManager.js';
+import { managerDashboard, managerQueue, importBatchesForBranch, officerActivity, pinLoan, unpinLoan } from './dalManager.js';
 import { writeRollCohortCache } from './scoring/rollCohort.js';
 import { istDateKey } from '../shared/datetime.js';
 
@@ -403,6 +403,41 @@ app.post('/api/manager/priority', async (c) => {
       return c.json({ error: 'forbidden' }, 403); // foreign loan or officer
     }
     return c.json({ ok: true, ...result });
+  } catch {
+    return c.json({ status: 'degraded' }, 503);
+  }
+});
+
+/** The branch's queued loans with their queue reason (A24): unmapped
+ *  pincode vs a data fix (no usable phone AND no address). Manager-only. */
+app.get('/api/manager/queue', async (c) => {
+  try {
+    const actor = await resolveSessionActor(getCookie(c, SESSION_COOKIE));
+    if (!actor) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    if (!isManager(actor)) {
+      return c.json({ error: 'forbidden' }, 403);
+    }
+    const queue = await managerQueue(actor);
+    return c.json({ queue });
+  } catch {
+    return c.json({ status: 'degraded' }, 503);
+  }
+});
+
+/** Past import batches (manager view for the import screen). */
+app.get('/api/manager/import-batches', async (c) => {
+  try {
+    const actor = await resolveSessionActor(getCookie(c, SESSION_COOKIE));
+    if (!actor) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    if (!isManager(actor)) {
+      return c.json({ error: 'forbidden' }, 403);
+    }
+    const batches = await importBatchesForBranch(actor);
+    return c.json({ batches });
   } catch {
     return c.json({ status: 'degraded' }, 503);
   }

@@ -160,6 +160,7 @@ const en = {
   scoreLimitedData: 'Limited data',
   scoreStandardOrder: 'Scores unavailable — showing the standard order',
   scoreHowItWorks: 'Advisory score from a transparent scorecard (roll-risk priors). Your judgement leads.',
+  pinnedByManager: 'Manager priority',
   scoreReasonsTitle: 'Why this score'
 };
 
@@ -313,6 +314,7 @@ const hi: typeof en = {
   scoreLimitedData: 'सीमित डेटा',
   scoreStandardOrder: 'स्कोर उपलब्ध नहीं — सामान्य क्रम दिख रहा है',
   scoreHowItWorks: 'पारदर्शी स्कोरकार्ड से सलाहकारी प्राथमिकता (रोल-जोखिम प्राथमिकताएँ)। आपका निर्णय ही अंतिम है।',
+  pinnedByManager: 'मैनेजर प्राथमिकता',
   scoreReasonsTitle: 'यह स्कोर क्यों'
 };
 

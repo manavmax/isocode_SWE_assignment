@@ -985,3 +985,123 @@ dialog.blocked-sheet {
 .score-how {
   margin: 0;
 }
+
+/* Manager surface (SPEC 13, prompt 13) — English only (A67). */
+.manager-screen .tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--sp-3);
+}
+
+.manager-screen .tile {
+  border: var(--border);
+  border-radius: var(--radius);
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.manager-screen .tile-value {
+  font-size: var(--font-size-28);
+  font-weight: 600;
+}
+
+.manager-screen .tile-label {
+  font-size: var(--font-size-12);
+  color: var(--text);
+}
+
+.manager-screen .panel {
+  border: var(--border);
+  border-radius: var(--radius);
+  padding: var(--sp-3);
+  margin-block-start: var(--sp-3);
+  overflow-x: auto;
+}
+
+.manager-screen .panel-title {
+  font-size: var(--font-size-16);
+  margin: 0 0 var(--sp-2);
+}
+
+.manager-screen .manager-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-14);
+}
+
+.manager-screen .manager-table th,
+.manager-screen .manager-table td {
+  text-align: left;
+  border-bottom: var(--border);
+  padding: var(--sp-2) var(--sp-3);
+  white-space: nowrap;
+}
+
+.manager-screen .manager-table tr.greyed {
+  opacity: 0.45;
+}
+
+.manager-screen .chart {
+  width: 100%;
+  height: auto;
+}
+
+.footnote {
+  font-size: var(--font-size-12);
+  color: var(--text);
+  margin: var(--sp-2) 0 0;
+}
+
+.migration-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-1) 0;
+}
+
+.migration-label {
+  min-width: 130px;
+  font-size: var(--font-size-12);
+}
+
+.migration-bar {
+  flex: 1;
+  display: flex;
+  height: 14px;
+  border: var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.migration-seg {
+  display: block;
+  height: 100%;
+}
+
+.migration-rolled { background: var(--status-warn); }
+.migration-stayed { background: var(--accent-strong); opacity: 0.55; }
+.migration-cured { background: var(--grey-300); }
+
+.import-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  align-items: end;
+}
+
+.import-label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  font-size: var(--font-size-12);
+}
+
+.abort-box {
+  border: var(--border-strong);
+  border-color: var(--status-warn);
+  border-radius: var(--radius);
+  padding: var(--sp-3);
+  margin-block-start: var(--sp-3);
+}

@@ -15,6 +15,11 @@ import { Today } from './screens/Today.js';
 // when it arrives, follows the same lazy pattern — no manager route exists
 // yet, so there is nothing manager-side to split today.
 const LoanDetail = lazy(() => import('./screens/LoanDetail.js').then((m) => ({ default: m.LoanDetail })));
+// Manager routes are lazy too (prompt 13): the officer bundle never
+// downloads the dashboard/import/activity chunks.
+const ManagerDashboard = lazy(() => import('./screens/ManagerDashboard.js').then((m) => ({ default: m.ManagerDashboard })));
+const ManagerImport = lazy(() => import('./screens/ManagerImport.js').then((m) => ({ default: m.ManagerImport })));
+const OfficerActivity = lazy(() => import('./screens/OfficerActivity.js').then((m) => ({ default: m.OfficerActivity })));
 const Me = lazy(() => import('./screens/Me.js').then((m) => ({ default: m.Me })));
 const Promises = lazy(() => import('./screens/Promises.js').then((m) => ({ default: m.Promises })));
 
@@ -78,7 +83,8 @@ export function App() {
       setAuth('signedIn');
       setSessionExpired(false);
       resetLoginRequired();
-      navigate({ name: 'today' });
+      // SPEC 2: a manager lands on their dashboard; officers on Today.
+      navigate(result.ok && result.data.user.role === 'branch_manager' ? { name: 'dashboard' } : { name: 'today' });
     })();
   }
 
@@ -103,21 +109,43 @@ export function App() {
               <Me lang={lang} setLang={setLang} user={user} onLoggedOut={signOut} />
             ) : route.name === 'promises' ? (
               <Promises lang={lang} onOpenLoan={(loanId) => navigate({ name: 'loan', loanId })} />
+            ) : route.name === 'dashboard' ? (
+              <ManagerDashboard onOpenActivity={(officerId) => navigate({ name: 'activity', officerId })} />
+            ) : route.name === 'import' ? (
+              <ManagerImport />
+            ) : route.name === 'activity' ? (
+              <OfficerActivity officerId={route.officerId} onBack={() => navigate({ name: 'dashboard' })} />
             ) : (
               <Today lang={lang} onOpenLoan={(loanId) => navigate({ name: 'loan', loanId })} />
             )}
           </Suspense>
           <nav className="bottom-nav" aria-label={t('appName')}>
-            <button type="button" className="nav-item" aria-current={route.name === 'today' ? 'page' : undefined} onClick={() => navigate({ name: 'today' })}>
-              {t('navToday')}
-            </button>
-            <button type="button" className="nav-item nav-item-badge" aria-current={route.name === 'promises' ? 'page' : undefined} onClick={() => navigate({ name: 'promises' })}>
-              {t('navPromises')}
-              {dueToday > 0 ? <span className="nav-badge num" aria-label={t('segmentDueToday')}>{dueToday}</span> : null}
-            </button>
-            <button type="button" className="nav-item" aria-current={route.name === 'me' ? 'page' : undefined} onClick={() => navigate({ name: 'me' })}>
-              {t('navMe')}
-            </button>
+            {user?.role === 'branch_manager' ? (
+              <>
+                <button type="button" className="nav-item" aria-current={route.name === 'dashboard' ? 'page' : undefined} onClick={() => navigate({ name: 'dashboard' })}>
+                  Dashboard
+                </button>
+                <button type="button" className="nav-item" aria-current={route.name === 'import' ? 'page' : undefined} onClick={() => navigate({ name: 'import' })}>
+                  Import
+                </button>
+                <button type="button" className="nav-item" aria-current={route.name === 'me' ? 'page' : undefined} onClick={() => navigate({ name: 'me' })}>
+                  {t('navMe')}
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="nav-item" aria-current={route.name === 'today' ? 'page' : undefined} onClick={() => navigate({ name: 'today' })}>
+                  {t('navToday')}
+                </button>
+                <button type="button" className="nav-item nav-item-badge" aria-current={route.name === 'promises' ? 'page' : undefined} onClick={() => navigate({ name: 'promises' })}>
+                  {t('navPromises')}
+                  {dueToday > 0 ? <span className="nav-badge num" aria-label={t('segmentDueToday')}>{dueToday}</span> : null}
+                </button>
+                <button type="button" className="nav-item" aria-current={route.name === 'me' ? 'page' : undefined} onClick={() => navigate({ name: 'me' })}>
+                  {t('navMe')}
+                </button>
+              </>
+            )}
           </nav>
         </>
       )}
