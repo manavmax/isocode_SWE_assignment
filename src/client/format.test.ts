@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDateShort, formatDayMonth, formatMoneyExact, formatMoneyShort, pluralCopy } from './format.js';
+import { formatDateShort, formatDayMonth, formatMoneyExact, formatMoneyShort, pluralCopy, promiseDueChip } from './format.js';
 
 /**
  * The one formatter module (prompt 20 item 10): money short/exact, IST
@@ -104,5 +104,28 @@ describe('pluralCopy (en + hi)', () => {
   it('renders role names translated', () => {
     expect(pluralCopy('en', { one: 'roleFieldOfficer', other: 'roleBranchManager' }, 1)).toBe('Field officer');
     expect(pluralCopy('hi', { one: 'roleFieldOfficer', other: 'roleBranchManager' }, 2)).toBe('ब्रांच मैनेजर');
+  });
+});
+
+describe('promiseDueChip (prompt 20 item 2)', () => {
+  const noonIst = Date.parse('2026-11-09T06:30:00Z');
+
+  it('says "Due today" ONLY when the promised date equals today (IST)', () => {
+    expect(promiseDueChip('2026-11-09', noonIst, 'en')).toBe('Due today');
+    expect(promiseDueChip('2026-11-09', noonIst, 'hi')).toBe('आज देना है');
+  });
+
+  it('says "Tomorrow" for the next day — never "Due today"', () => {
+    expect(promiseDueChip('2026-11-10', noonIst, 'en')).toBe('Tomorrow');
+    expect(promiseDueChip('2026-11-10', noonIst, 'hi')).toBe('कल');
+  });
+
+  it('says the concrete date for any other day', () => {
+    expect(promiseDueChip('2026-11-12', noonIst, 'en')).toBe('12 Nov');
+    expect(promiseDueChip('2026-11-12', noonIst, 'hi')).toBe('12 नव');
+  });
+
+  it('a past date shows the concrete date, never "Due today"', () => {
+    expect(promiseDueChip('2026-11-05', noonIst, 'en')).toBe('5 Nov');
   });
 });

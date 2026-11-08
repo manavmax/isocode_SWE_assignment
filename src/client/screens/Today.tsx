@@ -6,6 +6,7 @@ import { t as translate, type Lang } from '../i18n/dictionary.js';
 import { describeReason } from '../../shared/scoring/phrases.js';
 import { EmptyState, ErrorState, OfflineBanner, SkeletonList } from '../components/States.js';
 import { useOutboxCounts } from '../sync/useOutboxCounts.js';
+import { useNow } from '../useNow.js';
 import { syncNow } from '../sync/scheduler.js';
 
 type Load = 'loading' | 'empty' | 'error' | 'ready';
@@ -24,6 +25,7 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
   const [fromCache, setFromCache] = useState(false);
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const counts = useOutboxCounts();
+  const nowMs = useNow();
   const [promisesDue, setPromisesDue] = useState(0);
   const [doneToday, setDoneToday] = useState(0);
   const [segment, setSegment] = useState<'all' | 'promises' | 'low'>('all');
@@ -163,7 +165,7 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
           <span className="tile-label">{tr('summaryPromisesDue')}</span>
           <span className="summary-value num">
             {promisesDue}
-            {promisesDue > 0 && soonestDue ? <span className="tile-unit"> · {formatDateShort(soonestDue, Date.now(), lang)}</span> : null}
+            {promisesDue > 0 && soonestDue ? <span className="tile-unit"> · {formatDateShort(soonestDue, nowMs, lang)}</span> : null}
           </span>
         </div>
         <div className="summary-card">

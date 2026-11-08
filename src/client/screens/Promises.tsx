@@ -3,7 +3,8 @@ import { api, type BrokenPromiseCardDto, type LoanDetailDto, type PromiseCardDto
 import { loadPromises, savePromises } from '../dexie/db.js';
 import { getOutboxItems } from '../dexie/db.js';
 import { formatIstTime } from '../../shared/datetime.js';
-import { formatMoneyShort } from '../format.js';
+import { formatDayMonth, formatMoneyShort, promiseDueChip } from '../format.js';
+import { useNow } from '../useNow.js';
 import { t as translate, type Lang } from '../i18n/dictionary.js';
 import { EmptyState, ErrorState, OfflineBanner, SkeletonList } from '../components/States.js';
 import { startGpsWatch } from '../gps.js';
@@ -302,15 +303,17 @@ function PromiseCardView({
   onLogOutcome: () => void;
   onOpenLoan: (loanId: string) => void;
 }) {
+  const nowMs = useNow();
   const tr = (key: Parameters<typeof translate>[1], params?: Record<string, string | number>) => translate(lang, key, params);
   const broken = 'daysPastDue' in card ? card : null;
-  const statusChip = isPending(card)
+  const dateLabel = formatDayMonth(card.promisedDate, lang);
+  const chipLabel = isPending(card)
     ? tr('promiseNotSynced')
     : card.status === 'broken'
       ? tr('promiseStatusBroken')
       : card.status === 'broken_part'
         ? tr('promiseStatusBrokenPart')
-        : translate(lang, 'promiseStatusDue');
+        : promiseDueChip(card.promisedDate, nowMs, lang);
   return (
     <div className="card promise-card">
       <button type="button" className="promise-card-main" onClick={() => onOpenLoan(card.loanId)}>
@@ -320,8 +323,8 @@ function PromiseCardView({
         </span>
         <span className="card-amount money num">{formatMoneyShort(card.amountPaise)}</span>
         <span className="card-row">
-          <span className="chip">{statusChip}</span>
-          <span className="screen-subtitle num">{card.promisedDate}</span>
+          <span className="chip">{chipLabel}</span>
+          {chipLabel !== dateLabel ? <span className="screen-subtitle num">{dateLabel}</span> : null}
         </span>
         {broken ? (
           <span className="card-row">

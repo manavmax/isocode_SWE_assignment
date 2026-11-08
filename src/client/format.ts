@@ -67,6 +67,16 @@ export function formatDateShort(dateKey: string, nowMs: number, lang: Lang): str
   return formatDayMonth(dateKey, lang);
 }
 
+/** The promise card's date chip (prompt 20 item 2): "Due today" only when
+ *  the promised date equals the IST day of nowMs (clock injectable);
+ *  otherwise "Tomorrow" or the concrete "9 Nov". Never ISO, never a
+ *  mislabelled "Due today" on a future date. */
+export function promiseDueChip(dateKey: string, nowMs: number, lang: Lang): string {
+  const short = formatDateShort(dateKey, nowMs, lang);
+  if (short === translate(lang, 'dateToday')) return translate(lang, 'promiseStatusDue');
+  return short;
+}
+
 /** Plural-aware copy: dictionary keys carry {n}; n === 1 picks the `one`
  *  form ("1 promise due" / "2 promises due"), in both languages. */
 export function pluralCopy(
