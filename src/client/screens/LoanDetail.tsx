@@ -5,6 +5,7 @@ import { isWithinContactWindow } from '../../shared/contactWindow.js';
 import { t as translate, type Lang } from '../i18n/dictionary.js';
 import { describeEvidence, describeReason } from '../../shared/scoring/phrases.js';
 import { ErrorState, SkeletonList } from '../components/States.js';
+import { bucketIndex, bucketLabel } from './Today.js';
 import type { OutcomeValue, KindValue } from '../components/OutcomeSheet.js';
 import { startGpsWatch } from '../gps.js';
 import type { GpsState } from '../gps.js';
@@ -174,7 +175,8 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
 
       {load === 'ready' && loan ? (
         <>
-          <div className="detail-hero">
+          <div className={`detail-hero gradient-b${bucketIndex(loan.bucket)}`} data-hero>
+            <p className="bucket-name num">{bucketLabel(lang, loan.bucket)}</p>
             <h1 className="card-name">{loan.borrowerName}</h1>
             {loan.businessName ? <p className="business">{loan.businessName}</p> : null}
             <p className="amount-hero money num">{formatLakhCrore(loan.overdueAmount / 100)}</p>
@@ -184,7 +186,7 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
           </div>
 
           {loan.score !== null ? (
-            <div className="score-panel">
+            <div className="score-panel detail-card">
               <p className="score-inline">
                 {tr('scoreAdvisory')}: <span className="num">{loan.score}</span> ·{' '}
                 {translate(lang, loan.band === 'high' ? 'scoreBandHigh' : loan.band === 'medium' ? 'scoreBandMedium' : 'scoreBandLow')}
@@ -207,18 +209,20 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
             </div>
           ) : null}
 
-          <div className="facts">
-            {factRow(tr('factOutstanding'), formatLakhCrore(loan.outstanding / 100), true)}
-            {loan.emiAmount !== null ? factRow(tr('factEmi'), formatRupeePaise(loan.emiAmount), true) : null}
-            {factRow(tr('factLastContact'), loan.lastContactDays === null ? '—' : (loan.lastContactDays === 0 ? tr('todayLabelShort') : tr('daysAgo', { n: loan.lastContactDays })))}
-            {factRow(tr('factPromise'), loan.openPromiseDue ?? '—')}
-            {factRow(tr('factDpd'), String(loan.dpd))}
-            {factRow(tr('factStatus'), statusLabel(lang, loan.status))}
-            {loan.product ? factRow(tr('factProduct'), loan.product) : null}
-            {factRow(tr('factPincode'), loan.pincode ?? '—')}
-            {loan.address ? factRow(tr('factAddress'), loan.address) : null}
-            {factRow(tr('factPhone'), loan.mobileMasked ?? '—', true)}
-            {factRow(tr('factAltPhone'), loan.altMobileMasked ?? '—', true)}
+          <div className="detail-card">
+            <div className="facts">
+              {factRow(tr('factOutstanding'), formatLakhCrore(loan.outstanding / 100), true)}
+              {loan.emiAmount !== null ? factRow(tr('factEmi'), formatRupeePaise(loan.emiAmount), true) : null}
+              {factRow(tr('factLastContact'), loan.lastContactDays === null ? '—' : (loan.lastContactDays === 0 ? tr('todayLabelShort') : tr('daysAgo', { n: loan.lastContactDays })))}
+              {factRow(tr('factPromise'), loan.openPromiseDue ?? '—')}
+              {factRow(tr('factDpd'), String(loan.dpd))}
+              {factRow(tr('factStatus'), statusLabel(lang, loan.status))}
+              {loan.product ? factRow(tr('factProduct'), loan.product) : null}
+              {factRow(tr('factPincode'), loan.pincode ?? '—')}
+              {loan.address ? factRow(tr('factAddress'), loan.address) : null}
+              {factRow(tr('factPhone'), loan.mobileMasked ?? '—', true)}
+              {factRow(tr('factAltPhone'), loan.altMobileMasked ?? '—', true)}
+            </div>
           </div>
 
           {revealError && (
@@ -230,18 +234,30 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
             </div>
           )}
 
-          <div className="sticky-bar">
-            <div className="sticky-bar-side">
+          <div className="sticky-bar" data-float>
+            <div className="sticky-side">
               <button
                 type="button"
+                aria-label={callLoading ? tr('callLoading') : tr('callButton')}
                 className={`sticky-btn ${callLoading ? 'sticky-btn-loading' : ''} ${inWindow === false ? 'sticky-btn-muted' : ''}`}
                 onClick={() => void handleCallTap()}
                 disabled={callLoading}
               >
-                {callLoading ? tr('callLoading') : tr('callButton')}
+                <svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20">
+                  <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z" />
+                </svg>
               </button>
-              <a className="sticky-btn" href={mapsHref(loan)} target="_blank" rel="noreferrer">
-                {tr('mapButtonLabel')}
+              <a
+                className="sticky-btn"
+                aria-label={tr('mapButtonLabel')}
+                href={mapsHref(loan)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20">
+                  <path d="M12 21s-6-5.2-6-10a6 6 0 0 1 12 0c0 4.8-6 10-6 10z" />
+                  <circle cx="12" cy="11" r="2" />
+                </svg>
               </a>
             </div>
             <button type="button" className="sticky-btn sticky-btn-accent" onClick={() => setShowOutcome(true)}>

@@ -97,7 +97,7 @@ async function shootDetailSheets(page, lang) {
   await page.waitForSelector('.undo-toast', { state: 'detached', timeout: 8000 });
 
   await page.clock.setFixedTime(new Date('2026-11-06T16:30:00Z'));
-  await page.locator('button.sticky-btn', { hasText: /Call|कॉल/ }).first().click();
+  await page.locator('button.sticky-btn').first().click();
   await page.waitForSelector('dialog.blocked-sheet');
   await shoot(page, `blocked-${lang}`);
   await page.getByRole('button', { name: /Close|बंद करें/ }).click();

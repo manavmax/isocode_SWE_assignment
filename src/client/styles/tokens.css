@@ -1,5 +1,7 @@
 :root {
-  /* neutrals: cool greys on white; hairlines over boxes */
+  /* Prompt 16 soft-card system: grey page, white cards, ink + secondary */
+  --page: #eef0f3;
+  --ink: #0e1116;
   --grey-100: #f7f8fa;
   --grey-200: #eef0f3;
   --grey-300: #e3e6ea; /* the hairline */
@@ -7,15 +9,27 @@
   --grey-500: #8b94a3;
   --grey-700: #3d4553;
 
-  /* one deep-teal accent; 7.4:1 on white — safe for body-size text */
+  /* accent for links/active states is the black pill (prompt 16); teal
+     remains for the DPD rail and small status text */
   --accent: #0f5f5c;
   --accent-strong: #0b4b49;
+  --pill-ink: #0e1116;
 
-  /* single-hue DPD rail ramp, light to dark */
+  /* bucket gradients: 135deg, dark stop -> lighter stop; both stops keep
+     white text >= 4.5:1 (the indigo and coral lighter stops from the
+     direction measured 4.49/4.27 and were darkened to #5568d4/#c93f63) */
   --dpd-1: #bfe3e0;
   --dpd-2: #7cc2bd;
   --dpd-3: #3d908b;
   --dpd-4: #14504e;
+  --grad-1: linear-gradient(135deg, #3f4bb8, #5568d4);
+  --grad-2: linear-gradient(135deg, #b45309, #c2410c);
+  --grad-3: linear-gradient(135deg, #be3455, #c93f63);
+  --grad-4: linear-gradient(135deg, #9f1239, #be123c);
+  --bucket-1-solid: #3f4bb8;
+  --bucket-2-solid: #b45309;
+  --bucket-3-solid: #be3455;
+  --bucket-4-solid: #9f1239;
 
   /* status colours, text-only usage */
   --status-ok: #1a6f33;
@@ -43,19 +57,23 @@
   --sp-8: 2rem;
   --sp-12: 3rem;
 
-  /* one radius for interactive chrome; flat surfaces elsewhere */
-  --radius: 8px;
+  /* cards 20px, inner chips 12px, pills 999px */
+  --radius-card: 20px;
+  --radius: 12px;
+  --radius-pill: 999px;
   --hairline: 1px solid var(--grey-300);
   --border: 1px solid var(--grey-300);
   --border-strong: 1px solid var(--grey-400);
+  /* the ONLY shadow: floating action bar + bottom sheet (data-float) */
+  --shadow-float: 0 8px 24px rgba(14, 17, 22, 0.12);
 
   /* motion 150-200ms */
   --motion: 175ms ease-out;
 
-  /* surfaces: white page, white surfaces, hierarchy by type */
-  --bg: #ffffff;
+  /* surfaces: grey page, white cards, ink text */
+  --bg: var(--page);
   --surface: #ffffff;
-  --text: #1f262e;
+  --text: var(--ink);
   --text-secondary: #4a5464;
   --text-faint: var(--text-secondary);
 

@@ -58,7 +58,7 @@ async function runAudit(page) {
   return page.evaluate(() => {
     const SIZES = [12, 13, 14, 16, 18, 22, 24, 28, 32, 36];
     const TOLERANCE = 0.6;
-    const SPACING = [0, 4, 8, 12, 16, 24, 32, 48, 56, 88, 96];
+    const SPACING = [0, 4, 8, 12, 16, 24, 32, 48, 56, 88, 96, 120];
     const WEIGHTS = [400, 600];
     const lang = document.documentElement.lang;
     const onScale = (size) => {
@@ -72,13 +72,20 @@ async function runAudit(page) {
       return candidates.some((s) => Math.abs(s - value) <= 0.6);
     };
     const luminance = (rgb) => {
-      const m = rgb.match(/(\d+(\.\d+)?)/g);
-      if (!m) return 1;
+      const m = rgb.match(/([\d.]+)/g);
+      if (!m || m.length < 3) return 1;
       const [r, g, b] = m.slice(0, 3).map((v) => {
         const c = Number(v) / 255;
         return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
       });
       return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const lighterGradientStop = (image) => {
+      // Pick the stop colour with the HIGHEST luminance (the lighter stop).
+      const stops = (image.match(/rgba?\([^)]*\)|#[0-9a-fA-F]{3,8}/g) || [])
+        .map((css) => ({ css, lum: luminance(css) }))
+        .sort((a, b) => b.lum - a.lum);
+      return stops.length ? stops[0].css : 'rgb(255, 255, 255)';
     };
     const contrast = (fg, bg) => {
       const l1 = luminance(fg);
@@ -106,16 +113,30 @@ async function runAudit(page) {
       }
       let bgEl = el;
       let bg = 'rgba(0, 0, 0, 0)';
-      while (bgEl && bg === 'rgba(0, 0, 0, 0)') {
+      let gradientBg = null;
+      while (bgEl && bg === 'rgba(0, 0, 0, 0)' && !gradientBg) {
+        const image = getComputedStyle(bgEl).backgroundImage;
+        if (image && image.includes('gradient')) {
+          gradientBg = image; // text on a gradient: judge vs the lighter stop
+          break;
+        }
         bg = getComputedStyle(bgEl).backgroundColor;
+        // Semi-transparent overlays (white 18% over a gradient, etc.) do not
+        // give a usable solid bg — keep walking to the painted surface.
+        const alpha = bg.startsWith('rgba') ? Number(bg.match(/([\d.]+)\)$/)?.[1] ?? 1) : 1;
+        if (alpha < 0.5) {
+          bg = 'rgba(0, 0, 0, 0)';
+        }
         bgEl = bgEl.parentElement;
       }
-      if (bg === 'rgba(0, 0, 0, 0)') bg = 'rgb(255, 255, 255)';
-      const ratio = contrast(style.color, bg);
+      let bgForContrast = bg;
+      if (gradientBg) bgForContrast = lighterGradientStop(gradientBg);
+      if (bg === 'rgba(0, 0, 0, 0)' && !gradientBg) bgForContrast = 'rgb(255, 255, 255)';
+      const ratio = contrast(style.color, bgForContrast);
       const bodySize = size >= 16 && weight < 600;
       const threshold = bodySize ? 7 : 4.5;
       if (ratio < threshold) {
-        findings.push('contrast ' + ratio.toFixed(2) + ':1 < ' + threshold + ':1 on ' + tag + ' (' + style.color + ' on ' + bg + ')');
+        findings.push('contrast ' + ratio.toFixed(2) + ':1 < ' + threshold + ':1 on ' + tag + ' (' + style.color + ' on ' + (gradientBg ? 'gradient' : bg) + ')');
       }
     }
     for (const el of [...document.querySelectorAll('body *')]) {
@@ -134,8 +155,8 @@ async function runAudit(page) {
           }
         }
       }
-      if (style.boxShadow !== 'none') findings.push('box-shadow on ' + tag);
-      if (style.backgroundImage.includes('gradient')) findings.push('gradient on ' + tag);
+      if (style.boxShadow !== 'none' && !el.closest('[data-float]')) findings.push('box-shadow outside [data-float] on ' + tag);
+      if (style.backgroundImage.includes('gradient') && !el.closest('[data-hero]')) findings.push('gradient outside [data-hero] on ' + tag);
     }
     for (const el of document.querySelectorAll('button, a.btn, a.chip, [role="button"]')) {
       if (el.offsetParent === null) continue;

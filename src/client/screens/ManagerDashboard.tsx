@@ -12,40 +12,43 @@ import { ErrorState, SkeletonList } from '../components/States.js';
 
 type Load = 'loading' | 'ready' | 'error';
 
-const TARGET = 0.16;
 
 function pct(value: number | null): string {
   return value === null ? '—' : `${(100 * value).toFixed(1)}%`;
 }
 
-/** Trend line with a dashed 16% target: hand-rolled SVG polyline. */
-function TrendChart({ trend }: { trend: { t0: string; t1: string; rollRateCount: number | null }[] }) {
-  const width = 640;
-  const height = 160;
-  const pad = 28;
+/** Dot-matrix trend: columns of 4px dots (one per 5-point step), filled
+ *  dots for the value, the dashed 16% target labelled in the axis row.
+ *  Hand-rolled, no chart library. */
+function DotMatrixChart({ trend }: { trend: { t0: string; t1: string; rollRateCount: number | null }[] }) {
   const completed = trend.filter((point) => point.rollRateCount !== null);
   if (completed.length < 2) {
     return <p className="screen-subtitle">Not enough completed windows for a trend yet.</p>;
   }
-  const stepX = (width - pad * 2) / (completed.length - 1);
-  const y = (rate: number): number => height - pad - rate * (height - pad * 2);
-  const points = completed.map((point, index) => `${pad + index * stepX},${y(point.rollRateCount as number)}`).join(' ');
-  const ticks = [0, 0.25, 0.5].map((rate) => ({ rate, yy: y(rate) }));
+  const shown = completed.slice(-24);
+  const DOTS = 12;
+  const STEP = 0.05; // one dot per 5 percentage points
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="chart" role="img" aria-label="Roll rate trend">
-      {ticks.map((tick) => (
-        <g key={tick.rate}>
-          <line x1={pad} y1={tick.yy} x2={width - pad} y2={tick.yy} stroke="#e3e6ea" strokeWidth="1" />
-          <text x={pad - 4} y={tick.yy + 4} textAnchor="end" fontSize="12" fill="#5b6573">{Math.round(tick.rate * 100)}%</text>
-        </g>
-      ))}
-      <line x1={pad} y1={y(TARGET)} x2={width - pad} y2={y(TARGET)} stroke="#0f5f5c" strokeDasharray="6 4" strokeWidth="1.5" />
-      <polyline points={points} fill="none" stroke="#0f5f5c" strokeWidth="1.5" />
-      {completed.map((point, index) => (
-        <circle key={point.t0} cx={pad + index * stepX} cy={y(point.rollRateCount as number)} r="2.5" fill="#0f5f5c" />
-      ))}
-      <text x={width - pad} y={y(TARGET) - 6} textAnchor="end" fontSize="12" fill="#0f5f5c">16% target</text>
-    </svg>
+    <div>
+      <div className="dotmatrix" role="img" aria-label="Roll rate trend, one column per completed window">
+        {shown.map((point) => {
+          const rate = point.rollRateCount as number;
+          const filled = Math.min(DOTS, Math.round(rate / STEP));
+          return (
+            <div key={point.t0} className="dotmatrix-col" title={`${point.t0}: ${(rate * 100).toFixed(1)}%`}>
+              {Array.from({ length: DOTS }, (_, i) => (
+                <span key={i} className={i < filled ? 'filled' : ''} />
+              ))}
+            </div>
+          );
+        })}
+      </div>
+      <p className="dotmatrix-axis num">
+        <span>0%</span>
+        <span>– – – 16% target</span>
+        <span>60%</span>
+      </p>
+    </div>
   );
 }
 
@@ -68,7 +71,7 @@ function MigrationBars({ rows }: { rows: { openingBucket: string; cohortN: numbe
   );
 }
 
-export function ManagerDashboard({ onOpenActivity }: { onOpenActivity: (officerId: string) => void }) {
+export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityRoute }: { onOpenActivity: (officerId: string) => void; onOpenImport: () => void; onOpenActivityRoute: () => void }) {
   const [load, setLoad] = useState<Load>('loading');
   const [data, setData] = useState<ManagerDashboardDto | null>(null);
   const [pinBusy, setPinBusy] = useState<string | null>(null);
@@ -109,6 +112,11 @@ export function ManagerDashboard({ onOpenActivity }: { onOpenActivity: (officerI
   return (
     <main className="screen manager-screen" data-auto-centered="true">
       <h1 className="screen-title">Branch dashboard — {data?.branchName ?? ''}</h1>
+      <nav className="manager-seg" aria-label="Manager sections">
+        <button type="button" aria-current="page" onClick={() => undefined}>Overview</button>
+        <button type="button" onClick={onOpenImport}>Import</button>
+        <button type="button" onClick={onOpenActivityRoute}>Activity</button>
+      </nav>
       {load === 'loading' ? <SkeletonList rows={4} /> : null}
       {load === 'error' ? (
         <ErrorState title="Couldn't reach server" body="Check your connection and try again." onRetry={() => void refresh()} retryLabel="Retry" />
@@ -118,36 +126,37 @@ export function ManagerDashboard({ onOpenActivity }: { onOpenActivity: (officerI
           {data.tiles === null ? (
             <p className="screen-subtitle">No completed 30-day window yet — the roll rate shows "pending", never zero.</p>
           ) : (
+            <>
             <div className="tile-grid">
-              <div className="tile">
-                <span className="tile-value num">{pct(data.tiles.rollRateCount)}</span>
+              <div className="tile gradient-b1" data-hero>
                 <span className="tile-label">Roll B1→B2, count (target 16%)</span>
+                <span className="tile-value num">{pct(data.tiles.rollRateCount)}</span>
+                <span className="tile-label">{data.tiles.loansToSave} loans to save</span>
               </div>
-              <div className="tile">
-                <span className="tile-value num">{pct(data.tiles.rollRateAmount)}</span>
+              <div className="tile gradient-b2" data-hero>
                 <span className="tile-label">Roll B1→B2, balance</span>
+                <span className="tile-value num">{pct(data.tiles.rollRateAmount)}</span>
+                <span className="tile-label">of {formatLakhCrore(data.tiles.cohortAmt / 100)} cohort</span>
               </div>
-              <div className="tile">
-                <span className="tile-value num">{data.tiles.loansToSave}</span>
-                <span className="tile-label">Loans to save = ceil((roll% − 16%) × n)</span>
+              <div className="tile gradient-b4" data-hero>
+                <span className="tile-label">Promises kept</span>
+                <span className="tile-value num">
+                  {data.keptRate === null ? '—' : pct(data.keptRate)} <span className="tile-unit">({data.keptMade} settled)</span>
+                </span>
+                <span className="tile-label">{data.openBrokenPromises} open broken</span>
               </div>
-              <div className="tile">
-                <span className="tile-value num">{data.keptRate === null ? '—' : pct(data.keptRate)}</span>
-                <span className="tile-label">Promise kept rate ({data.keptMade} settled)</span>
-              </div>
-              <div className="tile">
-                <span className="tile-value num">{data.openBrokenPromises}</span>
-                <span className="tile-label">Open broken promises</span>
-              </div>
+            </div>
+            <div className="tile-grid">
               <div className="tile">
                 <span className="tile-value num">{data.queueCount}</span>
                 <span className="tile-label">Queued loans (branch)</span>
               </div>
               <div className="tile">
                 <span className="tile-value num">{data.blockedAttempts30d}</span>
-                <span className="tile-label">Blocked contact attempts, 30 days</span>
+                <span className="tile-label">Blocked attempts, 30 days</span>
               </div>
             </div>
+            </>
           )}
           <p className="footnote">
             {data.tiles
@@ -157,7 +166,7 @@ export function ManagerDashboard({ onOpenActivity }: { onOpenActivity: (officerI
 
           <section className="panel">
             <h2 className="panel-title">Roll-rate trend ({data.trendWindowsAvailable} completed windows)</h2>
-            <TrendChart trend={data.trend} />
+            <DotMatrixChart trend={data.trend} />
             <p className="footnote">{footnote}</p>
           </section>
 

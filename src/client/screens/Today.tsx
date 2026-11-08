@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, type AssignmentCard } from '../api.js';
-import { loadAssignments, saveAssignments, savePromises } from '../dexie/db.js';
-import { formatIstTime } from '../../shared/datetime.js';
+import { loadAssignments, saveAssignments, savePromises, getOutboxItems } from '../dexie/db.js';
 import { formatLakhCrore } from '../../shared/money.js';
 import { t as translate, type Lang } from '../i18n/dictionary.js';
 import { describeReason } from '../../shared/scoring/phrases.js';
@@ -15,12 +14,13 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
   const [load, setLoad] = useState<Load>('loading');
   const [loans, setLoans] = useState<AssignmentCard[]>([]);
   const [scoringMode, setScoringMode] = useState<'scorecard' | 'fallback'>('fallback');
-  const [fetchedAt, setFetchedAt] = useState<number | null>(null);
+
   const [offline, setOffline] = useState(false);
   const [fromCache, setFromCache] = useState(false);
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const counts = useOutboxCounts();
   const [promisesDue, setPromisesDue] = useState(0);
+  const [doneToday, setDoneToday] = useState(0);
 
   const tr = (key: Parameters<typeof translate>[1], params?: Record<string, string | number>) => translate(lang, key, params);
 
@@ -32,7 +32,6 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
       const now = Date.now();
       setLoans(result.data.assignments);
       setScoringMode(result.data.scoringMode);
-      setFetchedAt(now);
       await saveAssignments(result.data.assignments, now);
       setLoad(result.data.assignments.length === 0 ? 'empty' : 'ready');
       return;
@@ -43,8 +42,7 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
       if (cached) {
         setFromCache(true);
         setLoans(cached.loans);
-        setFetchedAt(cached.fetchedAt);
-        setLoad(cached.loans.length === 0 ? 'empty' : 'ready');
+          setLoad(cached.loans.length === 0 ? 'empty' : 'ready');
         return;
       }
       setLoad('error');
@@ -63,8 +61,7 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
       if (cached) {
         setFromCache(true);
         setLoans(cached.loans);
-        setFetchedAt(cached.fetchedAt);
-        setLoad(cached.loans.length === 0 ? 'empty' : 'ready');
+          setLoad(cached.loans.length === 0 ? 'empty' : 'ready');
       }
       await refresh();
     })();
@@ -81,7 +78,9 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
     };
   }, []);
 
-  // The header's "n promises due" line: best-effort read, never blocks.
+  // The header's "n promises due" line and the hero's dot strip: best-effort
+  // reads, never blocking. Filled dots = contact events logged today from
+  // this device (outbox keeps synced items 24 h).
   useEffect(() => {
     void (async () => {
       const result = await api.promises();
@@ -89,6 +88,12 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
         setPromisesDue(result.data.dueToday.length);
         await savePromises(result.data, Date.now());
       }
+      const items = await getOutboxItems(100);
+      const todayKey = new Date().toISOString().slice(0, 10);
+      const done = items.filter(
+        (item) => item.createdAt >= Date.parse(`${todayKey}T00:00:00Z`) - 330 * 60_000 && item.payload.kind !== 'BLOCKED'
+      ).length;
+      setDoneToday(done);
     })();
   }, []);
 
@@ -115,18 +120,9 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
 
   return (
     <main className="screen">
-      <header className="screen-header">
-        <div className="today-header-row">
-          <div>
-            <p className="today-date num">{todayLabel()}</p>
-            <h1 className="today-headline">
-              {visitCount === 1 ? tr('todayVisitsTodayOne') : tr('todayVisitsToday', { n: visitCount })}
-            </h1>
-            {promisesDue > 0 ? <p className="today-sub num">{tr('promisesDueToday', { n: promisesDue })}</p> : null}
-            <p className="screen-subtitle">
-              {tr('todayLastUpdated', { time: fetchedAt ? formatIstTime(fetchedAt) : '—' })}
-            </p>
-          </div>
+      <header className="today-hero gradient-b1" data-hero>
+        <div className="today-hero-row">
+          <p className="today-date">{todayLabel()}</p>
           <button
             type="button"
             className="sync-pill"
@@ -137,6 +133,15 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
             <span className={`sync-dot ${counts.failed > 0 ? 'sync-dot-fail' : counts.pending > 0 ? 'sync-dot-pending' : 'sync-dot-ok'}`} aria-hidden="true" />
             {syncPillLabel()}
           </button>
+        </div>
+        <h1 className="today-headline num">
+          {visitCount === 1 ? tr('todayVisitsTodayOne') : tr('todayVisitsToday', { n: visitCount })}
+        </h1>
+        {promisesDue > 0 ? <p className="today-sub num">{tr('promisesDueToday', { n: promisesDue })}</p> : null}
+        <div className="dot-strip" aria-hidden="true">
+          {sorted.map((loan) => (
+            <span key={loan.loanId} className={doneToday > 0 && sorted.indexOf(loan) < doneToday ? 'done' : ''} />
+          ))}
         </div>
       </header>
       {offline || !online ? <OfflineBanner text={tr('offlineBanner')} /> : null}
@@ -161,9 +166,8 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
               onClick={() => onOpenLoan(loan.loanId)}
             >
               <span className="card-name">
+                <span className={`bucket-chip b${bucketIndex(loan.bucket)} num`}>{loan.bucket}</span>
                 {loan.borrowerName}
-                {loan.pinned ? <span className="chip chip-warn">{tr('pinnedByManager')}</span> : null}
-                {loan.limitedData ? <span className="chip">{tr('scoreLimitedData')}</span> : null}
               </span>
               {loan.businessName ? <span className="card-sub">{loan.businessName}</span> : null}
               <span className="card-row">
@@ -179,7 +183,7 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
                 </span>
                 <span className="card-amount money num">{formatLakhCrore(loan.overdueAmount / 100)}</span>
               </span>
-              {loan.duePromise ? <span className="score-reason">{tr('promiseDueLabel')}</span> : null}
+              {loan.duePromise ? <span className="chip-soft-green">{tr('promiseDueLabel')}</span> : null}
               {loan.topReasons && loan.topReasons.length > 0 ? (
                 <span className="score-reason">{describeReason(lang, loan.topReasons[0]!)}</span>
               ) : null}

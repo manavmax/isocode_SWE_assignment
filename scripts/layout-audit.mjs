@@ -107,7 +107,7 @@ async function auditDetailSheets(page, lang) {
 
   // Blocked-by-window sheet (button looks muted but stays tappable).
   await page.clock.setFixedTime(new Date('2026-11-06T16:30:00Z'));
-  await page.locator('button.sticky-btn', { hasText: /Call|कॉल/ }).first().click();
+  await page.locator('button.sticky-btn').first().click();
   await page.waitForSelector('dialog.blocked-sheet');
   await auditPage(`blocked-${lang}`, page);
   await page.getByRole('button', { name: /Close|बंद करें/ }).click();

@@ -154,7 +154,7 @@ export function App() {
             ) : route.name === 'promises' ? (
               <Promises lang={lang} onOpenLoan={(loanId) => navigate({ name: 'loan', loanId })} />
             ) : route.name === 'dashboard' ? (
-              <ManagerDashboard onOpenActivity={(officerId) => navigate({ name: 'activity', officerId })} />
+              <ManagerDashboard onOpenActivity={(officerId) => navigate({ name: 'activity', officerId })} onOpenImport={() => navigate({ name: 'import' })} onOpenActivityRoute={() => navigate({ name: 'activity', officerId: 'first' })} />
             ) : route.name === 'import' ? (
               <ManagerImport />
             ) : route.name === 'activity' ? (
