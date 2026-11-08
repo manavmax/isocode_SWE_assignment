@@ -4,6 +4,7 @@ import { loadAssignments, saveAssignments, savePromises, getOutboxItems } from '
 import { formatMoneyShort, formatDateShort, pluralCopy } from '../format.js';
 import { t as translate, type Lang } from '../i18n/dictionary.js';
 import { describeReason } from '../../shared/scoring/phrases.js';
+import { visibleReasons } from '../reasons.js';
 import { EmptyState, ErrorState, OfflineBanner, SkeletonList } from '../components/States.js';
 import { useOutboxCounts } from '../sync/useOutboxCounts.js';
 import { useNow } from '../useNow.js';
@@ -225,9 +226,10 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
                 <span className="card-amount money num">{formatMoneyShort(loan.overdueAmount)}</span>
               </span>
               {loan.duePromise ? <span className="chip-soft-green">{tr('promiseDueLabel')}</span> : null}
-              {loan.topReasons && loan.topReasons.length > 0 ? (
-                <span className="score-reason">{describeReason(lang, loan.topReasons[0]!)}</span>
-              ) : null}
+              {(() => {
+                const reasons = visibleReasons(loan.topReasons);
+                return reasons.length > 0 ? <span className="score-reason">{describeReason(lang, reasons[0]!)}</span> : null;
+              })()}
             </button>
             </>
           ))}
