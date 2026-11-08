@@ -3,6 +3,7 @@ import { api, type LoanDetailDto } from '../api.js';
 import { formatRupeePaise } from '../../shared/money.js';
 import { isWithinContactWindow } from '../../shared/contactWindow.js';
 import { t as translate, type Lang } from '../i18n/dictionary.js';
+import { describeReason } from '../../shared/scoring/phrases.js';
 import { BucketChip, ErrorState, SkeletonList } from '../components/States.js';
 import { bucketLabel } from './Today.js';
 import type { OutcomeValue, KindValue } from '../components/OutcomeSheet.js';
@@ -184,6 +185,29 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
               </span>
             </div>
           </div>
+
+          {loan.score !== null ? (
+            <div className="score-panel">
+              <div className="card-row">
+                <span className={`score-chip score-band-${loan.band}`}>
+                  {tr('scoreAdvisory')}: {loan.score} ·{' '}
+                  {translate(lang, loan.band === 'high' ? 'scoreBandHigh' : loan.band === 'medium' ? 'scoreBandMedium' : 'scoreBandLow')}
+                </span>
+                {loan.limitedData ? <span className="chip chip-warn">{tr('scoreLimitedData')}</span> : null}
+              </div>
+              {loan.topReasons && loan.topReasons.length > 0 ? (
+                <>
+                  <p className="score-reasons-title">{tr('scoreReasonsTitle')}</p>
+                  <ul className="score-reasons">
+                    {loan.topReasons.map((reason) => (
+                      <li key={reason.feature}>{describeReason(lang, reason)}</li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+              <p className="screen-subtitle score-how">{tr('scoreHowItWorks')}</p>
+            </div>
+          ) : null}
 
           <div className="facts">
             {factRow(tr('factLoanId'), loan.loanId)}

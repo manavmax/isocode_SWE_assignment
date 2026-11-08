@@ -927,3 +927,61 @@ dialog.blocked-sheet {
   border: var(--border-strong);
   color: var(--surface);
 }
+
+/* Priority score (SPEC 8, prompt 12): band text carries the meaning; colour
+   is only an accent (never colour alone). */
+.score-chip {
+  display: inline-block;
+  margin-inline-start: var(--sp-2);
+  padding: 1px var(--sp-2);
+  border-radius: var(--radius);
+  border: var(--border);
+  font-size: var(--font-size-12);
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.score-band-high {
+  border-color: var(--status-warn);
+  color: var(--status-warn);
+}
+
+.score-band-medium {
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
+}
+
+.score-band-low {
+  border-color: var(--grey-400, var(--text));
+  color: var(--text);
+}
+
+.score-reason {
+  font-size: var(--font-size-12);
+  color: var(--text);
+}
+
+.score-panel {
+  border: var(--border);
+  border-radius: var(--radius);
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.score-reasons-title {
+  font-size: var(--font-size-12);
+  font-weight: 600;
+  margin: 0;
+}
+
+.score-reasons {
+  margin: 0;
+  padding-inline-start: var(--sp-4);
+  font-size: var(--font-size-14);
+}
+
+.score-how {
+  margin: 0;
+}

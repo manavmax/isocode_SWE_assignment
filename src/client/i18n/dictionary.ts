@@ -150,7 +150,17 @@ const en = {
   promiseManagerAttention: '2nd break — manager attention',
   promiseNotSynced: 'Not synced yet',
   promiseBrokenFollowup: 'Follow up: no contact since the break',
-  promisesOfflineCache: 'Promise list cached on this phone; expires after 24 hours.'
+  promisesOfflineCache: 'Promise list cached on this phone; expires after 24 hours.',
+  // Priority score (SPEC 8, prompt 12)
+  scoreBandHigh: 'High',
+  scoreBandMedium: 'Medium',
+  scoreBandLow: 'Low',
+  scoreAdvisory: 'Priority score',
+  scoreRupeesAtRisk: 'At risk',
+  scoreLimitedData: 'Limited data',
+  scoreStandardOrder: 'Scores unavailable — showing the standard order',
+  scoreHowItWorks: 'Advisory score from a transparent scorecard (roll-risk priors). Your judgement leads.',
+  scoreReasonsTitle: 'Why this score'
 };
 
 const hi: typeof en = {
@@ -294,7 +304,16 @@ const hi: typeof en = {
   promiseManagerAttention: 'दूसरा टूटा वादा — मैनेजर की नज़र',
   promiseNotSynced: 'अभी सिंक नहीं हुआ',
   promiseBrokenFollowup: 'फ़ॉलो-अप: टूटने के बाद कोई संपर्क नहीं',
-  promisesOfflineCache: 'वादों की सूची इस फ़ोन पर सेव है; 24 घंटे बाद हट जाएगी।'
+  promisesOfflineCache: 'वादों की सूची इस फ़ोन पर सेव है; 24 घंटे बाद हट जाएगी।',
+  scoreBandHigh: 'उच्च',
+  scoreBandMedium: 'मध्यम',
+  scoreBandLow: 'कम',
+  scoreAdvisory: 'प्राथमिकता स्कोर',
+  scoreRupeesAtRisk: 'जोखिम में',
+  scoreLimitedData: 'सीमित डेटा',
+  scoreStandardOrder: 'स्कोर उपलब्ध नहीं — सामान्य क्रम दिख रहा है',
+  scoreHowItWorks: 'पारदर्शी स्कोरकार्ड से सलाहकारी प्राथमिकता (रोल-जोखिम प्राथमिकताएँ)। आपका निर्णय ही अंतिम है।',
+  scoreReasonsTitle: 'यह स्कोर क्यों'
 };
 
 export const dictionaries: Record<Lang, typeof en> = { en, hi };

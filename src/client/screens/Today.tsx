@@ -4,6 +4,7 @@ import { loadAssignments, saveAssignments } from '../dexie/db.js';
 import { formatIstTime } from '../../shared/datetime.js';
 import { formatRupeePaise } from '../../shared/money.js';
 import { t as translate, type Lang } from '../i18n/dictionary.js';
+import { describeReason } from '../../shared/scoring/phrases.js';
 import { BucketChip, EmptyState, ErrorState, OfflineBanner, SkeletonList } from '../components/States.js';
 import { useOutboxCounts } from '../sync/useOutboxCounts.js';
 import { syncNow } from '../sync/scheduler.js';
@@ -13,6 +14,7 @@ type Load = 'loading' | 'empty' | 'error' | 'ready';
 export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: string) => void }) {
   const [load, setLoad] = useState<Load>('loading');
   const [loans, setLoans] = useState<AssignmentCard[]>([]);
+  const [scoringMode, setScoringMode] = useState<'scorecard' | 'fallback'>('fallback');
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
   const [offline, setOffline] = useState(false);
   const [fromCache, setFromCache] = useState(false);
@@ -28,6 +30,7 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
     if (result.ok) {
       const now = Date.now();
       setLoans(result.data.assignments);
+      setScoringMode(result.data.scoringMode);
       setFetchedAt(now);
       await saveAssignments(result.data.assignments, now);
       setLoad(result.data.assignments.length === 0 ? 'empty' : 'ready');
@@ -77,7 +80,10 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
     };
   }, []);
 
-  const sorted = [...loans].sort((a, b) => b.dpd - a.dpd || a.loanId.localeCompare(b.loanId));
+  // The server owns the worklist order (SPEC 8: promise-due pinned, rupees
+  // at risk, low lane last; fallback = broken/DPD/overdue). The client
+  // never re-sorts.
+  const sorted = loans;
   const visitCount = sorted.length;
 
   function syncPillLabel(): string {
@@ -109,6 +115,7 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
         </div>
       </header>
       {offline || !online ? <OfflineBanner text={tr('offlineBanner')} /> : null}
+      {scoringMode === 'fallback' && load === 'ready' ? <OfflineBanner text={tr('scoreStandardOrder')} /> : null}
       {load === 'loading' ? <SkeletonList /> : null}
       {load === 'empty' ? (
         <EmptyState title={tr('todayEmptyTitle')} action={<button type="button" className="btn btn-secondary" onClick={() => void refresh()}>{tr('todayEmptyAction')}</button>} />
@@ -121,12 +128,23 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
         <div className="card-list">
           {sorted.map((loan) => (
             <button type="button" key={loan.loanId} className="card" onClick={() => onOpenLoan(loan.loanId)}>
-              <span className="card-name">{loan.borrowerName}</span>
+              <span className="card-name">
+                {loan.borrowerName}
+                {loan.score !== null ? (
+                  <span className={`score-chip score-band-${loan.band}`}>
+                    {loan.score} · {translate(lang, loan.band === 'high' ? 'scoreBandHigh' : loan.band === 'medium' ? 'scoreBandMedium' : 'scoreBandLow')}
+                  </span>
+                ) : null}
+                {loan.limitedData ? <span className="chip chip-warn">{tr('scoreLimitedData')}</span> : null}
+              </span>
               <span className="card-amount money num">{formatRupeePaise(loan.overdueAmount)}</span>
               <span className="card-row">
                 <BucketChip bucket={loan.bucket} label={bucketLabel(lang, loan.bucket)} />
                 <span className="screen-subtitle num">{tr('factDpd')}: {loan.dpd}</span>
               </span>
+              {loan.topReasons && loan.topReasons.length > 0 ? (
+                <span className="card-row score-reason">{describeReason(lang, loan.topReasons[0]!)}</span>
+              ) : null}
             </button>
           ))}
         </div>

@@ -5,6 +5,12 @@ export interface ApiUser {
   officerId: string | null;
 }
 
+export interface ReasonContributionDto {
+  feature: string;
+  contribution: number;
+  evidence: Record<string, number | string>;
+}
+
 export interface AssignmentCard {
   loanId: string;
   borrowerName: string;
@@ -15,6 +21,12 @@ export interface AssignmentCard {
   outstanding: number;
   overdueAmount: number;
   mobileMasked: string | null;
+  /** SPEC 8 (prompt 12): present when the book has been scored. */
+  score: number | null;
+  band: 'high' | 'medium' | 'low' | null;
+  rupeesAtRisk: number | null;
+  topReasons: ReasonContributionDto[] | null;
+  limitedData: boolean;
 }
 
 export interface LoanDetailDto {
@@ -35,6 +47,11 @@ export interface LoanDetailDto {
   status: 'overdue' | 'cleared' | 'queue';
   mobileMasked: string | null;
   altMobileMasked: string | null;
+  score: number | null;
+  band: 'high' | 'medium' | 'low' | null;
+  rupeesAtRisk: number | null;
+  limitedData: boolean;
+  topReasons: ReasonContributionDto[] | null;
 }
 
 export interface PromiseCardDto {
@@ -103,7 +120,8 @@ export const api = {
     }),
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
   me: () => request<{ user: ApiUser }>('/api/me'),
-  assignments: () => request<{ assignments: AssignmentCard[] }>('/api/me/assignments'),
+  assignments: () =>
+    request<{ scoringMode: 'scorecard' | 'fallback'; assignments: AssignmentCard[] }>('/api/me/assignments'),
   promises: () => request<OfficerPromisesDto>('/api/me/promises'),
   loan: (loanId: string) => request<{ loan: LoanDetailDto }>(`/api/loans/${encodeURIComponent(loanId)}`),
   revealPhone: (loanId: string) =>

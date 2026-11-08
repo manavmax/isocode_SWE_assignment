@@ -171,7 +171,14 @@ function maskLoan(loan: LoanRowData): LoanDetail {
     homeOfficerId: loan.homeOfficerId,
     status: loan.status,
     mobileMasked: maskPhone(loan.mobile),
-    altMobileMasked: maskPhone(loan.altMobile)
+    altMobileMasked: maskPhone(loan.altMobile),
+    // Score fields are filled by the caller (fetchLoanForActor joins
+    // score_log); a masked loan on its own carries none.
+    score: null,
+    band: null,
+    rupeesAtRisk: null,
+    limitedData: false,
+    topReasons: null
   };
 }
 
@@ -193,6 +200,12 @@ export interface LoanDetail {
   status: LoanStatus;
   mobileMasked: string | null;
   altMobileMasked: string | null;
+  /** SPEC 8 (prompt 12): the latest scorecard row, when the book is scored. */
+  score: number | null;
+  band: 'high' | 'medium' | 'low' | null;
+  rupeesAtRisk: number | null;
+  limitedData: boolean;
+  topReasons: { feature: string; contribution: number; evidence: Record<string, number | string> }[] | null;
 }
 
 export async function fetchLoanForActor(actor: Actor, loanId: string): Promise<LoanDetail | null> {
@@ -216,7 +229,20 @@ export async function fetchLoanForActor(actor: Actor, loanId: string): Promise<L
       homeOfficerId: loans.homeOfficerId,
       status: loans.status,
       mobile: loans.mobile,
-      altMobile: loans.altMobile
+      altMobile: loans.altMobile,
+      scoreLog: sql<unknown>`(
+        SELECT jsonb_build_object(
+          'reasons', s.reasons_json,
+          'score', s.score,
+          'band', s.features_json->'band',
+          'rupeesAtRisk', s.rupees_at_risk,
+          'limitedData', coalesce(jsonb_array_length(s.features_json->'limitedData'), 0) > 0
+        )
+        FROM score_log s
+        WHERE s.loan_id = ${loans.loanId}
+        ORDER BY s.as_of DESC
+        LIMIT 1
+      )`
     })
     .from(loans)
     .where(eq(loans.loanId, loanId))
@@ -225,7 +251,22 @@ export async function fetchLoanForActor(actor: Actor, loanId: string): Promise<L
   if (!loan || !canReadLoan(actor, loan)) {
     return null;
   }
-  return maskLoan(loan as LoanRowData);
+  const masked = maskLoan(loan as LoanRowData);
+  const scoreInfo = (loan.scoreLog ?? null) as {
+    reasons?: { feature: string; contribution: number; evidence: Record<string, number | string> }[];
+    score?: number;
+    band?: 'high' | 'medium' | 'low';
+    rupeesAtRisk?: number;
+    limitedData?: boolean;
+  } | null;
+  return {
+    ...masked,
+    score: scoreInfo?.score ?? null,
+    band: scoreInfo?.band ?? null,
+    rupeesAtRisk: scoreInfo?.rupeesAtRisk ?? null,
+    limitedData: scoreInfo?.limitedData ?? false,
+    topReasons: Array.isArray(scoreInfo?.reasons) ? scoreInfo!.reasons : null
+  };
 }
 
 /** A34/A31: demo-account chips. Returns ONLY the A31 demo chip usernames
