@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { chromium } from '@playwright/test';
 
 /**
@@ -53,6 +54,15 @@ process.on('unhandledRejection', (err) => {
 });
 
 const browser = await chromium.launch();
+
+// Layout contracts (prompt 16): runtime data-section order per screen.
+const CONTRACTS = JSON.parse(readFileSync(new URL('../src/client/screens/contracts.json', import.meta.url), 'utf8'));
+const SCREEN_CONTRACTS = [
+  { name: 'today', file: 'today', select: async (page) => { await gotoLogin(page, 'en'); await login(page, 'demo-officer-1'); await page.waitForSelector('[data-section="cards"]', { timeout: 60000 }); } },
+  { name: 'detail', file: 'detail', select: async (page) => { await gotoLogin(page, 'en'); await login(page, 'demo-officer-1'); await page.waitForSelector('button.card', { timeout: 60000 }); await page.locator('button.card').first().click(); await page.waitForSelector('[data-section="actions"]', { timeout: 60000 }); } },
+  { name: 'manager', file: 'manager', select: async (page) => { await gotoLogin(page, 'en'); await login(page, 'demo-manager'); await page.waitForSelector('[data-section="kpis"]', { timeout: 60000 }); } }
+];
+const AUDIT_DEFAULT = process.env.AUDIT_SKIP_ORDER ? null : null;
 
 async function runAudit(page) {
   return page.evaluate(() => {
@@ -170,6 +180,31 @@ async function runAudit(page) {
 }
 
 
+async function gotoLogin(page, lang) {
+  await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
+  await page.evaluate((l) => window.localStorage.setItem('fc.lang', l), lang);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForTimeout(300);
+}
+
+async function login(page, username) {
+  await page.fill('#username', username);
+  await page.fill('#pin', '1234');
+  await page.getByRole('button', { name: /Sign in|साइन इन/ }).click();
+  await page.waitForURL(/\/(today|dashboard)/, { timeout: 15000 });
+  await page.waitForTimeout(500);
+}
+
+async function assertOrder(name, page, contract) {
+  const actual = await page.evaluate(() => [...document.querySelectorAll('[data-section]')].map((el) => el.dataset.section));
+  const expected = CONTRACTS[contract];
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    console.log(`[${name}] ORDER MISMATCH: expected ${JSON.stringify(expected)} got ${JSON.stringify(actual)}`);
+    return 1;
+  }
+  return 0;
+}
+
 async function auditPage(name, page) {
   const result = await runAudit(page);
   if (result.length === 0) {
@@ -184,13 +219,6 @@ async function auditPage(name, page) {
   return 0;
 }
 
-async function login(page, username) {
-  await page.fill('#username', username);
-  await page.fill('#pin', '1234');
-  await page.getByRole('button', { name: /Sign in|साइन इन/ }).click();
-  await page.waitForURL(/\/(today|dashboard)/, { timeout: 15000 });
-  await page.waitForTimeout(500);
-}
 
 let totalFindings = 0;
 for (const lang of ['en', 'hi']) {
@@ -204,11 +232,13 @@ for (const lang of ['en', 'hi']) {
   await login(page, 'demo-officer-1');
   await page.waitForSelector('button.card, [data-testid="empty"], [data-testid="error"]', { timeout: 60000 });
   totalFindings += await auditPage(`today-${lang}`, page);
+  totalFindings += await assertOrder(`today-${lang}`, page, 'today');
   await page.locator('button.card').first().click({ timeout: 60000 });
   await page.waitForURL('**/loans/**');
   await page.waitForSelector('.detail-hero', { timeout: 10000 });
   await page.waitForTimeout(300);
   totalFindings += await auditPage(`detail-${lang}`, page);
+  totalFindings += await assertOrder(`detail-${lang}`, page, 'detail');
   await page.locator('button.sticky-btn-accent').click();
   await page.waitForSelector('dialog.outcome-sheet');
   await page.waitForTimeout(200);
@@ -235,6 +265,7 @@ for (const lang of ['en', 'hi']) {
   await page.waitForSelector('.tile-grid', { timeout: 15000 });
   await page.waitForTimeout(500);
   totalFindings += await auditPage('manager-dashboard-desktop', page);
+  totalFindings += await assertOrder('manager-dashboard-desktop', page, 'manager');
   await context.close();
 }
 

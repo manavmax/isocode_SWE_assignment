@@ -40,6 +40,7 @@ process.on('unhandledRejection', (err) => {
   process.exit(1);
 });
 const browser = await chromium.launch();
+let totalFindings = 0;
 
 const AUDIT = () => {
   const overflowX = document.scrollingElement.scrollWidth - document.scrollingElement.clientWidth;
@@ -57,6 +58,51 @@ const AUDIT = () => {
   const hindiSize = document.documentElement.lang === 'hi' && h1 ? getComputedStyle(h1).fontSize : null;
   return { lang: document.documentElement.lang, overflowX, smallTargets, truncated, bodyFont, hindiSize };
 };
+
+/** Prompt 16: the floating bar and the nav pill never overlap each other
+ *  or the last content card, at 360x640 and 390x844. */
+async function auditFloatOverlap(name, page) {
+  for (const [width, height] of [[360, 640], [390, 844]]) {
+    await page.setViewportSize({ width, height });
+    await page.waitForTimeout(250);
+    const result = await page.evaluate(() => {
+      const rect = (el) => el.getBoundingClientRect();
+      const floats = [...document.querySelectorAll('[data-float], .bottom-nav')].filter((el) => {
+        const style = getComputedStyle(el);
+        return style.display !== 'none' && style.position === 'fixed';
+      });
+      const cards = [...document.querySelectorAll('[data-section]')].filter(
+        (el) => !['top-bar', 'nav', 'actions'].includes(el.dataset.section) && el.getBoundingClientRect().height > 0
+      );
+      const lastCard = cards[cards.length - 1];
+      const problems = [];
+      for (let i = 0; i < floats.length; i += 1) {
+        for (let j = i + 1; j < floats.length; j += 1) {
+          const a = rect(floats[i]);
+          const b = rect(floats[j]);
+          const overlap = !(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top);
+          if (overlap) problems.push(`floats overlap: ${String(floats[i].className).split(' ')[0]} vs ${String(floats[j].className).split(' ')[0]}`);
+        }
+      }
+      if (lastCard) {
+        const card = rect(lastCard);
+        for (const f of floats) {
+          const fr = rect(f);
+          const overlap = !(fr.top >= card.bottom || fr.bottom <= card.top || fr.right <= card.left || card.right <= fr.left);
+          if (overlap) problems.push(`float covers last card (${lastCard.dataset.section}): ${String(f.className).split(' ')[0] || f.tagName}`);
+        }
+      }
+      return problems;
+    });
+    for (const problem of result) {
+      console.log(`[${name} @ ${width}x${height}] OVERLAP: ${problem}`);
+    }
+    if (result.length > 0) {
+      return result.length;
+    }
+  }
+  return 0;
+}
 
 async function auditPage(name, page) {
   try {
@@ -125,11 +171,13 @@ for (const lang of ['hi', 'en']) {
   await auditPage(`login-${lang}`, page);
   await login(page, 'demo-officer-1');
   await auditPage(`today-${lang}`, page);
+  totalFindings += await auditFloatOverlap(`today-${lang}`, page);
   await page.locator('button.card').first().click();
   await page.waitForURL('**/loans/**');
   await page.waitForTimeout(400);
   await page.waitForSelector('.detail-hero', { timeout: 10000 });
   await auditPage(`detail-${lang}`, page);
+  totalFindings += await auditFloatOverlap(`detail-${lang}`, page);
   await auditDetailSheets(page, lang);
   // Promises screen (prompt 11 item 5): three segments audited in place.
   // Login is demo-officer-1 (Rahul Chouhan) so every segment has content.
@@ -200,4 +248,8 @@ for (const [name, viewport] of [['desktop', { width: 1280, height: 800 }], ['pho
 await browser.close();
 api.kill();
 vite.kill();
+if (totalFindings > 0) {
+  console.error(`layout-audit FAILED: ${totalFindings} overlap finding(s)`);
+  process.exit(1);
+}
 process.exit(0);
