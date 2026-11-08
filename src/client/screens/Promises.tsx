@@ -3,7 +3,7 @@ import { api, type BrokenPromiseCardDto, type LoanDetailDto, type PromiseCardDto
 import { loadPromises, savePromises } from '../dexie/db.js';
 import { getOutboxItems } from '../dexie/db.js';
 import { formatIstTime } from '../../shared/datetime.js';
-import { formatLakhCrore } from '../../shared/money.js';
+import { formatMoneyShort } from '../format.js';
 import { t as translate, type Lang } from '../i18n/dictionary.js';
 import { EmptyState, ErrorState, OfflineBanner, SkeletonList } from '../components/States.js';
 import { startGpsWatch } from '../gps.js';
@@ -318,7 +318,7 @@ function PromiseCardView({
           {card.borrowerName}
           {isPending(card) ? <span className="chip chip-warn">{tr('promiseNotSynced')}</span> : null}
         </span>
-        <span className="card-amount money num">{formatLakhCrore(card.amountPaise / 100)}</span>
+        <span className="card-amount money num">{formatMoneyShort(card.amountPaise)}</span>
         <span className="card-row">
           <span className="chip">{statusChip}</span>
           <span className="screen-subtitle num">{card.promisedDate}</span>

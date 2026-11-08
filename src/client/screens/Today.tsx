@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, type AssignmentCard } from '../api.js';
 import { loadAssignments, saveAssignments, savePromises, getOutboxItems } from '../dexie/db.js';
-import { formatLakhCrore } from '../../shared/money.js';
+import { formatMoneyShort, formatDateShort, pluralCopy } from '../format.js';
 import { t as translate, type Lang } from '../i18n/dictionary.js';
 import { describeReason } from '../../shared/scoring/phrases.js';
 import { EmptyState, ErrorState, OfflineBanner, SkeletonList } from '../components/States.js';
@@ -149,7 +149,9 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
         <p className="today-headline num">
           {visitCount === 1 ? tr('todayVisitsTodayOne') : tr('todayVisitsToday', { n: visitCount })}
         </p>
-        {promisesDue > 0 ? <p className="today-sub num">{tr('promisesDueToday', { n: promisesDue })}</p> : null}
+        {promisesDue > 0 ? (
+          <p className="today-sub num">{pluralCopy(lang, { one: 'promisesDueTodayOne', other: 'promisesDueToday' }, promisesDue)}</p>
+        ) : null}
         <div className="dot-strip" aria-hidden="true">
           {sorted.map((loan, index) => (
             <span key={loan.loanId} className={index < doneToday ? 'done' : ''} />
@@ -161,12 +163,12 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
           <span className="tile-label">{tr('summaryPromisesDue')}</span>
           <span className="summary-value num">
             {promisesDue}
-            {promisesDue > 0 && soonestDue ? <span className="tile-unit"> · {soonestDue}</span> : null}
+            {promisesDue > 0 && soonestDue ? <span className="tile-unit"> · {formatDateShort(soonestDue, Date.now(), lang)}</span> : null}
           </span>
         </div>
         <div className="summary-card">
           <span className="tile-label">{tr('summaryOverdueTotal')}</span>
-          <span className="summary-value num">{formatLakhCrore(overdueTotal / 100)}</span>
+          <span className="summary-value num">{formatMoneyShort(overdueTotal)}</span>
         </div>
       </section>
       <nav className="segment-row" data-section="segmented" aria-label={tr('todayTitle')}>
@@ -218,7 +220,7 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
                     </span>
                   ) : null}
                 </span>
-                <span className="card-amount money num">{formatLakhCrore(loan.overdueAmount / 100)}</span>
+                <span className="card-amount money num">{formatMoneyShort(loan.overdueAmount)}</span>
               </span>
               {loan.duePromise ? <span className="chip-soft-green">{tr('promiseDueLabel')}</span> : null}
               {loan.topReasons && loan.topReasons.length > 0 ? (

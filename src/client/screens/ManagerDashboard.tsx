@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, type ManagerDashboardDto } from '../api.js';
-import { formatLakhCrore } from '../../shared/money.js';
+import { formatMoneyShort } from '../format.js';
 import { ErrorState, SkeletonList } from '../components/States.js';
 
 /**
@@ -151,7 +151,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
               <div className="tile gradient-b2" data-hero>
                 <span className="tile-label">Roll B1→B2, balance</span>
                 <span className="tile-value num">{pct(data.tiles.rollRateAmount)}</span>
-                <span className="tile-label">of {formatLakhCrore(data.tiles.cohortAmt / 100)} cohort</span>
+                <span className="tile-label">of {formatMoneyShort(data.tiles.cohortAmt)} cohort</span>
               </div>
               <div className="tile gradient-b4" data-hero>
                 <span className="tile-label">Promises kept</span>
@@ -175,7 +175,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
           )}
           <p className="footnote">
             {data.tiles
-              ? `Counts: ${data.tiles.rolledN} rolled of ${data.tiles.cohortN} cohort loans. Balances: ${formatLakhCrore(data.tiles.rolledAmt / 100)} rolled of ${formatLakhCrore(data.tiles.cohortAmt / 100)}. Wilson 95%: ${data.tiles.wilson ? `${pct(data.tiles.wilson.low)}–${pct(data.tiles.wilson.high)}` : 'n/a'}. ${footnote}`
+              ? `Counts: ${data.tiles.rolledN} rolled of ${data.tiles.cohortN} cohort loans. Balances: ${formatMoneyShort(data.tiles.rolledAmt)} rolled of ${formatMoneyShort(data.tiles.cohortAmt)}. Wilson 95%: ${data.tiles.wilson ? `${pct(data.tiles.wilson.low)}–${pct(data.tiles.wilson.high)}` : 'n/a'}. ${footnote}`
               : footnote}
           </p>
 
@@ -249,7 +249,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
                     <tr key={row.promiseId}>
                       <td className="num">{row.loanId}</td>
                       <td>{row.borrowerName}</td>
-                      <td className="num">{formatLakhCrore(row.amountPaise / 100)}</td>
+                      <td className="num">{formatMoneyShort(row.amountPaise)}</td>
                       <td className="num">{row.ageDays} d</td>
                       <td>{row.officerName ?? '—'}</td>
                       <td>
@@ -287,7 +287,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
                       <td className="num">{row.loanId}</td>
                       <td>{row.borrowerName}</td>
                       <td className="num">{row.dpd}</td>
-                      <td className="num">{formatLakhCrore(row.overdueAmount / 100)}</td>
+                      <td className="num">{formatMoneyShort(row.overdueAmount)}</td>
                       <td>{row.officerName ?? '—'}</td>
                       <td>
                         <button type="button" className="btn btn-secondary" disabled={pinBusy === row.loanId || row.officerName === null} onClick={() => void pin(row.loanId, row.officerName)}>
@@ -323,7 +323,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
                     <tr key={row.promiseId}>
                       <td className="num">{row.loanId}</td>
                       <td>{row.borrowerName}</td>
-                      <td className="num">{formatLakhCrore(row.amountPaise / 100)}</td>
+                      <td className="num">{formatMoneyShort(row.amountPaise)}</td>
                       <td className="num">{row.deadline}</td>
                       <td className="num">{row.daysPastDue}</td>
                       <td>{row.officerName ?? '—'}</td>

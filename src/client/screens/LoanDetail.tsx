@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { api, type LoanDetailDto } from '../api.js';
-import { formatLakhCrore, formatRupeePaise } from '../../shared/money.js';
+import { formatMoneyExact } from '../format.js';
 import { isWithinContactWindow } from '../../shared/contactWindow.js';
 import { t as translate, type Lang } from '../i18n/dictionary.js';
 import { describeEvidence, describeReason } from '../../shared/scoring/phrases.js';
@@ -208,7 +208,7 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
             <p className="bucket-name num">{bucketLabel(lang, loan.bucket)}</p>
             <h1 className="card-name">{loan.borrowerName}</h1>
             {loan.businessName ? <p className="business">{loan.businessName}</p> : null}
-            <p className="amount-hero money num">{formatLakhCrore(loan.overdueAmount / 100)}</p>
+            <p className="amount-hero money num">{formatMoneyExact(loan.overdueAmount)}</p>
             <p className="amount-sub num">
               {loan.dpd === 1 ? tr('daysOverdueOne') : tr('daysOverdue', { n: loan.dpd })}
             </p>
@@ -216,8 +216,8 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
 
           <div className="detail-card" data-section="facts">
             <div className="facts">
-              {factRow(tr('factOutstanding'), formatLakhCrore(loan.outstanding / 100), true)}
-              {loan.emiAmount !== null ? factRow(tr('factEmi'), formatRupeePaise(loan.emiAmount), true) : null}
+              {factRow(tr('factOutstanding'), formatMoneyExact(loan.outstanding), true)}
+              {loan.emiAmount !== null ? factRow(tr('factEmi'), formatMoneyExact(loan.emiAmount), true) : null}
               {factRow(tr('factLastContact'), loan.lastContactDays === null ? '—' : (loan.lastContactDays === 0 ? tr('todayLabelShort') : tr('daysAgo', { n: loan.lastContactDays })))}
               {factRow(tr('factPromise'), loan.openPromiseDue ?? '—')}
               {factRow(tr('factDpd'), String(loan.dpd))}
