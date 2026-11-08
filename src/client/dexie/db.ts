@@ -53,12 +53,22 @@ export interface CachedPromises {
   fetchedAt: number;
 }
 
+/** Offline loan-detail cache (prompt 19.1): the last successfully fetched
+ *  LoanDetailDto per loan, so a detail deep-link or reload renders from
+ *  cache when offline instead of an error state. */
+export interface CachedLoan {
+  loanId: string;
+  detail: import('../api.js').LoanDetailDto;
+  fetchedAt: number;
+}
+
 class CollectionsDb extends Dexie {
   outbox!: Table<OutboxItem, string>;
   meta!: Table<MetaRow, string>;
   revealCache!: Table<RevealCacheRow, string>;
   assignments!: Table<CachedAssignments, string>;
   promises!: Table<CachedPromises, string>;
+  loans!: Table<CachedLoan, string>;
 
   constructor() {
     super('field-collections');
@@ -77,6 +87,14 @@ class CollectionsDb extends Dexie {
       revealCache: 'loanId, expiresAt',
       assignments: 'key',
       promises: 'key'
+    });
+    this.version(4).stores({
+      outbox: 'id, state, createdAt, notBefore',
+      meta: 'key',
+      revealCache: 'loanId, expiresAt',
+      assignments: 'key',
+      promises: 'key',
+      loans: 'loanId'
     });
   }
 }
@@ -97,6 +115,29 @@ export async function loadAssignments(): Promise<CachedAssignments | undefined> 
     return undefined;
   }
   return cached;
+}
+
+/** Loan-detail cache: same 24 h expiry and logout wipe as assignments. */
+export async function saveLoan(detail: import('../api.js').LoanDetailDto, fetchedAt = Date.now()): Promise<void> {
+  await db.loans.put({ loanId: detail.loanId, detail, fetchedAt });
+}
+
+export async function loadLoan(loanId: string): Promise<CachedLoan | undefined> {
+  const cached = await db.loans.get(loanId);
+  if (!cached) return undefined;
+  if (Date.now() - cached.fetchedAt > CACHE_TTL_MS) {
+    await db.loans.delete(loanId);
+    return undefined;
+  }
+  return cached;
+}
+
+/** The cached worklist card for one loan — the offline fallback when the
+ *  full detail was never fetched (prompt 19.1: render what the worklist
+ *  cache has, mark the rest unavailable). */
+export async function loadAssignmentCard(loanId: string): Promise<import('../api.js').AssignmentCard | undefined> {
+  const cached = await loadAssignments();
+  return cached?.loans.find((loan) => loan.loanId === loanId);
 }
 
 /** Promise-tracker cache: same 24 h expiry and logout wipe as assignments. */
@@ -286,6 +327,7 @@ export async function clearCache(): Promise<void> {
     db.meta.clear(),
     db.revealCache.clear(),
     db.assignments.clear(),
-    db.promises.clear()
+    db.promises.clear(),
+    db.loans.clear()
   ]);
 }

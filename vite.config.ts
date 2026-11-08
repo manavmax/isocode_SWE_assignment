@@ -18,7 +18,8 @@ export default defineConfig({
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
         skipWaiting: true,
-        clientsClaim: true
+        clientsClaim: true,
+        navigateFallbackDenylist: [/^\/api\//]
       },
       manifest: {
         name: 'Field Collections',

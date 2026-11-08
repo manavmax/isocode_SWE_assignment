@@ -12,7 +12,8 @@ import type { GpsState } from '../gps.js';
 import { attemptBorrowerCall } from '../sync/call.js';
 import { buildContactEvent } from '../sync/buildEvent.js';
 import { correctedNowMs } from '../sync/engine.js';
-import { getSkew, setMeta, getMeta, META_KEYS, queueEvent, undoItem } from '../dexie/db.js';
+import { getSkew, setMeta, getMeta, META_KEYS, queueEvent, undoItem, saveLoan, loadLoan, loadAssignmentCard } from '../dexie/db.js';
+import { loanOfflineFallback } from '../dexie/loanFallback.js';
 import { kick } from '../sync/scheduler.js';
 
 // The sheets only render on a tap, so they load on first open instead of
@@ -53,13 +54,29 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
     if (result.ok) {
       setLoan(result.data.loan);
       setLoad('ready');
-    } else if (result.error.kind === 'notFound') {
-      setLoad('notFound');
-    } else if (result.error.kind === 'unauthorized') {
-      window.location.assign('/login');
-    } else {
-      setLoad('error');
+      await saveLoan(result.data.loan);
+      return;
     }
+    if (result.error.kind === 'notFound') {
+      setLoad('notFound');
+      return;
+    }
+    if (result.error.kind === 'unauthorized') {
+      window.location.assign('/login');
+      return;
+    }
+    // Offline or server error: hydrate from the Dexie caches (prompt 19.1).
+    // The floating action bar renders in every non-null case so the officer
+    // can still queue an outcome offline.
+    const cachedDetail = await loadLoan(loanId);
+    const cachedCard = await loadAssignmentCard(loanId);
+    const fallback = loanOfflineFallback(loanId, cachedDetail?.detail, cachedCard);
+    if (fallback) {
+      setLoan(fallback.detail);
+      setLoad('ready');
+      return;
+    }
+    setLoad('error');
   }, [loanId]);
 
   function startGps(): void {
