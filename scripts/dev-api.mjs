@@ -1,4 +1,4 @@
-import { rmSync, readdirSync } from 'node:fs';
+import { rmSync, readdirSync, mkdirSync, copyFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import http from 'node:http';
@@ -18,6 +18,22 @@ const entries = [...tsEntries('api'), ...tsEntries('src/server'), ...tsEntries('
 rmSync(outdir, { recursive: true, force: true });
 
 await esbuild.build({ entryPoints: entries, outdir, outbase: '.', format: 'esm', logLevel: 'silent' });
+
+// The transpile is per-file, so runtime JSON imports (the scorecard's
+// weights/params) must be copied alongside the compiled modules.
+function copyJson(dir) {
+  for (const entry of readdirSync(dir, { recursive: true, withFileTypes: true })) {
+    if (entry.isFile() && entry.name.endsWith('.json')) {
+      const src = path.join(entry.parentPath ?? entry.path, entry.name);
+      const dest = path.join(outdir, src);
+      mkdirSync(path.dirname(dest), { recursive: true });
+      copyFileSync(src, dest);
+    }
+  }
+}
+copyJson('src/shared');
+copyJson('src/server');
+copyJson('data');
 
 const entryModule = await import(pathToFileURL(path.join(outdir, 'api', 'index.js')).href);
 const handler = entryModule.default.fetch;

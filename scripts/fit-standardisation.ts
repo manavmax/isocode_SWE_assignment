@@ -37,7 +37,11 @@ function meanSd(values: number[]): { mean: number; sd: number } {
   const n = values.length;
   const mean = values.reduce((a, b) => a + b, 0) / n;
   const variance = values.reduce((acc, v) => acc + (v - mean) * (v - mean), 0) / n;
-  return { mean: Math.round(mean * 1e6) / 1e6, sd: Math.round(Math.sqrt(variance) * 1e6) / 1e6 };
+  // Floor the SD at 5% of the mean (and at a small epsilon): a degenerate
+  // feature (the seed's overdue is exactly 12 EMIs for every loan) must not
+  // turn rounding noise into a clipped z of ±3.
+  const sd = Math.max(Math.sqrt(variance), Math.abs(mean) * 0.05, 1e-6);
+  return { mean: Math.round(mean * 1e6) / 1e6, sd: Math.round(sd * 1e6) / 1e6 };
 }
 
 const emiOf = (loan: (typeof loans)[number]): number | null =>

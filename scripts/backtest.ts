@@ -49,24 +49,24 @@ const rows = (
     WITH cohort AS (
       SELECT s.loan_id, s.dpd, s.outstanding, l.bounce_count_12m, l.vintage_months, l.emi_amount
       FROM loan_snapshot s JOIN loan l ON l.loan_id = s.loan_id
-      WHERE s.as_of = DATE $1 AND s.dpd BETWEEN 1 AND 30
+      WHERE s.as_of = $1::date AND s.dpd BETWEEN 1 AND 30
     ), end_state AS (
-      SELECT loan_id, dpd FROM loan_snapshot WHERE as_of = DATE $2
+      SELECT loan_id, dpd FROM loan_snapshot WHERE as_of = $2::date
     )
     SELECT c.loan_id, c.dpd, c.outstanding, c.bounce_count_12m, c.vintage_months, c.emi_amount,
            (e.loan_id IS NOT NULL AND e.dpd >= 31) AS rolled,
            (SELECT count(*) FROM promise p WHERE p.loan_id = c.loan_id
-              AND p.status IN ('broken','broken_part') AND p.resolved_at < DATE $1)::int AS broken90,
+              AND p.status IN ('broken','broken_part') AND p.resolved_at < $1::date)::int AS broken90,
            (SELECT count(*) FROM promise p WHERE p.loan_id = c.loan_id AND p.status = 'kept'
-              AND p.created_at < DATE $1)::int AS kept,
+              AND p.created_at < $1::date)::int AS kept,
            (SELECT count(*) FROM promise p WHERE p.loan_id = c.loan_id AND p.status IN ('kept','broken','broken_part')
-              AND p.created_at < DATE $1)::int AS made,
+              AND p.created_at < $1::date)::int AS made,
            (SELECT ce.outcome FROM contact_event ce WHERE ce.loan_id = c.loan_id
-              AND ce.kind IN ('CALL','VISIT','MESSAGE') AND ce.attempted_at_ist < DATE $1
+              AND ce.kind IN ('CALL','VISIT','MESSAGE') AND ce.attempted_at_ist < $1::date
               ORDER BY ce.attempted_at_ist DESC LIMIT 1) AS last_outcome,
            (SELECT max((ce.attempted_at_ist AT TIME ZONE 'Asia/Kolkata')::date)::text FROM contact_event ce
               WHERE ce.loan_id = c.loan_id AND ce.kind IN ('CALL','VISIT','MESSAGE')
-              AND ce.attempted_at_ist < DATE $1) AS last_touch_date,
+              AND ce.attempted_at_ist < $1::date) AS last_touch_date,
            EXISTS (SELECT 1 FROM promise p WHERE p.loan_id = c.loan_id AND p.status IN ('broken','broken_part')) AS has_broken
     FROM cohort c LEFT JOIN end_state e ON e.loan_id = c.loan_id
     ORDER BY c.loan_id
@@ -183,12 +183,15 @@ function ks(pairs: { p: number; y: boolean }[]): number {
   return maxGap;
 }
 
-function decileTable(rowsIn: { p: number; y: boolean }[]): string[] {
+function decileTable(
+  rowsIn: { p: number; y: boolean }[],
+  opts: { meanLabel: string; formatValue: (p: number) => string }
+): string[] {
   const sorted = [...rowsIn].sort((a, b) => b.p - a.p);
   const n = sorted.length;
   const totalRolls = sorted.filter((r) => r.y).length;
   const lines: string[] = [];
-  lines.push('| decile | n | mean predicted | actual roll rate | lift | cumulative rolls captured |');
+  lines.push(`| decile | n | ${opts.meanLabel} | actual roll rate | lift | cumulative rolls captured |`);
   lines.push('| --- | --- | --- | --- | --- | --- |');
   let cumulativeRolls = 0;
   for (let d = 0; d < 10; d += 1) {
@@ -196,13 +199,13 @@ function decileTable(rowsIn: { p: number; y: boolean }[]): string[] {
     if (slice.length === 0) {
       continue;
     }
-    const meanPredicted = slice.reduce((acc, r) => acc + r.p, 0) / slice.length;
+    const meanValue = slice.reduce((acc, r) => acc + r.p, 0) / slice.length;
     const actual = slice.filter((r) => r.y).length;
     cumulativeRolls += actual;
     const baseRate = totalRolls / n;
     const lift = actual / slice.length / baseRate;
     lines.push(
-      `| ${d + 1} | ${slice.length} | ${(meanPredicted * 100).toFixed(1)}% | ` +
+      `| ${d + 1} | ${slice.length} | ${opts.formatValue(meanValue)} | ` +
         `${((100 * actual) / slice.length).toFixed(1)}% | ${lift.toFixed(2)}x | ` +
         `${((100 * cumulativeRolls) / Math.max(1, totalRolls)).toFixed(1)}% |`
     );
@@ -210,20 +213,21 @@ function decileTable(rowsIn: { p: number; y: boolean }[]): string[] {
   return lines;
 }
 
-function metrics(pairs: { p: number; y: boolean }[]): { auc: number; gini: number; ks: number; brier: number } {
+function metrics(pairs: { p: number; y: boolean }[], probability = true): { auc: number; gini: number; ks: number; brier: number | null } {
   const a = auc(pairs);
-  return { auc: a, gini: 2 * a - 1, ks: ks(pairs), brier: brier(pairs) };
+  // Brier needs probabilities: a rank score (DPD, outstanding) gets none.
+  return { auc: a, gini: 2 * a - 1, ks: ks(pairs), brier: probability ? brier(pairs) : null };
 }
 
 // --- the model, scored at t0 ---
 const modelPairs = loans.map((loan) => ({ p: loan.pRoll, y: loan.rolled }));
-const model = metrics(modelPairs);
+const model = metrics(modelPairs, true);
 
 // --- baselines: DPD descending and outstanding descending ---
 const dpdPairs = loans.map((loan) => ({ p: loan.dpd, y: loan.rolled }));
-const dpd = metrics(dpdPairs);
+const dpd = metrics(dpdPairs, false);
 const outstandingPairs = loans.map((loan) => ({ p: loan.outstanding, y: loan.rolled }));
-const outstanding = metrics(outstandingPairs);
+const outstanding = metrics(outstandingPairs, false);
 
 // --- bootstrap 95% CI for the AUC (resample the cohort, 1000 draws) ---
 let rngState = 20261108;
@@ -255,7 +259,7 @@ const ciHigh = bootstrapAucs[Math.ceil(0.975 * bootstrapAucs.length) - 1]!;
 const curedSorted = loans.filter((loan) => !loan.rolled).sort((a, b) => b.pRoll - a.pRoll).slice(0, 10);
 const rolledSorted = loans.filter((loan) => loan.rolled).sort((a, b) => a.pRoll - b.pRoll).slice(0, 10);
 
-const fmt = (value: number): string => (Number.isFinite(value) ? value.toFixed(3) : 'n/a');
+const fmt = (value: number | null): string => (value !== null && Number.isFinite(value) ? value.toFixed(3) : 'n/a');
 const rollRate = loans.filter((loan) => loan.rolled).length / loans.length;
 
 const report = `# Back-test: priority scorecard at t0 = ${t0}
@@ -268,8 +272,8 @@ const report = `# Back-test: priority scorecard at t0 = ${t0}
 | scorer | AUC | Gini | KS | Brier |
 | --- | --- | --- | --- | --- |
 | Scorecard | ${fmt(model.auc)} (95% bootstrap CI ${fmt(ciLow)}–${fmt(ciHigh)}) | ${fmt(model.gini)} | ${fmt(model.ks)} | ${fmt(model.brier)} |
-| Baseline: DPD descending | ${fmt(dpd.auc)} | ${fmt(dpd.gini)} | ${fmt(dpd.ks)} | ${fmt(dpd.brier)} |
-| Baseline: outstanding descending | ${fmt(outstanding.auc)} | ${fmt(outstanding.gini)} | ${fmt(outstanding.ks)} | ${fmt(outstanding.brier)} |
+| Baseline: DPD descending | ${fmt(dpd.auc)} | ${fmt(dpd.gini)} | ${fmt(dpd.ks)} | n/a (rank score, not a probability) |
+| Baseline: outstanding descending | ${fmt(outstanding.auc)} | ${fmt(outstanding.gini)} | ${fmt(outstanding.ks)} | n/a (rank score, not a probability) |
 
 **The honest value-add is the delta over the DPD baseline: ΔAUC = ${(model.auc - dpd.auc).toFixed(3)}.**
 
@@ -277,11 +281,11 @@ The data is synthetic, so this proves the pipeline works, not real-world accurac
 
 ## Decile table — scorecard
 
-${decileTable(modelPairs).join('\n')}
+${decileTable(modelPairs, { meanLabel: 'mean predicted', formatValue: (p: number) => `${(100 * p).toFixed(1)}%` }).join('\n')}
 
 ## Decile table — DPD baseline
 
-${decileTable(dpdPairs).join('\n')}
+${decileTable(dpdPairs, { meanLabel: 'mean DPD in decile', formatValue: (p: number) => p.toFixed(1) }).join('\n')}
 
 ## Calibration (scorecard, by predicted decile)
 

@@ -341,8 +341,8 @@ export async function listOfficerAssignments(actor: Actor, todayIst: string): Pr
              sl.model_version,
              EXISTS (SELECT 1 FROM promise p
                       WHERE p.loan_id = l.loan_id AND p.status = 'open'
-                        AND p.promised_date <= DATE ${todayIst}
-                        AND p.promised_date + p.grace_days >= DATE ${todayIst}) AS due_promise,
+                        AND p.promised_date <= ${todayIst}::date
+                        AND p.promised_date + p.grace_days >= ${todayIst}::date) AS due_promise,
              (SELECT count(*) FROM promise p
                WHERE p.loan_id = l.loan_id AND p.status IN ('broken', 'broken_part'))::int AS broken_count
       FROM loan l
@@ -357,8 +357,8 @@ export async function listOfficerAssignments(actor: Actor, todayIst: string): Pr
       ORDER BY
         EXISTS (SELECT 1 FROM promise p
                  WHERE p.loan_id = l.loan_id AND p.status = 'open'
-                   AND p.promised_date <= DATE ${todayIst}
-                   AND p.promised_date + p.grace_days >= DATE ${todayIst}) DESC,
+                   AND p.promised_date <= ${todayIst}::date
+                   AND p.promised_date + p.grace_days >= ${todayIst}::date) DESC,
         (CASE WHEN sl.p_roll IS NOT NULL AND sl.p_roll < ${weights.lowLaneMaxPRoll}
                AND (SELECT count(*) FROM promise p WHERE p.loan_id = l.loan_id AND p.status IN ('broken', 'broken_part')) = 0
               THEN 1 ELSE 0 END) ASC,
@@ -557,7 +557,7 @@ export async function listStuckPromises(todayIst: string): Promise<(BrokenPromis
     JOIN loan l ON l.loan_id = p.loan_id
     LEFT JOIN officer o ON o.id = p.officer_id
     WHERE p.status IN ('broken', 'broken_part')
-      AND (p.promised_date + p.grace_days) <= DATE ${todayIst} - 2
+      AND (p.promised_date + p.grace_days) <= (${todayIst}::date - 2)
       AND NOT EXISTS (
         SELECT 1 FROM contact_event ce
         WHERE ce.loan_id = p.loan_id AND ce.attempted_at_ist >= p.resolved_at

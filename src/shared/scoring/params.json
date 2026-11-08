@@ -1,0 +1,46 @@
+{
+  "modelVersion": "scorecard-v1-priors",
+  "fittedAt": "2026-11-08T09:26:20.150Z",
+  "fittedFromAsOf": "2026-11-07",
+  "n": 175,
+  "features": {
+    "dpd": {
+      "mean": 29.805714,
+      "sd": 24.366417
+    },
+    "bounces": {
+      "mean": 0.897143,
+      "sd": 0.901264
+    },
+    "broken90": {
+      "mean": 0.302857,
+      "sd": 0.56035
+    },
+    "keptRate": {
+      "mean": 0.626429,
+      "sd": 0.087724
+    },
+    "daysSinceContact": {
+      "mean": 27.181208,
+      "sd": 23.088407
+    },
+    "overdueEmiMultiples": {
+      "mean": 11.999989,
+      "sd": 0.599999
+    },
+    "logOutstanding": {
+      "mean": 17.881243,
+      "sd": 0.894062
+    },
+    "vintageMonths": {
+      "mean": 19.485714,
+      "sd": 9.324534
+    }
+  },
+  "outcomeShares": {
+    "unreachable": 0.194286,
+    "refused": 0.045714,
+    "promised": 0.36,
+    "part_paid": 0.085714
+  }
+}

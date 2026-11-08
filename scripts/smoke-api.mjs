@@ -1,4 +1,4 @@
-import { rmSync, readdirSync } from 'node:fs';
+import { rmSync, readdirSync, mkdirSync, copyFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import esbuild from 'esbuild';
@@ -22,6 +22,18 @@ await esbuild.build({
   format: 'esm',
   logLevel: 'silent'
 });
+
+// The transpile is per-file: copy runtime JSON imports (scorecard weights).
+for (const dir of ['src/shared', 'src/server']) {
+  for (const entry of readdirSync(dir, { recursive: true, withFileTypes: true })) {
+    if (entry.isFile() && entry.name.endsWith('.json')) {
+      const src = path.join(entry.parentPath ?? entry.path, entry.name);
+      const dest = path.join(outdir, src);
+      mkdirSync(path.dirname(dest), { recursive: true });
+      copyFileSync(src, dest);
+    }
+  }
+}
 
 delete process.env.DATABASE_URL;
 

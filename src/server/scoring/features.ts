@@ -68,7 +68,7 @@ export async function collectLoanFeatures(asOf: string): Promise<ScoredLoanFeatu
              l.outstanding,
              (SELECT count(*) FROM promise p
                WHERE p.loan_id = l.loan_id AND p.status IN ('broken', 'broken_part')
-                 AND p.resolved_at >= DATE ${windowStart})::int AS broken90,
+                 AND p.resolved_at >= ${windowStart}::date)::int AS broken90,
              (SELECT count(*) FROM promise p
                WHERE p.loan_id = l.loan_id AND p.status = 'kept')::int AS kept,
              (SELECT count(*) FROM promise p
@@ -80,7 +80,7 @@ export async function collectLoanFeatures(asOf: string): Promise<ScoredLoanFeatu
                WHERE ce.loan_id = l.loan_id AND ce.kind IN ('CALL', 'VISIT', 'MESSAGE')) AS last_touch_date,
              EXISTS (SELECT 1 FROM promise p WHERE p.loan_id = l.loan_id AND p.status IN ('broken', 'broken_part')) AS has_broken,
              EXISTS (SELECT 1 FROM promise p WHERE p.loan_id = l.loan_id AND p.status = 'open'
-               AND p.promised_date <= DATE ${asOf} AND p.promised_date + p.grace_days >= DATE ${asOf}) AS due_promise
+               AND p.promised_date <= ${asOf}::date AND p.promised_date + p.grace_days >= ${asOf}::date) AS due_promise
         FROM loan l
        WHERE l.status = 'overdue'
        ORDER BY l.loan_id
