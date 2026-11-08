@@ -22,6 +22,7 @@ import { ASSIGNMENT_REASONS, type AssignmentReason } from '../../shared/assignme
 import { runAssignment } from '../assignment/runAssignment.js';
 import { inferPaymentsFromDelta, istDayUtcRange, istNoonUtc } from './inferPayments.js';
 import { recomputePromiseStatuses } from '../jobs/nightly.js';
+import { runScoring } from '../scoring/runScoring.js';
 
 export interface ImportActor {
   userId: string | null;
@@ -395,6 +396,21 @@ export async function applyImport(input: ApplyImportInput): Promise<ApplyImportO
         await tx.insert(auditLog).values({
           actor: input.actor.username,
           action: 'promise_nightly:failed',
+          subject: outcome.batchId,
+          detail: { asOf: input.asOf, message: err instanceof Error ? err.message : String(err) }
+        });
+      });
+    }
+    // And re-score the book for this as_of (prompt 12 item 5): fresh
+    // balances/contacts move the priority score. Non-fatal on the same
+    // pattern — the nightly cron re-runs it.
+    try {
+      await runScoring(input.asOf);
+    } catch (err) {
+      await withTx(async (tx) => {
+        await tx.insert(auditLog).values({
+          actor: input.actor.username,
+          action: 'scoring:failed',
           subject: outcome.batchId,
           detail: { asOf: input.asOf, message: err instanceof Error ? err.message : String(err) }
         });

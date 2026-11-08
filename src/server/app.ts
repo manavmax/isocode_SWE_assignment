@@ -21,6 +21,7 @@ import { contactEventBatchSchema, MAX_EVENT_BATCH } from '../shared/sync/eventSc
 import { demoLoginAllowed, demoModeEnabled } from './demo.js';
 import { listDemoUsernames, listOfficerPromises } from './dal.js';
 import { cronSecretMatches, recomputePromiseStatuses } from './jobs/nightly.js';
+import { runScoring } from './scoring/runScoring.js';
 import { istDateKey } from '../shared/datetime.js';
 
 export const app = new Hono();
@@ -156,8 +157,8 @@ app.get('/api/me/assignments', async (c) => {
     if (actor.role !== 'field_officer' || !actor.officerId) {
       return c.json({ error: 'forbidden' }, 403);
     }
-    const assignments = await listOfficerAssignments(actor);
-    return c.json({ assignments });
+    const assignments = await listOfficerAssignments(actor, istDateKey(Date.now()));
+    return c.json(assignments);
   } catch {
     return c.json({ status: 'degraded' }, 503);
   }
@@ -193,8 +194,12 @@ app.post('/api/jobs/nightly', async (c) => {
     return c.json({ error: 'unauthorized' }, 401);
   }
   try {
-    const outcome = await recomputePromiseStatuses();
-    return c.json({ ok: true, ...outcome });
+    const promises = await recomputePromiseStatuses();
+    // The nightly pass also refreshes the priority scores for today's book
+    // (prompt 12 item 5) — scoring throws never fake a model, the response
+    // reports fallback and the assignments query degrades gracefully.
+    const scoring = await runScoring(istDateKey(Date.now()));
+    return c.json({ ok: true, promises, scoring });
   } catch {
     return c.json({ status: 'degraded' }, 503);
   }

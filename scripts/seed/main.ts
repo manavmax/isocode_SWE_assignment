@@ -18,9 +18,9 @@
 import { readdirSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { inArray, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { closePool, getDb, getPool, withTx } from '../../src/server/db.js';
-import { contactEvents, promises as promisesTable, territory as territoryTable } from '../../src/server/db/schema.js';
+import { contactEvents, loans as loansTable, promises as promisesTable, territory as territoryTable } from '../../src/server/db/schema.js';
 import { applyImport } from '../../src/server/import/applyImport.js';
 import { demoModeEnabled } from '../../src/server/demo.js';
 import { loadSeedConfigFile } from './config.js';
@@ -454,6 +454,19 @@ async function main(): Promise<void> {
       });
   }
   console.log('[seed] part 2: events and promises inserted (append-only trigger untouched)');
+
+  // A65: the LMS CSV carries no bounce or vintage column, so the seed writes
+  // the generator's ground truth onto the loan rows (a side feed in a real
+  // deployment) — the scorecard's bounce and vintage features need it.
+  for (let i = 0; i < universe.loans.length; i += 100) {
+    for (const loan of universe.loans.slice(i, i + 100)) {
+      await db
+        .update(loansTable)
+        .set({ bounceCount12m: loan.bounceCount, vintageMonths: loan.vintageMonths })
+        .where(eq(loansTable.loanId, loan.loanId));
+    }
+  }
+  console.log('[seed] part 2: bounce counts and vintages written onto the loan rows');
 
   // Recompute as the nightly job would, graded at the AS-OF clock (the demo
   // story is anchored there): the seed's stored statuses must already agree

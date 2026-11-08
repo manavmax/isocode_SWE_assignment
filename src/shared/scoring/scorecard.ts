@@ -26,7 +26,7 @@
  * Missing features impute the portfolio mean (z = 0, contribution 0) and
  * the result flags them as limited data — shown, never hidden.
  */
-import weightsJson from './weights.json';
+import weightsJson from './weights.json' with { type: 'json' };
 
 export interface Weights {
   modelVersion: string;

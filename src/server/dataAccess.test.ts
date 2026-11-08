@@ -31,7 +31,7 @@ const h = vi.hoisted(() => {
     select: () => chain,
     insert: () => ({ values: async (value: unknown) => value }),
     delete: () => ({ where: async () => ({ rowCount: 0 }) }),
-    execute: async () => ({ rows: [] })
+    execute: async () => ({ rows: shift() })
   };
   return { queue, fakeDb };
 });
@@ -92,6 +92,30 @@ function loanRow(over: Record<string, unknown> = {}) {
   };
 }
 
+/** The worklist query's snake_case row (score_log joined, flags included). */
+function assignmentsRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    loan_id: 'LN-1001',
+    borrower_name: 'Scorecard Borrower',
+    pincode: '452001',
+    locality: null,
+    dpd: 18,
+    bucket: '1-30',
+    outstanding: 800_000,
+    overdue_amount: 120_000,
+    mobile: '9876543321',
+    p_roll: null,
+    score: null,
+    rupees_at_risk: null,
+    reasons_json: null,
+    features_json: null,
+    model_version: null,
+    due_promise: false,
+    broken_count: 0,
+    ...overrides
+  };
+}
+
 function sessionRowFor(who: Partial<Actor> = {}) {
   const a = actor(who);
   return {
@@ -140,15 +164,52 @@ describe('GET /api/me/assignments', () => {
 
   it('returns the officer overdue worklist with masked phones and no raw numbers', async () => {
     h.queue.push(sessionRowFor());
-    h.queue.push([loanRow({ loanId: 'LN-2002', dpd: 40 }), loanRow({ loanId: 'LN-2001', dpd: 15 })]);
+    // The worklist query is one raw SQL execute over snake_case rows (prompt
+    // 12: score_log join + worklist order). With no scores the order falls
+    // to the fallback comparator: broken, then DPD, then overdue.
+    h.queue.push([
+      assignmentsRow({ loan_id: 'LN-2002', dpd: 40 }),
+      assignmentsRow({ loan_id: 'LN-2001', dpd: 15 })
+    ]);
     const { status, body } = await getMenu();
     expect(status).toBe(200);
-    const { assignments } = body as { assignments: Record<string, unknown>[] };
+    const { assignments, scoringMode } = body as { assignments: Record<string, unknown>[]; scoringMode: string };
     expect(assignments).toHaveLength(2);
     expect(assignments[0]!.loanId).toBe('LN-2002');
     expect(assignments[0]!.mobileMasked).toBe('98XXXXXX21');
     expect(assignments[0]!.dpd).toBe(40);
+    expect(assignments[0]!.score).toBeNull();
+    expect(scoringMode).toBe('fallback'); // no score rows -> never fake a model
     expect(JSON.stringify(body)).not.toContain('9876543321');
+  });
+
+  it('carries the score fields through and reports scorecard mode when every loan is scored', async () => {
+    h.queue.push(sessionRowFor());
+    // The fake driver has no SQL engine: the pushed order IS the server's
+    // worklist order (the SQL ORDER BY and its pure counterpart,
+    // worklistOrder, are tested separately).
+    h.queue.push([
+      assignmentsRow({
+        loan_id: 'LN-B',
+        dpd: 30,
+        score: 25,
+        p_roll: 0.25,
+        rupees_at_risk: 900_000,
+        due_promise: true,
+        reasons_json: [{ feature: 'dpd', contribution: 0.3, evidence: { days: 30 } }],
+        features_json: { band: 'medium', limitedData: ['overdueEmiMultiples'] }
+      }),
+      assignmentsRow({ loan_id: 'LN-A', dpd: 10, score: 55, p_roll: 0.55, rupees_at_risk: 550_000 })
+    ]);
+    const { body } = await getMenu();
+    const { assignments, scoringMode } = body as { assignments: Record<string, unknown>[]; scoringMode: string };
+    expect(scoringMode).toBe('scorecard');
+    expect(assignments.map((a) => a.loanId)).toEqual(['LN-B', 'LN-A']);
+    expect(assignments[0]!.score).toBe(25);
+    expect(assignments[0]!.band).toBe('medium');
+    expect(assignments[0]!.rupeesAtRisk).toBe(900_000);
+    expect(assignments[0]!.limitedData).toBe(true);
+    expect(assignments[0]!.topReasons).toEqual([{ feature: 'dpd', contribution: 0.3, evidence: { days: 30 } }]);
   });
 
   it('403 for a manager: the worklist is officer-scoped (no loan query even ran)', async () => {

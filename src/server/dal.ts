@@ -6,6 +6,7 @@ import type { LoanStatus } from '../shared/types.js';
 import { DEMO_ACCOUNTS } from './demo.js';
 import { addIstDays } from '../shared/promises.js';
 import { promiseDeadline } from '../shared/promiseState.js';
+import { weights } from '../shared/scoring/scorecard.js';
 import { isStuck } from './jobs/nightly.js';
 
 export interface Actor {
@@ -243,6 +244,8 @@ export async function listDemoUsernames(): Promise<string[]> {
   return rows.map((row) => row.username).filter((username) => chipNames.has(username));
 }
 
+/** The officer's overdue work list. Manager requests are refused at the route
+ * (A33: assignments are officer-scoped); this stays defensive with []. */
 export interface AssignmentSummary {
   loanId: string;
   borrowerName: string;
@@ -253,41 +256,105 @@ export interface AssignmentSummary {
   outstanding: number;
   overdueAmount: number;
   mobileMasked: string | null;
+  /** SPEC 8 (prompt 12 item 5): the latest score_log row, joined when the
+   *  book has been scored. topReasons are the structured contributions —
+   *  the client renders the bilingual phrases. */
+  score: number | null;
+  band: 'high' | 'medium' | 'low' | null;
+  rupeesAtRisk: number | null;
+  topReasons: { feature: string; contribution: number; evidence: Record<string, number | string> }[] | null;
+  limitedData: boolean;
+  pRoll: number | null;
 }
 
-/** The officer's overdue work list. Manager requests are refused at the route
- * (A33: assignments are officer-scoped); this stays defensive with []. */
-export async function listOfficerAssignments(actor: Actor): Promise<AssignmentSummary[]> {
+export interface OfficerAssignments {
+  scoringMode: 'scorecard' | 'fallback';
+  assignments: AssignmentSummary[];
+}
+
+/** SPEC 8 worklist order, in SQL: promise-due pins first, the low lane
+ *  (p_roll < threshold AND no broken promise) sinks to the bottom, then
+ *  rupees at risk; with no scores at all the trailing keys ARE the
+ *  fallback comparator (broken, then DPD, then overdue). */
+export async function listOfficerAssignments(actor: Actor, todayIst: string): Promise<OfficerAssignments> {
   if (actor.role !== 'field_officer' || !actor.officerId) {
-    return [];
+    return { scoringMode: 'fallback', assignments: [] };
   }
   const db = getDb();
-  const rows = await db
-    .select({
-      loanId: loans.loanId,
-      borrowerName: loans.borrowerName,
-      pincode: loans.pincode,
-      locality: loans.locality,
-      dpd: loans.dpd,
-      bucket: loans.bucket,
-      outstanding: loans.outstanding,
-      overdueAmount: loans.overdueAmount,
-      mobile: loans.mobile
-    })
-    .from(loans)
-    .where(and(eq(loans.assignedOfficerId, actor.officerId), eq(loans.status, 'overdue')))
-    .orderBy(desc(loans.dpd), asc(loans.loanId));
-    return rows.map((row) => ({
-      loanId: row.loanId,
-      borrowerName: row.borrowerName,
-      pincode: row.pincode,
-      locality: row.locality,
-      dpd: row.dpd,
-      bucket: row.bucket,
-      outstanding: row.outstanding,
-      overdueAmount: row.overdueAmount,
-      mobileMasked: maskPhone(row.mobile)
-    }));
+  const rows = (
+    await db.execute(sql`
+      SELECT l.loan_id::text AS loan_id,
+             l.borrower_name,
+             l.pincode,
+             l.locality,
+             l.dpd,
+             l.bucket::text AS bucket,
+             l.outstanding,
+             l.overdue_amount,
+             l.mobile,
+             sl.p_roll,
+             sl.score,
+             sl.rupees_at_risk,
+             sl.reasons_json,
+             sl.features_json,
+             sl.model_version,
+             EXISTS (SELECT 1 FROM promise p
+                      WHERE p.loan_id = l.loan_id AND p.status = 'open'
+                        AND p.promised_date <= DATE ${todayIst}
+                        AND p.promised_date + p.grace_days >= DATE ${todayIst}) AS due_promise,
+             (SELECT count(*) FROM promise p
+               WHERE p.loan_id = l.loan_id AND p.status IN ('broken', 'broken_part'))::int AS broken_count
+      FROM loan l
+      LEFT JOIN LATERAL (
+        SELECT s.p_roll, s.score, s.rupees_at_risk, s.reasons_json, s.features_json, s.model_version
+          FROM score_log s
+         WHERE s.loan_id = l.loan_id
+         ORDER BY s.as_of DESC
+         LIMIT 1
+      ) sl ON true
+      WHERE l.assigned_officer_id = ${actor.officerId} AND l.status = 'overdue'
+      ORDER BY
+        EXISTS (SELECT 1 FROM promise p
+                 WHERE p.loan_id = l.loan_id AND p.status = 'open'
+                   AND p.promised_date <= DATE ${todayIst}
+                   AND p.promised_date + p.grace_days >= DATE ${todayIst}) DESC,
+        (CASE WHEN sl.p_roll IS NOT NULL AND sl.p_roll < ${weights.lowLaneMaxPRoll}
+               AND (SELECT count(*) FROM promise p WHERE p.loan_id = l.loan_id AND p.status IN ('broken', 'broken_part')) = 0
+              THEN 1 ELSE 0 END) ASC,
+        sl.rupees_at_risk DESC NULLS LAST,
+        broken_count DESC,
+        l.dpd DESC,
+        l.overdue_amount DESC,
+        l.loan_id
+    `)
+  ).rows as Record<string, unknown>[];
+
+  const assignments: AssignmentSummary[] = rows.map((row) => {
+    const features = (row.features_json ?? null) as { limitedData?: string[] } | null;
+    const reasons = (row.reasons_json ?? null) as AssignmentSummary['topReasons'];
+    return {
+      loanId: String(row.loan_id),
+      borrowerName: String(row.borrower_name),
+      pincode: row.pincode === null ? null : String(row.pincode),
+      locality: row.locality === null ? null : String(row.locality),
+      dpd: Number(row.dpd),
+      bucket: String(row.bucket),
+      outstanding: Number(row.outstanding),
+      overdueAmount: Number(row.overdue_amount),
+      mobileMasked: maskPhone(row.mobile === null ? null : String(row.mobile)),
+      pRoll: row.p_roll === null || row.p_roll === undefined ? null : Number(row.p_roll),
+      score: row.score === null || row.score === undefined ? null : Number(row.score),
+      band: row.p_roll == null ? null : (row.features_json as { band?: 'high' | 'medium' | 'low' } | null)?.band ?? null,
+      rupeesAtRisk: row.rupees_at_risk === null || row.rupees_at_risk === undefined ? null : Number(row.rupees_at_risk),
+      topReasons: reasons,
+      limitedData: Boolean(features?.limitedData && features.limitedData.length > 0)
+    };
+  });
+  const scored = assignments.filter((row) => row.score !== null);
+  return {
+    scoringMode: assignments.length > 0 && scored.length === assignments.length ? 'scorecard' : 'fallback',
+    assignments
+  };
 }
 
 /** SPEC 12 promise-tracker cards (prompt 11 item 3), officer-scoped by the

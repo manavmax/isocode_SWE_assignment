@@ -353,6 +353,7 @@ export const scoreLog = pgTable(
     pRoll: doublePrecision('p_roll').notNull(),
     score: integer('score').notNull(),
     rank: integer('rank').notNull(),
+    rupeesAtRisk: bigint('rupees_at_risk', { mode: 'number' }).notNull().default(0),
     reasonsJson: jsonb('reasons_json').notNull(),
     featuresJson: jsonb('features_json').notNull(),
     modelVersion: text('model_version').notNull()
