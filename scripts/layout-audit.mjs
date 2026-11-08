@@ -51,7 +51,10 @@ const AUDIT = () => {
     .filter((el) => el.offsetParent !== null && el.scrollWidth > el.clientWidth + 1)
     .map((el) => ({ text: (el.textContent ?? '').trim().slice(0, 30), scroll: el.scrollWidth, client: el.clientWidth }));
   const bodyFont = getComputedStyle(document.body).fontSize;
-  const hindiSize = document.documentElement.lang === 'hi' ? getComputedStyle(document.querySelector('h1')).fontSize : null;
+  // The lazy route chunks render inside Suspense — an h1 may not exist for a
+  // beat; audit what is on screen instead of throwing.
+  const h1 = document.querySelector('h1');
+  const hindiSize = document.documentElement.lang === 'hi' && h1 ? getComputedStyle(h1).fontSize : null;
   return { lang: document.documentElement.lang, overflowX, smallTargets, truncated, bodyFont, hindiSize };
 };
 
@@ -124,13 +127,16 @@ for (const lang of ['hi', 'en']) {
   await page.locator('button.card').first().click();
   await page.waitForURL('**/loans/**');
   await page.waitForTimeout(400);
+  await page.waitForSelector('.detail-hero', { timeout: 10000 });
   await auditPage(`detail-${lang}`, page);
   await auditDetailSheets(page, lang);
   // Promises screen (prompt 11 item 5): three segments audited in place.
   // Login is demo-officer-1 (Rahul Chouhan) so every segment has content.
   await page.locator('nav.bottom-nav').getByRole('button', { name: /Promises|वादे/ }).click();
   await page.waitForURL('**/promises', { timeout: 10000 });
-  await page.waitForTimeout(600);
+  await page.waitForSelector('.segment-row', { timeout: 10000 });
+  await page.waitForSelector('.promise-card, [data-testid="empty"]', { timeout: 10000 });
+  await page.waitForTimeout(300);
   await auditPage(`promises-due-${lang}`, page);
   await page.getByRole('tab', { name: /Upcoming|आने वाले/ }).click();
   await page.waitForTimeout(300);

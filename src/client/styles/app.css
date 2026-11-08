@@ -906,17 +906,19 @@ dialog.blocked-sheet {
   position: relative;
 }
 
+/* The badge sits inline after the label: an absolutely positioned badge
+   overflowed the Hindi label's box (the layout audit found the truncation). */
 .nav-badge {
-  position: absolute;
-  top: 2px;
-  right: calc(50% - 26px);
+  display: inline-block;
   min-width: 18px;
   height: 18px;
+  margin-inline-start: 6px;
   border-radius: 9px;
   background: var(--accent-strong);
   color: var(--surface);
   font-size: 11px;
   line-height: 18px;
+  vertical-align: middle;
   padding: 0 4px;
 }
 
