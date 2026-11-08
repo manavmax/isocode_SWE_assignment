@@ -185,10 +185,10 @@ export function App() {
                   <IconToday />
                   {t('navToday')}
                 </button>
-                <button type="button" className="nav-item nav-item-badge" aria-current={route.name === 'promises' ? 'page' : undefined} onClick={() => navigate({ name: 'promises' })}>
+                <button type="button" className="nav-item nav-item-badge" aria-current={route.name === 'promises' ? 'page' : undefined} onClick={() => navigate({ name: 'promises' })} aria-label={t('navPromises')}>
                   <IconPromises />
                   {t('navPromises')}
-                  {dueToday > 0 ? <span className="nav-badge num" aria-label={t('segmentDueToday')}>{dueToday}</span> : null}
+                  {dueToday > 0 ? <span className="nav-badge num" aria-hidden="true">{dueToday}</span> : null}
                 </button>
                 <button type="button" className="nav-item" aria-current={route.name === 'me' ? 'page' : undefined} onClick={() => navigate({ name: 'me' })}>
                   <IconMe />

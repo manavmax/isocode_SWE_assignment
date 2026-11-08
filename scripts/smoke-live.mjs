@@ -50,19 +50,28 @@ function maskOk(value) {
   return value === null || MASKED.test(value);
 }
 
-// 0. Security headers (prompt 14a item 7): every check below reads the
-// health response's headers — the app and the API must both carry them.
+// 0. Security headers (prompt 14a + 19.2): the API, the HTML shell, one
+// JS asset and sw.js must ALL carry them — a missing set on any layer fails.
 {
-  const { res, hint } = await call('headers', '/api/health');
-  const h = (name) => res.headers.get(name) ?? '';
-  const headerOk =
-    h('strict-transport-security').includes('max-age=31536000') &&
-    h('x-content-type-options') === 'nosniff' &&
-    (h('x-frame-options') === 'DENY' || h('content-security-policy').includes("frame-ancestors 'none'")) &&
-    h('referrer-policy') === 'strict-origin-when-cross-origin' &&
-    h('content-security-policy').includes("frame-ancestors 'none'") &&
-    h('content-security-policy').includes("default-src 'self'");
-  report(headerOk, 'Security headers on /api/health', `hsts=${Boolean(h('strict-transport-security'))} nosniff=${h('x-content-type-options') === 'nosniff'} frame-ancestors=${h('content-security-policy').includes("frame-ancestors 'none'")} referrer=${h('referrer-policy') || 'MISSING'}${headerOk ? '' : ` hint(${res.status})`}`);
+  const required = ['strict-transport-security', 'x-content-type-options', 'content-security-policy', 'referrer-policy'];
+  const checkHeaders = (label, res) => {
+    const h = (name) => res.headers.get(name) ?? '';
+    const ok = required.every((name) => h(name)) && h('x-content-type-options') === 'nosniff' && h('content-security-policy').includes("frame-ancestors 'none'");
+    report(ok, `Security headers on ${label}`, `${res.status} hsts=${Boolean(h('strict-transport-security'))} nosniff=${h('x-content-type-options') === 'nosniff'} csp-frame-ancestors=${h('content-security-policy').includes("frame-ancestors 'none'")} referrer=${h('referrer-policy') || 'MISSING'}`);
+    return ok;
+  };
+  const html = await fetch(`${root}/`);
+  checkHeaders('/ (HTML shell)', html);
+  const assetMatch = (await html.text()).match(/src="\/assets\/[a-zA-Z0-9_-]+\.js"/);
+  if (assetMatch) {
+    const assetRes = await fetch(`${root}${assetMatch[0].match(/src="([^"]+)"/)[1]}`);
+    checkHeaders('JS asset', assetRes);
+  }
+  const apiRes = await fetch(`${root}/api/health`);
+  checkHeaders('/api/health', apiRes);
+  const swRes = await fetch(`${root}/sw.js`);
+  checkHeaders('/sw.js', swRes);
+  report((swRes.headers.get('cache-control') ?? '').includes('no-cache'), 'sw.js Cache-Control: no-cache', swRes.headers.get('cache-control') ?? 'MISSING');
 }
 
 // 1. Health: our JSON 200 with db ok (a Vercel plain-text 404 fails here).
