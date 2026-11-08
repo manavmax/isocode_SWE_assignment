@@ -78,3 +78,34 @@ export function describeReason(lang: ReasonLang, reason: ReasonContribution): st
 export function describeReasons(lang: ReasonLang, reasons: readonly ReasonContribution[]): string[] {
   return reasons.map((reason) => describeReason(lang, reason));
 }
+
+const EVIDENCE_EN: Record<string, PhraseFn> = {
+  broken90: () => 'in the last 90 days',
+  bounces: (e) => `${e.count} in the last 12 months`,
+  daysSinceContact: (e) => `${e.days} days since the last attempt`,
+  dpd: (e) => `${e.days} days past due at scoring`,
+  overdueEmiMultiples: (e) => `${e.multiples} EMIs of overdue`,
+  lastOutcomeGroup: (e) => `${String(e.group).replace('_', ' ')}`,
+  keptRate: (e) => `${e.kept} of ${e.made} promises settled`,
+  logOutstanding: () => 'balance at scoring',
+  vintageMonths: (e) => `${e.months} months since disbursal`
+};
+
+const EVIDENCE_HI: Record<string, PhraseFn> = {
+  broken90: () => 'पिछले 90 दिनों में',
+  bounces: (e) => `पिछले 12 महीनों में ${e.count}`,
+  daysSinceContact: (e) => `${e.days} दिन पहले अंतिम प्रयास`,
+  dpd: (e) => `स्कोरिंग पर ${e.days} दिन अतीत देय`,
+  overdueEmiMultiples: (e) => `${e.multiples} किश्त के बराबर बकाया`,
+  lastOutcomeGroup: (e) => `${String(e.group).replace('_', ' ')}`,
+  keptRate: (e) => `${e.made} में ${e.kept} वादे निभाए`,
+  logOutstanding: () => 'स्कोरिंग पर बकाया',
+  vintageMonths: (e) => `${e.months} महीने`
+};
+
+/** The raw evidence under a reason line (14px secondary in the UI). */
+export function describeEvidence(lang: ReasonLang, reason: ReasonContribution): string {
+  const table = lang === 'hi' ? EVIDENCE_HI : EVIDENCE_EN;
+  const template = table[reason.feature];
+  return template ? template(reason.evidence) : '';
+}

@@ -161,7 +161,18 @@ const en = {
   scoreStandardOrder: 'Scores unavailable — showing the standard order',
   scoreHowItWorks: 'Advisory score from a transparent scorecard (roll-risk priors). Your judgement leads.',
   pinnedByManager: 'Manager priority',
-  scoreReasonsTitle: 'Why this score'
+  scoreReasonsTitle: 'Why this score',
+  scoreAdvisoryLine: 'Advisory score; your manager can reorder.',
+  factLastContact: 'Last contact',
+  factPromise: 'Promise',
+  daysAgo: '{n} days ago',
+  todayLabelShort: 'Today',
+  todayVisitsToday: '{n} visits today',
+  todayVisitsTodayOne: '1 visit today',
+  promisesDueToday: '{n} promises due',
+  daysOverdue: '{n} days overdue',
+  daysOverdueOne: '1 day overdue',
+  promiseDueLabel: 'Promise due today'
 };
 
 const hi: typeof en = {
@@ -315,7 +326,18 @@ const hi: typeof en = {
   scoreStandardOrder: 'स्कोर उपलब्ध नहीं — सामान्य क्रम दिख रहा है',
   scoreHowItWorks: 'पारदर्शी स्कोरकार्ड से सलाहकारी प्राथमिकता (रोल-जोखिम प्राथमिकताएँ)। आपका निर्णय ही अंतिम है।',
   pinnedByManager: 'मैनेजर प्राथमिकता',
-  scoreReasonsTitle: 'यह स्कोर क्यों'
+  scoreReasonsTitle: 'यह स्कोर क्यों',
+  scoreAdvisoryLine: 'सलाहकारी स्कोर; आपका मैनेजर क्रम बदल सकता है।',
+  factLastContact: 'अंतिम संपर्क',
+  factPromise: 'वादा',
+  daysAgo: '{n} दिन पहले',
+  todayLabelShort: 'आज',
+  todayVisitsToday: 'आज {n} विज़िट',
+  todayVisitsTodayOne: 'आज 1 विज़िट',
+  promisesDueToday: '{n} वादे आज देने हैं',
+  daysOverdue: '{n} दिन अतीत देय',
+  daysOverdueOne: '1 दिन अतीत देय',
+  promiseDueLabel: 'आज वादा देना है'
 };
 
 export const dictionaries: Record<Lang, typeof en> = { en, hi };

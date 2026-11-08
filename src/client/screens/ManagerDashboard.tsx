@@ -30,14 +30,21 @@ function TrendChart({ trend }: { trend: { t0: string; t1: string; rollRateCount:
   const stepX = (width - pad * 2) / (completed.length - 1);
   const y = (rate: number): number => height - pad - rate * (height - pad * 2);
   const points = completed.map((point, index) => `${pad + index * stepX},${y(point.rollRateCount as number)}`).join(' ');
+  const ticks = [0, 0.25, 0.5].map((rate) => ({ rate, yy: y(rate) }));
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="chart" role="img" aria-label="Roll rate trend">
-      <line x1={pad} y1={y(TARGET)} x2={width - pad} y2={y(TARGET)} stroke="#0f5f5c" strokeDasharray="6 4" strokeWidth="1.5" />
-      <polyline points={points} fill="none" stroke="#0f5f5c" strokeWidth="2" />
-      {completed.map((point, index) => (
-        <circle key={point.t0} cx={pad + index * stepX} cy={y(point.rollRateCount as number)} r="3" fill="#0f5f5c" />
+      {ticks.map((tick) => (
+        <g key={tick.rate}>
+          <line x1={pad} y1={tick.yy} x2={width - pad} y2={tick.yy} stroke="#e3e6ea" strokeWidth="1" />
+          <text x={pad - 4} y={tick.yy + 4} textAnchor="end" fontSize="12" fill="#5b6573">{Math.round(tick.rate * 100)}%</text>
+        </g>
       ))}
-      <text x={width - pad} y={y(TARGET) - 6} textAnchor="end" fontSize="11" fill="#0f5f5c">16% target</text>
+      <line x1={pad} y1={y(TARGET)} x2={width - pad} y2={y(TARGET)} stroke="#0f5f5c" strokeDasharray="6 4" strokeWidth="1.5" />
+      <polyline points={points} fill="none" stroke="#0f5f5c" strokeWidth="1.5" />
+      {completed.map((point, index) => (
+        <circle key={point.t0} cx={pad + index * stepX} cy={y(point.rollRateCount as number)} r="2.5" fill="#0f5f5c" />
+      ))}
+      <text x={width - pad} y={y(TARGET) - 6} textAnchor="end" fontSize="12" fill="#0f5f5c">16% target</text>
     </svg>
   );
 }
@@ -100,7 +107,7 @@ export function ManagerDashboard({ onOpenActivity }: { onOpenActivity: (officerI
   const footnote = 'Numerator: loans rolling to 31+ DPD. Denominator: the 1-30 DPD cohort at the window start. Count and balance versions shown. Cohort: opening snapshot, attributed to the opening branch/officer. Synthetic data.';
 
   return (
-    <main className="screen manager-screen">
+    <main className="screen manager-screen" data-auto-centered="true">
       <h1 className="screen-title">Branch dashboard — {data?.branchName ?? ''}</h1>
       {load === 'loading' ? <SkeletonList rows={4} /> : null}
       {load === 'error' ? (

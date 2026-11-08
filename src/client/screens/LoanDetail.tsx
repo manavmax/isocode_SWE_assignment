@@ -1,11 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { api, type LoanDetailDto } from '../api.js';
-import { formatRupeePaise } from '../../shared/money.js';
+import { formatLakhCrore, formatRupeePaise } from '../../shared/money.js';
 import { isWithinContactWindow } from '../../shared/contactWindow.js';
 import { t as translate, type Lang } from '../i18n/dictionary.js';
-import { describeReason } from '../../shared/scoring/phrases.js';
-import { BucketChip, ErrorState, SkeletonList } from '../components/States.js';
-import { bucketLabel } from './Today.js';
+import { describeEvidence, describeReason } from '../../shared/scoring/phrases.js';
+import { ErrorState, SkeletonList } from '../components/States.js';
 import type { OutcomeValue, KindValue } from '../components/OutcomeSheet.js';
 import { startGpsWatch } from '../gps.js';
 import type { GpsState } from '../gps.js';
@@ -42,7 +41,7 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
   const [inWindow, setInWindow] = useState<boolean | null>(null);
   const stopGpsRef = useRef<(() => void) | null>(null);
 
-  const tr = (key: Parameters<typeof translate>[1]) => translate(lang, key);
+  const tr = (key: Parameters<typeof translate>[1], params?: Record<string, string | number>) => translate(lang, key, params);
 
   const fetchLoan = useCallback(async () => {
     const result = await api.loan(loanId);
@@ -177,48 +176,47 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
         <>
           <div className="detail-hero">
             <h1 className="card-name">{loan.borrowerName}</h1>
-            <p className="card-amount money num">{formatRupeePaise(loan.overdueAmount)}</p>
-            <div className="card-row">
-              <BucketChip bucket={loan.bucket} label={bucketLabel(lang, loan.bucket)} />
-              <span className="screen-subtitle num">
-                {tr('factDpd')}: {loan.dpd}
-              </span>
-            </div>
+            {loan.businessName ? <p className="business">{loan.businessName}</p> : null}
+            <p className="amount-hero money num">{formatLakhCrore(loan.overdueAmount / 100)}</p>
+            <p className="amount-sub num">
+              {loan.dpd === 1 ? tr('daysOverdueOne') : tr('daysOverdue', { n: loan.dpd })}
+            </p>
           </div>
 
           {loan.score !== null ? (
             <div className="score-panel">
-              <div className="card-row">
-                <span className={`score-chip score-band-${loan.band}`}>
-                  {tr('scoreAdvisory')}: {loan.score} ·{' '}
-                  {translate(lang, loan.band === 'high' ? 'scoreBandHigh' : loan.band === 'medium' ? 'scoreBandMedium' : 'scoreBandLow')}
-                </span>
-                {loan.limitedData ? <span className="chip chip-warn">{tr('scoreLimitedData')}</span> : null}
-              </div>
+              <p className="score-inline">
+                {tr('scoreAdvisory')}: <span className="num">{loan.score}</span> ·{' '}
+                {translate(lang, loan.band === 'high' ? 'scoreBandHigh' : loan.band === 'medium' ? 'scoreBandMedium' : 'scoreBandLow')}
+                {loan.limitedData ? ` · ${tr('scoreLimitedData')}` : ''}
+              </p>
               {loan.topReasons && loan.topReasons.length > 0 ? (
                 <>
                   <p className="score-reasons-title">{tr('scoreReasonsTitle')}</p>
-                  <ul className="score-reasons">
+                  <ol className="score-reasons">
                     {loan.topReasons.map((reason) => (
-                      <li key={reason.feature}>{describeReason(lang, reason)}</li>
+                      <li key={reason.feature}>
+                        {describeReason(lang, reason)}
+                        <span className="reason-evidence">{describeEvidence(lang, reason)}</span>
+                      </li>
                     ))}
-                  </ul>
+                  </ol>
                 </>
               ) : null}
-              <p className="screen-subtitle score-how">{tr('scoreHowItWorks')}</p>
+              <p className="score-how">{tr('scoreAdvisoryLine')}</p>
             </div>
           ) : null}
 
           <div className="facts">
-            {factRow(tr('factLoanId'), loan.loanId)}
-            {factRow(tr('factOutstanding'), formatRupeePaise(loan.outstanding), true)}
-            {factRow(tr('factOverdue'), formatRupeePaise(loan.overdueAmount), true)}
+            {factRow(tr('factOutstanding'), formatLakhCrore(loan.outstanding / 100), true)}
             {loan.emiAmount !== null ? factRow(tr('factEmi'), formatRupeePaise(loan.emiAmount), true) : null}
+            {factRow(tr('factLastContact'), loan.lastContactDays === null ? '—' : (loan.lastContactDays === 0 ? tr('todayLabelShort') : tr('daysAgo', { n: loan.lastContactDays })))}
+            {factRow(tr('factPromise'), loan.openPromiseDue ?? '—')}
+            {factRow(tr('factDpd'), String(loan.dpd))}
             {factRow(tr('factStatus'), statusLabel(lang, loan.status))}
             {loan.product ? factRow(tr('factProduct'), loan.product) : null}
-            {loan.address ? factRow(tr('factAddress'), loan.address) : null}
-            {loan.locality ? factRow(tr('factLocality'), loan.locality) : null}
             {factRow(tr('factPincode'), loan.pincode ?? '—')}
+            {loan.address ? factRow(tr('factAddress'), loan.address) : null}
             {factRow(tr('factPhone'), loan.mobileMasked ?? '—', true)}
             {factRow(tr('factAltPhone'), loan.altMobileMasked ?? '—', true)}
           </div>
@@ -233,27 +231,20 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
           )}
 
           <div className="sticky-bar">
-            <button
-              type="button"
-              className={`sticky-btn ${callLoading ? 'sticky-btn-loading' : ''} ${inWindow === false ? 'sticky-btn-muted' : ''}`}
-              onClick={() => void handleCallTap()}
-              disabled={callLoading}
-            >
-              {callLoading ? tr('callLoading') : tr('callButton')}
-            </button>
-            <a
-              className="sticky-btn"
-              href={mapsHref(loan)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {tr('mapButtonLabel')}
-            </a>
-            <button
-              type="button"
-              className="sticky-btn sticky-btn-accent"
-              onClick={() => setShowOutcome(true)}
-            >
+            <div className="sticky-bar-side">
+              <button
+                type="button"
+                className={`sticky-btn ${callLoading ? 'sticky-btn-loading' : ''} ${inWindow === false ? 'sticky-btn-muted' : ''}`}
+                onClick={() => void handleCallTap()}
+                disabled={callLoading}
+              >
+                {callLoading ? tr('callLoading') : tr('callButton')}
+              </button>
+              <a className="sticky-btn" href={mapsHref(loan)} target="_blank" rel="noreferrer">
+                {tr('mapButtonLabel')}
+              </a>
+            </div>
+            <button type="button" className="sticky-btn sticky-btn-accent" onClick={() => setShowOutcome(true)}>
               {tr('logOutcome')}
             </button>
           </div>

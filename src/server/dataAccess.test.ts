@@ -97,6 +97,8 @@ function assignmentsRow(overrides: Record<string, unknown> = {}): Record<string,
   return {
     loan_id: 'LN-1001',
     borrower_name: 'Scorecard Borrower',
+    business_name: null,
+    low_lane: false,
     pincode: '452001',
     locality: null,
     dpd: 18,

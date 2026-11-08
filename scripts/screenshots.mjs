@@ -134,7 +134,8 @@ await loginCtx.page.waitForTimeout(300);
 await shoot(loginCtx.page, 'me-hi');
 
 // --- today + detail (Hindi) + sheets ---
-await loginCtx.page.getByRole('button', { name: 'आज' }).click();await loginCtx.page.waitForURL('**/today', { timeout: 10000 });
+await loginCtx.page.goto(`${BASE}/today`, { waitUntil: 'networkidle' });
+await loginCtx.page.waitForTimeout(400);
 await loginCtx.page.waitForTimeout(300);
 await shoot(loginCtx.page, 'today-hi');
 await loginCtx.page.locator('button.card').first().click();

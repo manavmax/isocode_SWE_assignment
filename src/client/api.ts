@@ -14,6 +14,10 @@ export interface ReasonContributionDto {
 export interface AssignmentCard {
   loanId: string;
   borrowerName: string;
+  businessName: string | null;
+  /** SPEC 8 low lane (p_roll < 0.10 and no broken promise): rendered
+   *  behind a quiet divider. */
+  lowLane: boolean;
   pincode: string | null;
   locality: string | null;
   dpd: number;
@@ -25,6 +29,8 @@ export interface AssignmentCard {
   score: number | null;
   /** SPEC 13 manager reorder: pinned loans lead the officer's list. */
   pinned: boolean;
+  /** SPEC 8 worklist: an open promise due (or in grace) today. */
+  duePromise: boolean;
   band: 'high' | 'medium' | 'low' | null;
   rupeesAtRisk: number | null;
   topReasons: ReasonContributionDto[] | null;
@@ -49,6 +55,8 @@ export interface LoanDetailDto {
   status: 'overdue' | 'cleared' | 'queue';
   mobileMasked: string | null;
   altMobileMasked: string | null;
+  lastContactDays: number | null;
+  openPromiseDue: string | null;
   score: number | null;
   band: 'high' | 'medium' | 'low' | null;
   rupeesAtRisk: number | null;

@@ -5,6 +5,7 @@ import { maskPhone } from '../shared/phone.js';
 import type { LoanStatus } from '../shared/types.js';
 import { DEMO_ACCOUNTS } from './demo.js';
 import { addIstDays } from '../shared/promises.js';
+import { istDateKey } from '../shared/datetime.js';
 import { promiseDeadline } from '../shared/promiseState.js';
 import { weights } from '../shared/scoring/scorecard.js';
 import { isStuck } from './jobs/nightly.js';
@@ -178,7 +179,9 @@ function maskLoan(loan: LoanRowData): LoanDetail {
     band: null,
     rupeesAtRisk: null,
     limitedData: false,
-    topReasons: null
+    topReasons: null,
+    lastContactDays: null,
+    openPromiseDue: null
   };
 }
 
@@ -200,6 +203,9 @@ export interface LoanDetail {
   status: LoanStatus;
   mobileMasked: string | null;
   altMobileMasked: string | null;
+  /** SPEC 12 (prompt 15): last-contact recency and the open promise date. */
+  lastContactDays: number | null;
+  openPromiseDue: string | null;
   /** SPEC 8 (prompt 12): the latest scorecard row, when the book is scored. */
   score: number | null;
   band: 'high' | 'medium' | 'low' | null;
@@ -230,6 +236,16 @@ export async function fetchLoanForActor(actor: Actor, loanId: string): Promise<L
       status: loans.status,
       mobile: loans.mobile,
       altMobile: loans.altMobile,
+      lastTouch: sql<string | null>`(
+        SELECT max((ce.attempted_at_ist AT TIME ZONE 'Asia/Kolkata')::date)::text
+        FROM contact_event ce
+        WHERE ce.loan_id = ${loans.loanId} AND ce.kind IN ('CALL','VISIT','MESSAGE')
+      )`,
+      openPromiseDue: sql<string | null>`(
+        SELECT p.promised_date::text FROM promise p
+        WHERE p.loan_id = ${loans.loanId} AND p.status = 'open'
+        ORDER BY p.promised_date ASC LIMIT 1
+      )`,
       scoreLog: sql<unknown>`(
         SELECT jsonb_build_object(
           'reasons', s.reasons_json,
@@ -252,6 +268,16 @@ export async function fetchLoanForActor(actor: Actor, loanId: string): Promise<L
     return null;
   }
   const masked = maskLoan(loan as LoanRowData);
+  const todayIst = istDateKey(Date.now());
+  const lastContactDays =
+    loan.lastTouch === null || loan.lastTouch === undefined
+      ? null
+      : Math.max(
+          0,
+          Math.round(
+            (Date.parse(`${todayIst}T00:00:00Z`) - Date.parse(`${String(loan.lastTouch).slice(0, 10)}T00:00:00Z`)) / 86_400_000
+          )
+        );
   const scoreInfo = (loan.scoreLog ?? null) as {
     reasons?: { feature: string; contribution: number; evidence: Record<string, number | string> }[];
     score?: number;
@@ -265,7 +291,9 @@ export async function fetchLoanForActor(actor: Actor, loanId: string): Promise<L
     band: scoreInfo?.band ?? null,
     rupeesAtRisk: scoreInfo?.rupeesAtRisk ?? null,
     limitedData: scoreInfo?.limitedData ?? false,
-    topReasons: Array.isArray(scoreInfo?.reasons) ? scoreInfo!.reasons : null
+    topReasons: Array.isArray(scoreInfo?.reasons) ? scoreInfo!.reasons : null,
+    lastContactDays,
+    openPromiseDue: loan.openPromiseDue === null || loan.openPromiseDue === undefined ? null : String(loan.openPromiseDue).slice(0, 10)
   };
 }
 
@@ -313,6 +341,8 @@ export async function listDemoUsernames(): Promise<string[]> {
 export interface AssignmentSummary {
   loanId: string;
   borrowerName: string;
+  businessName: string | null;
+  lowLane: boolean;
   pincode: string | null;
   locality: string | null;
   dpd: number;
@@ -330,6 +360,8 @@ export interface AssignmentSummary {
   limitedData: boolean;
   /** SPEC 13 manager reorder: pinned loans lead the list with a label. */
   pinned: boolean;
+  /** SPEC 8: open promise due (or in grace) today — pins the row. */
+  duePromise: boolean;
   pRoll: number | null;
 }
 
@@ -351,6 +383,7 @@ export async function listOfficerAssignments(actor: Actor, todayIst: string): Pr
     await db.execute(sql`
       SELECT l.loan_id::text AS loan_id,
              l.borrower_name,
+             l.business_name,
              l.pincode,
              l.locality,
              l.dpd,
@@ -364,6 +397,13 @@ export async function listOfficerAssignments(actor: Actor, todayIst: string): Pr
              sl.reasons_json,
              sl.features_json,
              sl.model_version,
+             (CASE WHEN sl.p_roll IS NOT NULL AND sl.p_roll < ${weights.lowLaneMaxPRoll}
+               AND (SELECT count(*) FROM promise p WHERE p.loan_id = l.loan_id AND p.status IN ('broken', 'broken_part')) = 0
+              THEN true ELSE false END) AS low_lane,
+             EXISTS (SELECT 1 FROM promise p
+                      WHERE p.loan_id = l.loan_id AND p.status = 'open'
+                        AND p.promised_date <= ${todayIst}::date
+                        AND p.promised_date + p.grace_days >= ${todayIst}::date) AS due_promise,
              lpo.pinned_at,
              EXISTS (SELECT 1 FROM promise p
                       WHERE p.loan_id = l.loan_id AND p.status = 'open'
@@ -405,6 +445,9 @@ export async function listOfficerAssignments(actor: Actor, todayIst: string): Pr
     return {
       loanId: String(row.loan_id),
       borrowerName: String(row.borrower_name),
+      businessName: row.business_name === null || row.business_name === undefined ? null : String(row.business_name),
+      lowLane: row.low_lane === true,
+      duePromise: row.due_promise === true,
       pincode: row.pincode === null ? null : String(row.pincode),
       locality: row.locality === null ? null : String(row.locality),
       dpd: Number(row.dpd),

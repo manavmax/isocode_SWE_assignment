@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState, type ReactElement } from 'react';
 import { api, type ApiUser } from './api.js';
 import { useLang } from './i18n/LangContext.js';
 import { useRoute } from './router.js';
@@ -24,6 +24,50 @@ const Me = lazy(() => import('./screens/Me.js').then((m) => ({ default: m.Me }))
 const Promises = lazy(() => import('./screens/Promises.js').then((m) => ({ default: m.Promises })));
 
 type Auth = 'checking' | 'signedOut' | 'signedIn';
+
+/** 24px line icons (prompt 15): stroke-only, currentColor, no fills. */
+
+function IconToday(): ReactElement {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 6h16M4 12h10M4 18h7" />
+    </svg>
+  );
+}
+
+function IconPromises(): ReactElement {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="4" y="5" width="16" height="15" />
+      <path d="M8 3v4M16 3v4M9 13l2 2 4-4" />
+    </svg>
+  );
+}
+
+function IconDashboard(): ReactElement {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+    </svg>
+  );
+}
+
+function IconImport(): ReactElement {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 16V4M7 9l5-5 5 5M4 20h16" />
+    </svg>
+  );
+}
+
+function IconMe(): ReactElement {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 21c1.5-4 5-5 8-5s6.5 1 8 5" />
+    </svg>
+  );
+}
 
 export function App() {
   const { lang, setLang, t } = useLang();
@@ -123,25 +167,31 @@ export function App() {
             {user?.role === 'branch_manager' ? (
               <>
                 <button type="button" className="nav-item" aria-current={route.name === 'dashboard' ? 'page' : undefined} onClick={() => navigate({ name: 'dashboard' })}>
+                  <IconDashboard />
                   Dashboard
                 </button>
                 <button type="button" className="nav-item" aria-current={route.name === 'import' ? 'page' : undefined} onClick={() => navigate({ name: 'import' })}>
+                  <IconImport />
                   Import
                 </button>
                 <button type="button" className="nav-item" aria-current={route.name === 'me' ? 'page' : undefined} onClick={() => navigate({ name: 'me' })}>
+                  <IconMe />
                   {t('navMe')}
                 </button>
               </>
             ) : (
               <>
                 <button type="button" className="nav-item" aria-current={route.name === 'today' ? 'page' : undefined} onClick={() => navigate({ name: 'today' })}>
+                  <IconToday />
                   {t('navToday')}
                 </button>
                 <button type="button" className="nav-item nav-item-badge" aria-current={route.name === 'promises' ? 'page' : undefined} onClick={() => navigate({ name: 'promises' })}>
+                  <IconPromises />
                   {t('navPromises')}
                   {dueToday > 0 ? <span className="nav-badge num" aria-label={t('segmentDueToday')}>{dueToday}</span> : null}
                 </button>
                 <button type="button" className="nav-item" aria-current={route.name === 'me' ? 'page' : undefined} onClick={() => navigate({ name: 'me' })}>
+                  <IconMe />
                   {t('navMe')}
                 </button>
               </>

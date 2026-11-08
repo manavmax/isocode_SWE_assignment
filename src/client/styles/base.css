@@ -19,6 +19,7 @@ body {
   color: var(--text);
   font-family: 'Noto Sans', 'Noto Sans Devanagari', system-ui, -apple-system, sans-serif;
   font-size: var(--font-size-16);
+  font-weight: 400;
   line-height: 1.5;
   min-height: 100dvh;
 }
@@ -35,8 +36,20 @@ p {
   margin: 0;
 }
 
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+table {
+  border-collapse: collapse;
+}
+
 button {
   font: inherit;
+  font-weight: 400;
   color: inherit;
   background: none;
   border: none;
@@ -53,6 +66,11 @@ input {
   color: inherit;
 }
 
+strong,
+b {
+  font-weight: 600;
+}
+
 /* tabular numerals for money and DPD figures (SPEC 15) */
 .num,
 .money {
@@ -60,13 +78,14 @@ input {
   font-feature-settings: 'tnum' 1;
 }
 
-/* Hindi ~1.1x Latin size, on the root only so it does not compound (SPEC 15) */
+/* Hindi ~1.1x Latin size on the root so it does not compound; Devanagari
+   gets 1.5 line-height and no clipped matras (SPEC 15 + prompt 15) */
 html:lang(hi) {
   font-size: 1.1em;
 }
 
 :lang(hi) {
-  line-height: 1.55;
+  line-height: 1.5;
 }
 
 :lang(hi) .chip,
@@ -86,7 +105,7 @@ html:lang(hi) {
 .card,
 .skeleton,
 .state {
-  transition: background-color var(--motion), border-color var(--motion), color var(--motion), transform var(--motion);
+  transition: background-color var(--motion), border-color var(--motion), color var(--motion);
 }
 
 @media (prefers-reduced-motion: reduce) {

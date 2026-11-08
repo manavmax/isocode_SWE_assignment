@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, type AssignmentCard } from '../api.js';
-import { loadAssignments, saveAssignments } from '../dexie/db.js';
+import { loadAssignments, saveAssignments, savePromises } from '../dexie/db.js';
 import { formatIstTime } from '../../shared/datetime.js';
-import { formatRupeePaise } from '../../shared/money.js';
+import { formatLakhCrore } from '../../shared/money.js';
 import { t as translate, type Lang } from '../i18n/dictionary.js';
 import { describeReason } from '../../shared/scoring/phrases.js';
-import { BucketChip, EmptyState, ErrorState, OfflineBanner, SkeletonList } from '../components/States.js';
+import { EmptyState, ErrorState, OfflineBanner, SkeletonList } from '../components/States.js';
 import { useOutboxCounts } from '../sync/useOutboxCounts.js';
 import { syncNow } from '../sync/scheduler.js';
 
@@ -20,6 +20,7 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
   const [fromCache, setFromCache] = useState(false);
   const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const counts = useOutboxCounts();
+  const [promisesDue, setPromisesDue] = useState(0);
 
   const tr = (key: Parameters<typeof translate>[1], params?: Record<string, string | number>) => translate(lang, key, params);
 
@@ -80,11 +81,31 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
     };
   }, []);
 
+  // The header's "n promises due" line: best-effort read, never blocks.
+  useEffect(() => {
+    void (async () => {
+      const result = await api.promises();
+      if (result.ok) {
+        setPromisesDue(result.data.dueToday.length);
+        await savePromises(result.data, Date.now());
+      }
+    })();
+  }, []);
+
   // The server owns the worklist order (SPEC 8: promise-due pinned, rupees
   // at risk, low lane last; fallback = broken/DPD/overdue). The client
-  // never re-sorts.
+  // never re-sorts; it renders the low lane behind a quiet divider.
   const sorted = loans;
   const visitCount = sorted.length;
+  const firstLowIndex = sorted.findIndex((loan) => loan.lowLane);
+
+  function todayLabel(): string {
+    // "Sunday, 8 Nov" on the corrected IST clock (device clock is fine for a
+    // label; the contact window uses the skew-corrected one).
+    const now = new Date();
+    const shifted = new Date(now.getTime() + 330 * 60_000);
+    return shifted.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'UTC' });
+  }
 
   function syncPillLabel(): string {
     if (counts.failed > 0) return `${counts.failed} ${tr('pillFailed')}`;
@@ -97,9 +118,13 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
       <header className="screen-header">
         <div className="today-header-row">
           <div>
-            <h1 className="screen-title">{tr('todayTitle')}</h1>
+            <p className="today-date num">{todayLabel()}</p>
+            <h1 className="today-headline">
+              {visitCount === 1 ? tr('todayVisitsTodayOne') : tr('todayVisitsToday', { n: visitCount })}
+            </h1>
+            {promisesDue > 0 ? <p className="today-sub num">{tr('promisesDueToday', { n: promisesDue })}</p> : null}
             <p className="screen-subtitle">
-              {visitCount === 1 ? tr('todayVisitsOne') : tr('todayVisits', { n: visitCount })} · {tr('todayLastUpdated', { time: fetchedAt ? formatIstTime(fetchedAt) : '—' })}
+              {tr('todayLastUpdated', { time: fetchedAt ? formatIstTime(fetchedAt) : '—' })}
             </p>
           </div>
           <button
@@ -126,27 +151,40 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
       {load === 'ready' && fromCache && offline ? <p className="cached-note">{tr('meOfflineCache')}</p> : null}
       {load === 'ready' ? (
         <div className="card-list">
-          {sorted.map((loan) => (
-            <button type="button" key={loan.loanId} className="card" onClick={() => onOpenLoan(loan.loanId)}>
+          {sorted.map((loan, index) => (
+            <>
+              {index === firstLowIndex ? <p className="lane-divider">Low priority</p> : null}
+              <button
+              type="button"
+              key={loan.loanId}
+              className={`card bucket-${bucketIndex(loan.bucket)}${loan.lowLane ? ' lane-low' : ''}`}
+              onClick={() => onOpenLoan(loan.loanId)}
+            >
               <span className="card-name">
                 {loan.borrowerName}
                 {loan.pinned ? <span className="chip chip-warn">{tr('pinnedByManager')}</span> : null}
-                {loan.score !== null ? (
-                  <span className={`score-chip score-band-${loan.band}`}>
-                    {loan.score} · {translate(lang, loan.band === 'high' ? 'scoreBandHigh' : loan.band === 'medium' ? 'scoreBandMedium' : 'scoreBandLow')}
-                  </span>
-                ) : null}
-                {loan.limitedData ? <span className="chip chip-warn">{tr('scoreLimitedData')}</span> : null}
+                {loan.limitedData ? <span className="chip">{tr('scoreLimitedData')}</span> : null}
               </span>
-              <span className="card-amount money num">{formatRupeePaise(loan.overdueAmount)}</span>
+              {loan.businessName ? <span className="card-sub">{loan.businessName}</span> : null}
               <span className="card-row">
-                <BucketChip bucket={loan.bucket} label={bucketLabel(lang, loan.bucket)} />
-                <span className="screen-subtitle num">{tr('factDpd')}: {loan.dpd}</span>
+                <span className="card-sub num">
+                  {loan.dpd === 1 ? tr('daysOverdueOne') : tr('daysOverdue', { n: loan.dpd })}
+                  {loan.score !== null ? (
+                    <span className="score-inline">
+                      {' · '}
+                      {translate(lang, loan.band === 'high' ? 'scoreBandHigh' : loan.band === 'medium' ? 'scoreBandMedium' : 'scoreBandLow')}{' '}
+                      <span className="num">{loan.score}</span>
+                    </span>
+                  ) : null}
+                </span>
+                <span className="card-amount money num">{formatLakhCrore(loan.overdueAmount / 100)}</span>
               </span>
+              {loan.duePromise ? <span className="score-reason">{tr('promiseDueLabel')}</span> : null}
               {loan.topReasons && loan.topReasons.length > 0 ? (
-                <span className="card-row score-reason">{describeReason(lang, loan.topReasons[0]!)}</span>
+                <span className="score-reason">{describeReason(lang, loan.topReasons[0]!)}</span>
               ) : null}
             </button>
+            </>
           ))}
         </div>
       ) : null}
@@ -168,5 +206,19 @@ export function bucketLabel(lang: Lang, bucket: string): string {
       return translate(lang, 'bucket90plus');
     default:
       return bucket;
+  }
+}
+
+/** The 3px rail index for a row's DPD bucket (1-4, clamped). */
+export function bucketIndex(bucket: string): number {
+  switch (bucket) {
+    case '1-30':
+      return 1;
+    case '31-60':
+      return 2;
+    case '61-90':
+      return 3;
+    default:
+      return 4;
   }
 }
