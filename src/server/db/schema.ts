@@ -342,6 +342,19 @@ export const messageOutbox = pgTable(
   ]
 );
 
+export const loanPriorityOverride = pgTable('loan_priority_override', {
+  loanId: text('loan_id')
+    .primaryKey()
+    .references((): AnyPgColumn => loans.loanId, { onDelete: 'cascade' }),
+  officerId: uuid('officer_id')
+    .notNull()
+    .references(() => officers.id),
+  pinnedBy: uuid('pinned_by')
+    .notNull()
+    .references(() => users.id),
+  pinnedAt: timestamp('pinned_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow()
+});
+
 export const scoreLog = pgTable(
   'score_log',
   {

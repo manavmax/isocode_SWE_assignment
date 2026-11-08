@@ -110,6 +110,7 @@ function assignmentsRow(overrides: Record<string, unknown> = {}): Record<string,
     reasons_json: null,
     features_json: null,
     model_version: null,
+    pinned_at: null,
     due_promise: false,
     broken_count: 0,
     ...overrides

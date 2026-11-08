@@ -152,6 +152,7 @@ function aggregate(t0: readonly CohortSlice[], t1: readonly OutcomeRow[], option
 
 export interface BranchRollRow extends RollResult {
   branchId: string;
+  officerId: string | null;
 }
 
 export function aggregateByBranch(t0: readonly CohortSlice[], t1: readonly OutcomeRow[], options: RollOptions): BranchRollRow[] {

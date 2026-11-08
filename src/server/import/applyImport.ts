@@ -23,6 +23,7 @@ import { runAssignment } from '../assignment/runAssignment.js';
 import { inferPaymentsFromDelta, istDayUtcRange, istNoonUtc } from './inferPayments.js';
 import { recomputePromiseStatuses } from '../jobs/nightly.js';
 import { runScoring } from '../scoring/runScoring.js';
+import { writeRollCohortCache } from '../scoring/rollCohort.js';
 
 export interface ImportActor {
   userId: string | null;
@@ -412,6 +413,7 @@ export async function applyImport(input: ApplyImportInput): Promise<ApplyImportO
       )).latest.slice(0, 10);
       if (input.asOf >= maxBatch) {
         await runScoring(input.asOf);
+        await writeRollCohortCache(maxBatch);
       }
     } catch (err) {
       await withTx(async (tx) => {

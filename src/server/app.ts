@@ -22,6 +22,8 @@ import { demoLoginAllowed, demoModeEnabled } from './demo.js';
 import { listDemoUsernames, listOfficerPromises } from './dal.js';
 import { cronSecretMatches, recomputePromiseStatuses } from './jobs/nightly.js';
 import { runScoring } from './scoring/runScoring.js';
+import { managerDashboard, officerActivity, pinLoan, unpinLoan } from './dalManager.js';
+import { writeRollCohortCache } from './scoring/rollCohort.js';
 import { istDateKey } from '../shared/datetime.js';
 
 export const app = new Hono();
@@ -196,10 +198,12 @@ app.post('/api/jobs/nightly', async (c) => {
   try {
     const promises = await recomputePromiseStatuses();
     // The nightly pass also refreshes the priority scores for today's book
-    // (prompt 12 item 5) — scoring throws never fake a model, the response
-    // reports fallback and the assignments query degrades gracefully.
-    const scoring = await runScoring(istDateKey(Date.now()));
-    return c.json({ ok: true, promises, scoring });
+    // (prompt 12 item 5) and the roll_cohort cache for every completed
+    // window (prompt 13 item 2).
+    const todayIst = istDateKey(Date.now());
+    const scoring = await runScoring(todayIst);
+    const rollCache = await writeRollCohortCache(todayIst);
+    return c.json({ ok: true, promises, scoring, rollCache });
   } catch {
     return c.json({ status: 'degraded' }, 503);
   }
@@ -332,6 +336,90 @@ app.post('/api/events/batch', async (c) => {
       Date.now()
     );
     return c.json(outcome);
+  } catch {
+    return c.json({ status: 'degraded' }, 503);
+  }
+});
+
+/** SPEC 16: reveal is officer-only, on an assigned loan, inside the contact
+ * window by SERVER time, rate-limited in the DB (A56) and audited. This is
+ * the ONLY route that answers an unmasked number; the client may cache it
+ * until the end of the IST day (A57). Hono resolves the more specific
+ * /reveal-phone path before the :id catch-all above. */
+/** Manager-only guard (SPEC 13): officers answer 403 before any query. */
+app.get('/api/manager/dashboard', async (c) => {
+  try {
+    const actor = await resolveSessionActor(getCookie(c, SESSION_COOKIE));
+    if (!actor) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    if (!isManager(actor)) {
+      return c.json({ error: 'forbidden' }, 403);
+    }
+    const dashboard = await managerDashboard(actor, istDateKey(Date.now()));
+    return c.json(dashboard);
+  } catch {
+    return c.json({ status: 'degraded' }, 503);
+  }
+});
+
+app.get('/api/manager/officers/:officerId/activity', async (c) => {
+  try {
+    const actor = await resolveSessionActor(getCookie(c, SESSION_COOKIE));
+    if (!actor) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    if (!isManager(actor)) {
+      return c.json({ error: 'forbidden' }, 403);
+    }
+    const officerId = c.req.param('officerId');
+    if (!UUID_RE.test(officerId)) {
+      return c.json({ error: 'not found' }, 404);
+    }
+    const rows = await officerActivity(actor, officerId);
+    return c.json({ activity: rows });
+  } catch {
+    return c.json({ status: 'degraded' }, 503);
+  }
+});
+
+app.post('/api/manager/priority', async (c) => {
+  try {
+    const actor = await resolveSessionActor(getCookie(c, SESSION_COOKIE));
+    if (!actor) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    if (!isManager(actor)) {
+      return c.json({ error: 'forbidden' }, 403);
+    }
+    const body = (await c.req.json().catch(() => null)) as { loanId?: unknown; officerId?: unknown } | null;
+    const loanId = typeof body?.loanId === 'string' ? body.loanId : null;
+    const officerId = typeof body?.officerId === 'string' ? body.officerId : null;
+    if (!loanId || !officerId || !UUID_RE.test(officerId)) {
+      return c.json({ error: 'bad_request' }, 400);
+    }
+    const result = await pinLoan(actor, loanId, officerId);
+    if (!result) {
+      return c.json({ error: 'forbidden' }, 403); // foreign loan or officer
+    }
+    return c.json({ ok: true, ...result });
+  } catch {
+    return c.json({ status: 'degraded' }, 503);
+  }
+});
+
+app.delete('/api/manager/priority/:loanId', async (c) => {
+  try {
+    const actor = await resolveSessionActor(getCookie(c, SESSION_COOKIE));
+    if (!actor) {
+      return c.json({ error: 'unauthorized' }, 401);
+    }
+    if (!isManager(actor)) {
+      return c.json({ error: 'forbidden' }, 403);
+    }
+    const loanId = c.req.param('loanId');
+    const removed = await unpinLoan(actor, loanId);
+    return c.json({ ok: removed });
   } catch {
     return c.json({ status: 'degraded' }, 503);
   }

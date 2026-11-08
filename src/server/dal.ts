@@ -305,6 +305,8 @@ export interface AssignmentSummary {
   rupeesAtRisk: number | null;
   topReasons: { feature: string; contribution: number; evidence: Record<string, number | string> }[] | null;
   limitedData: boolean;
+  /** SPEC 13 manager reorder: pinned loans lead the list with a label. */
+  pinned: boolean;
   pRoll: number | null;
 }
 
@@ -339,6 +341,7 @@ export async function listOfficerAssignments(actor: Actor, todayIst: string): Pr
              sl.reasons_json,
              sl.features_json,
              sl.model_version,
+             lpo.pinned_at,
              EXISTS (SELECT 1 FROM promise p
                       WHERE p.loan_id = l.loan_id AND p.status = 'open'
                         AND p.promised_date <= ${todayIst}::date
@@ -353,8 +356,10 @@ export async function listOfficerAssignments(actor: Actor, todayIst: string): Pr
          ORDER BY s.as_of DESC
          LIMIT 1
       ) sl ON true
+      LEFT JOIN loan_priority_override lpo ON lpo.loan_id = l.loan_id AND lpo.officer_id = ${actor.officerId}::uuid
       WHERE l.assigned_officer_id = ${actor.officerId} AND l.status = 'overdue'
       ORDER BY
+        (lpo.loan_id IS NOT NULL) DESC,
         EXISTS (SELECT 1 FROM promise p
                  WHERE p.loan_id = l.loan_id AND p.status = 'open'
                    AND p.promised_date <= ${todayIst}::date
@@ -373,6 +378,7 @@ export async function listOfficerAssignments(actor: Actor, todayIst: string): Pr
   const assignments: AssignmentSummary[] = rows.map((row) => {
     const features = (row.features_json ?? null) as { limitedData?: string[] } | null;
     const reasons = (row.reasons_json ?? null) as AssignmentSummary['topReasons'];
+    const pinned = row.pinned_at !== null && row.pinned_at !== undefined;
     return {
       loanId: String(row.loan_id),
       borrowerName: String(row.borrower_name),
@@ -383,6 +389,7 @@ export async function listOfficerAssignments(actor: Actor, todayIst: string): Pr
       outstanding: Number(row.outstanding),
       overdueAmount: Number(row.overdue_amount),
       mobileMasked: maskPhone(row.mobile === null ? null : String(row.mobile)),
+      pinned,
       pRoll: row.p_roll === null || row.p_roll === undefined ? null : Number(row.p_roll),
       score: row.score === null || row.score === undefined ? null : Number(row.score),
       band: row.p_roll == null ? null : (row.features_json as { band?: 'high' | 'medium' | 'low' } | null)?.band ?? null,

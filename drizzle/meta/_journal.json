@@ -36,6 +36,13 @@
       "when": 1794500000000,
       "tag": "0004_score_log_rupees",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794600000000,
+      "tag": "0005_priority_override",
+      "breakpoints": true
     }
   ]
 }
