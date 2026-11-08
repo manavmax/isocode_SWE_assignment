@@ -185,7 +185,7 @@ const en = {
   summaryOverdueTotal: 'Overdue in list',
   segmentAll: 'All',
   segmentPromises: 'Promises',
-  segmentLow: 'Low priority'
+  segmentLow: 'Low'
 };
 
 const hi: typeof en = {
@@ -363,7 +363,7 @@ const hi: typeof en = {
   summaryOverdueTotal: 'सूची में बकाया',
   segmentAll: 'सभी',
   segmentPromises: 'वादे',
-  segmentLow: 'कम प्राथमिकता'
+  segmentLow: 'कम'
 };
 
 export const dictionaries: Record<Lang, typeof en> = { en, hi };

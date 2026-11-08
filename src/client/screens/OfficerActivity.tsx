@@ -61,8 +61,10 @@ export function OfficerActivity({ officerId, onBack }: { officerId: string; onBa
   return (
     <main className="screen manager-screen">
       <div className="topbar" data-section="top-bar">
-        <button type="button" className="topbar-icon" aria-label="Back" onClick={onBack}>
-          ‹
+        <button type="button" className="topbar-icon icon-button" aria-label="Back" onClick={onBack}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M15 5l-7 7 7 7" />
+          </svg>
         </button>
         <span className="topbar-title">{officerName ? `Activity · ${officerName}` : 'Activity'}</span>
         <span className="topbar-spacer" aria-hidden="true" />
@@ -76,11 +78,11 @@ export function OfficerActivity({ officerId, onBack }: { officerId: string; onBa
         rows.length === 0 ? (
           <p className="screen-subtitle">No contact events for this officer yet.</p>
         ) : (
-          <table className="manager-table" data-section="table">
+          <table className="manager-table" data-cards data-section="table">
             <thead>
               <tr>
-                <th>When (IST)</th>
                 <th>Loan</th>
+                <th>When (IST)</th>
                 <th>Kind</th>
                 <th>Outcome</th>
                 <th>Window</th>
@@ -90,8 +92,8 @@ export function OfficerActivity({ officerId, onBack }: { officerId: string; onBa
             <tbody>
               {rows.map((row) => (
                 <tr key={row.eventId}>
-                  <td className="num">{formatIstTime(Date.parse(row.attemptedAtIst))}</td>
-                  <td className="num">{row.loanId}</td>
+                  <td className="cell-name num">{row.loanId}</td>
+                  <td className="cell-key num">{formatIstTime(Date.parse(row.attemptedAtIst))}</td>
                   <td>{row.kind}</td>
                   <td>{row.outcome ?? '—'}</td>
                   <td>

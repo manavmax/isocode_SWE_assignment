@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { api, type ManagerDashboardDto } from '../api.js';
-import { formatMoneyShort } from '../format.js';
+import { formatDayMonth, formatMoneyShort } from '../format.js';
 import { ErrorState, SkeletonList } from '../components/States.js';
 
 /**
@@ -17,37 +18,42 @@ function pct(value: number | null): string {
   return value === null ? '—' : `${(100 * value).toFixed(1)}%`;
 }
 
-/** Dot-matrix trend: columns of 4px dots (one per 5-point step), filled
- *  dots for the value, the dashed 16% target labelled in the axis row.
+/** Dot-column trend (prompt 20 item 5): the last 12 COMPLETED windows, one
+ *  column per window, filled dots proportional to the roll % (one dot per
+ *  5 points), a dashed row at the 16% target labelled on the chart, and
+ *  "d MMM" x labels under every 3rd column — each label its own element.
  *  Hand-rolled, no chart library. */
-function DotMatrixChart({ trend }: { trend: { t0: string; t1: string; rollRateCount: number | null }[] }) {
-  const completed = trend.filter((point) => point.rollRateCount !== null);
+function DotColumnChart({ trend }: { trend: { t0: string; t1: string; rollRateCount: number | null }[] }) {
+  const completed = trend.filter((point) => point.rollRateCount !== null).slice(-12);
   if (completed.length < 2) {
     return <p className="screen-subtitle">Not enough completed windows for a trend yet.</p>;
   }
-  const shown = completed.slice(-24);
   const DOTS = 12;
   const STEP = 0.05; // one dot per 5 percentage points
+  const markerRow = Math.round(0.16 / STEP); // target row, counted from the bottom
   return (
-    <div>
-      <div className="dotmatrix" role="img" aria-label="Roll rate trend, one column per completed window">
-        {shown.map((point) => {
+    <div className="dotcolumn" role="img" aria-label="Roll rate trend: one dot column per completed window, dashed marker at the 16 percent target">
+      <div className="dotcolumn-plot">
+        {completed.map((point) => {
           const rate = point.rollRateCount as number;
           const filled = Math.min(DOTS, Math.round(rate / STEP));
           return (
-            <div key={point.t0} className="dotmatrix-col" title={`${point.t0}: ${(rate * 100).toFixed(1)}%`}>
+            <div key={point.t0} className="dotcolumn-col" title={`${point.t0}: ${(rate * 100).toFixed(1)}%`}>
               {Array.from({ length: DOTS }, (_, i) => (
                 <span key={i} className={i < filled ? 'filled' : ''} />
               ))}
             </div>
           );
         })}
+        <div className="dotcolumn-marker" style={{ '--row': DOTS - 1 - markerRow } as CSSProperties}>
+          <span className="dotcolumn-marker-label num">16% target</span>
+        </div>
       </div>
-      <p className="dotmatrix-axis num">
-        <span>0%</span>
-        <span>– – – 16% target</span>
-        <span>60%</span>
-      </p>
+      <div className="dotcolumn-x num" aria-hidden="true">
+        {completed.map((point, i) => (
+          <span key={point.t0}>{i % 3 === 2 ? formatDayMonth(point.t0.slice(0, 10), 'en') : ''}</span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -120,8 +126,8 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
       <div className="topbar" data-section="top-bar">
         <span className="topbar-spacer" aria-hidden="true" />
         <span className="topbar-title">{data?.branchName ?? 'Dashboard'}</span>
-        <button type="button" className="topbar-icon" aria-label="Refresh" onClick={() => void refresh()}>
-          <svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20">
+        <button type="button" className="topbar-icon icon-button" aria-label="Refresh" onClick={() => void refresh()}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4" />
           </svg>
         </button>
@@ -181,7 +187,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
 
           <section className="panel detail-card" data-section="chart">
             <h2 className="panel-title">Roll-rate trend ({data.trendWindowsAvailable} completed windows)</h2>
-            <DotMatrixChart trend={data.trend} />
+            <DotColumnChart trend={data.trend} />
             <p className="footnote">{footnote}</p>
           </section>
 
@@ -193,7 +199,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
 
           <section className="panel detail-card" data-section="tables">
             <h2 className="panel-title">Officers (roll rate by opening attribution)</h2>
-            <table className="manager-table">
+            <table className="manager-table" data-cards>
               <thead>
                 <tr>
                   <th>Officer</th>
@@ -209,14 +215,14 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
               <tbody>
                 {data.officerTable.map((row) => (
                   <tr key={row.officerId} className={row.greyedOut ? 'greyed' : ''}>
-                    <td>{row.officerName}</td>
+                    <td className="cell-name">{row.officerName}</td>
                     <td className="num">{row.cohortN}</td>
                     <td className="num">{row.rolledN}</td>
-                    <td className="num">{pct(row.cohortN > 0 ? row.rollRate : null)}</td>
+                    <td className="cell-key num">{pct(row.cohortN > 0 ? row.rollRate : null)}</td>
                     <td className="num">{row.wilson ? `${pct(row.wilson.low)}–${pct(row.wilson.high)}` : '—'}</td>
                     <td className="num">{row.keptRate === null ? '—' : pct(row.keptRate)}</td>
                     <td className="num">{row.workload}</td>
-                    <td>
+                    <td className="cell-action">
                       <button type="button" className="btn btn-ghost" onClick={() => onOpenActivity(row.officerId)}>
                         Last 50 events
                       </button>
@@ -233,7 +239,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
             {data.brokenPromises.length === 0 ? (
               <p className="screen-subtitle">None — nothing to escalate.</p>
             ) : (
-              <table className="manager-table">
+              <table className="manager-table" data-cards>
                 <thead>
                   <tr>
                     <th>Loan</th>
@@ -248,11 +254,11 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
                   {data.brokenPromises.map((row) => (
                     <tr key={row.promiseId}>
                       <td className="num">{row.loanId}</td>
-                      <td>{row.borrowerName}</td>
-                      <td className="num">{formatMoneyShort(row.amountPaise)}</td>
+                      <td className="cell-name">{row.borrowerName}</td>
+                      <td className="cell-key num">{formatMoneyShort(row.amountPaise)}</td>
                       <td className="num">{row.ageDays} d</td>
                       <td>{row.officerName ?? '—'}</td>
-                      <td>
+                      <td className="cell-action">
                         <button type="button" className="btn btn-secondary" disabled={pinBusy === row.loanId || row.officerName === null} onClick={() => void pin(row.loanId, row.officerName)}>
                           {pinBusy === row.loanId ? '…' : pinDone === row.loanId ? 'Pinned' : 'Pin to top'}
                         </button>
@@ -270,7 +276,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
             {data.exceptions.length === 0 ? (
               <p className="screen-subtitle">No exceptions today.</p>
             ) : (
-              <table className="manager-table">
+              <table className="manager-table" data-cards>
                 <thead>
                   <tr>
                     <th>Loan</th>
@@ -285,11 +291,11 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
                   {data.exceptions.map((row) => (
                     <tr key={row.loanId}>
                       <td className="num">{row.loanId}</td>
-                      <td>{row.borrowerName}</td>
+                      <td className="cell-name">{row.borrowerName}</td>
                       <td className="num">{row.dpd}</td>
-                      <td className="num">{formatMoneyShort(row.overdueAmount)}</td>
+                      <td className="cell-key num">{formatMoneyShort(row.overdueAmount)}</td>
                       <td>{row.officerName ?? '—'}</td>
-                      <td>
+                      <td className="cell-action">
                         <button type="button" className="btn btn-secondary" disabled={pinBusy === row.loanId || row.officerName === null} onClick={() => void pin(row.loanId, row.officerName)}>
                           {pinBusy === row.loanId ? '…' : pinDone === row.loanId ? 'Pinned' : 'Pin to top'}
                         </button>
@@ -307,7 +313,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
             {data.stuckPromises.length === 0 ? (
               <p className="screen-subtitle">No stuck promises — nothing 2+ days past due without action.</p>
             ) : (
-              <table className="manager-table">
+              <table className="manager-table" data-cards>
                 <thead>
                   <tr>
                     <th>Loan</th>
@@ -322,9 +328,9 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
                   {data.stuckPromises.map((row) => (
                     <tr key={row.promiseId}>
                       <td className="num">{row.loanId}</td>
-                      <td>{row.borrowerName}</td>
-                      <td className="num">{formatMoneyShort(row.amountPaise)}</td>
-                      <td className="num">{row.deadline}</td>
+                      <td className="cell-name">{row.borrowerName}</td>
+                      <td className="cell-key num">{formatMoneyShort(row.amountPaise)}</td>
+                      <td className="num">{formatDayMonth(row.deadline, 'en')}</td>
                       <td className="num">{row.daysPastDue}</td>
                       <td>{row.officerName ?? '—'}</td>
                     </tr>

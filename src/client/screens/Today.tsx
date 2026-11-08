@@ -136,12 +136,14 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
         <span className="topbar-title">{tr('todayTitle')}</span>
         <button
           type="button"
-          className="topbar-icon"
+          className={`topbar-icon icon-button icon-state-${counts.failed > 0 ? 'fail' : counts.pending > 0 ? 'pending' : 'ok'}`}
           onClick={() => void syncNow()}
           title={tr('syncNow')}
           aria-live="polite"
         >
-          <span className={`sync-dot ${counts.failed > 0 ? 'sync-dot-fail' : counts.pending > 0 ? 'sync-dot-pending' : 'sync-dot-ok'}`} aria-hidden="true" />
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4" />
+          </svg>
         </button>
       </div>
       <header className="screen-header" data-section="heading">

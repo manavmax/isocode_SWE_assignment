@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, type BatchRowDto, type ImportReportDto, type QueueLoanDto } from '../api.js';
+import { formatDayMonth, formatMoneyShort } from '../format.js';
 import { ErrorState, OfflineBanner, SkeletonList } from '../components/States.js';
 
 /**
@@ -122,8 +123,8 @@ export function ManagerImport({ onOpenOverview, onOpenActivityRoute }: { onOpenO
       <div className="topbar" data-section="top-bar">
         <span className="topbar-spacer" aria-hidden="true" />
         <span className="topbar-title">Import</span>
-        <button type="button" className="topbar-icon" aria-label="Refresh" onClick={() => void refresh()}>
-          <svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20">
+        <button type="button" className="topbar-icon icon-button" aria-label="Refresh" onClick={() => void refresh()}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4" />
           </svg>
         </button>
@@ -202,7 +203,7 @@ export function ManagerImport({ onOpenOverview, onOpenActivityRoute }: { onOpenO
         {queue.length === 0 ? (
           <p className="screen-subtitle">Nothing queued for this branch.</p>
         ) : (
-          <table className="manager-table">
+          <table className="manager-table" data-cards>
             <thead>
               <tr><th>Loan</th><th>Borrower</th><th>DPD</th><th>Overdue</th><th>Pincode</th><th>Reason</th></tr>
             </thead>
@@ -210,9 +211,9 @@ export function ManagerImport({ onOpenOverview, onOpenActivityRoute }: { onOpenO
               {queue.map((row) => (
                 <tr key={row.loanId}>
                   <td className="num">{row.loanId}</td>
-                  <td>{row.borrowerName}</td>
+                  <td className="cell-name">{row.borrowerName}</td>
                   <td className="num">{row.dpd}</td>
-                  <td className="num">{row.overdueAmount / 100}</td>
+                  <td className="cell-key num">{formatMoneyShort(row.overdueAmount)}</td>
                   <td className="num">{row.pincode ?? '—'}</td>
                   <td>{row.reason === 'unmapped_pincode' ? 'Unmapped pincode (no territory row)' : 'Data fix: no phone AND no address'}</td>
                 </tr>
@@ -228,20 +229,20 @@ export function ManagerImport({ onOpenOverview, onOpenActivityRoute }: { onOpenO
         {batches.length === 0 ? (
           <SkeletonList rows={2} />
         ) : (
-          <table className="manager-table">
+          <table className="manager-table" data-cards>
             <thead>
               <tr><th>As-of</th><th>File</th><th>Status</th><th>Rows</th><th>Errors</th><th>Warnings</th><th>errors.csv</th></tr>
             </thead>
             <tbody>
               {batches.map((batch) => (
                 <tr key={batch.batchId}>
-                  <td className="num">{batch.asOf}</td>
-                  <td>{batch.filename}</td>
+                  <td className="num">{formatDayMonth(batch.asOf, 'en')}</td>
+                  <td className="cell-name">{batch.filename}</td>
                   <td>{batch.status}</td>
-                  <td className="num">{batch.totalRows}</td>
+                  <td className="cell-key num">{batch.totalRows}</td>
                   <td className="num">{batch.errors}</td>
                   <td className="num">{batch.warnings}</td>
-                  <td>
+                  <td className="cell-action">
                     <a className="btn btn-ghost" href={`/api/import/${batch.batchId}/errors.csv`}>Download</a>
                   </td>
                 </tr>

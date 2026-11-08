@@ -10,13 +10,15 @@
 /* Scroll clearance: the floating nav (~72px incl. offset) plus, on detail,
    the floating action bar (~150px incl. offset) + safe area. */
 .screen {
-  padding: var(--sp-4) var(--sp-4) calc(120px + env(safe-area-inset-bottom));
+  /* scroll clearance = nav height (84px) + 24px + safe area (prompt 20 item 9) */
+  padding: var(--sp-4) var(--sp-4) calc(108px + env(safe-area-inset-bottom));
   max-width: 640px;
   margin: 0 auto;
 }
 
 .detail-screen {
-  padding-bottom: calc(200px + env(safe-area-inset-bottom));
+  /* nav + floating action bar (bottom 100 + 72 tall) + 24 + safe area */
+  padding-bottom: calc(196px + env(safe-area-inset-bottom));
 }
 
 /* A modal sheet owns the bottom: hide the floating nav behind it. */
@@ -104,7 +106,9 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   display: grid;
   grid-template-columns: 48px 1fr 48px;
   align-items: center;
-  margin: 0 calc(-1 * var(--sp-4)) var(--sp-2);
+  /* no negative margin: the back button keeps 16px from the left edge
+     (prompt 20 item 4, asserted in mobile-check) */
+  margin: 0 0 var(--sp-2);
 }
 
 .topbar-spacer {
@@ -120,9 +124,27 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   align-items: center;
   justify-content: center;
   justify-self: end;
-  font-size: var(--font-size-18);
   padding: 0;
 }
+
+/* every icon button renders a real inline SVG icon (prompt 20 item 4) */
+.icon-button svg {
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5;
+}
+
+.icon-button svg.icon-fill {
+  fill: currentColor;
+  stroke: none;
+}
+
+/* sync status colours ride the icon stroke (was: dot background) */
+.icon-state-ok svg { stroke: var(--accent); }
+.icon-state-pending svg { stroke: var(--status-warn); }
+.icon-state-fail svg { stroke: var(--status-danger); }
 
 .history-list li {
   display: flex;
@@ -384,6 +406,69 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
 
 .card.lane-low {
   opacity: 0.62;
+}
+
+/* ---------- phone: opted-in manager tables become stacked cards (prompt 20 item 6) ---------- */
+@media (max-width: 639.9px) {
+  .manager-table[data-cards] {
+    display: block;
+  }
+
+  .manager-table[data-cards] thead {
+    display: none;
+  }
+
+  .manager-table[data-cards] tbody {
+    display: block;
+  }
+
+  .manager-table[data-cards] tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-2);
+    background: var(--surface);
+    border-radius: var(--radius-card);
+    padding: var(--sp-4);
+    margin-bottom: var(--sp-3);
+  }
+
+  .manager-table[data-cards] td {
+    display: inline-flex;
+    align-items: baseline;
+    padding: 3px 10px;
+    background: var(--bg);
+    border-radius: var(--radius-pill);
+    font-size: var(--font-size-13);
+    color: var(--text-secondary);
+  }
+
+  /* borrower/officer name: 16/600, key number large and right-aligned */
+  .manager-table[data-cards] td.cell-name {
+    order: -2;
+    flex: 1 1 auto;
+    padding: 0;
+    background: none;
+    font-size: var(--font-size-16);
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .manager-table[data-cards] td.cell-key {
+    order: -1;
+    flex: 0 0 auto;
+    padding: 0;
+    background: none;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .manager-table[data-cards] td.cell-action {
+    width: 100%;
+    background: none;
+    padding: 0;
+  }
 }
 
 /* ---------- bottom nav ---------- */
@@ -710,10 +795,19 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   width: 56px;
   height: 56px;
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.14);
+  /* lighter circle fill; white 24px icons hold >= 3:1 against it */
+  background: #2a3038;
   color: #ffffff;
   font-size: var(--font-size-12);
   padding: 0;
+}
+
+.sticky-btn svg {
+  width: 24px;
+  height: 24px;
+  stroke: #ffffff;
+  fill: none;
+  stroke-width: 1.5;
 }
 
 .sticky-btn-loading {
@@ -993,12 +1087,17 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
 
 /* ---------- promises screen ---------- */
 
+/* the one segmented control (prompt 20 item 14): Today and Promises use
+   the same black-pill control as the manager screens */
 .segment-row {
-  display: flex;
-  gap: var(--sp-2);
-  padding: var(--sp-2) 0;
-  border-bottom: var(--hairline);
-  margin-bottom: var(--sp-2);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-1);
+  background: var(--surface);
+  border-radius: var(--radius-pill);
+  padding: var(--sp-1);
+  border-bottom: none;
+  margin-bottom: var(--sp-4);
 }
 
 .segment {
@@ -1006,15 +1105,17 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   min-height: var(--target-min);
   border: none;
   background: none;
+  border-radius: var(--radius-pill);
   color: var(--text);
-  font-size: var(--font-size-16);
+  font-size: var(--font-size-14);
   padding: var(--sp-2);
 }
 
 .segment-active {
-  color: var(--accent);
+  background: var(--pill-ink);
+  color: #ffffff;
   font-weight: 600;
-  border-bottom: 2px solid var(--accent);
+  border-bottom: none;
 }
 
 .promise-card {
@@ -1216,28 +1317,64 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
 }
 
 /* dot-matrix trend: columns of 4px dots */
-.dotmatrix {
+/* dot-column trend chart (prompt 20 item 5): 12 windows, 6px dots at a
+   9px pitch, dashed 16% target row labelled on-chart */
+.dotcolumn-plot {
+  position: relative;
   display: flex;
   gap: var(--sp-1);
   align-items: flex-end;
   padding: var(--sp-2) 0;
 }
 
-.dotmatrix-col {
+.dotcolumn-col {
   display: flex;
   flex-direction: column-reverse;
-  gap: 2px;
+  gap: 3px;
+  flex: 1;
 }
 
-.dotmatrix-col span {
-  width: 4px;
-  height: 4px;
+.dotcolumn-col span {
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--grey-300);
 }
 
-.dotmatrix-col span.filled {
+.dotcolumn-col span.filled {
   background: var(--pill-ink);
+}
+
+.dotcolumn-marker {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* --row counts from the top; 9px dot pitch, +4px centers on the dot */
+  top: calc(var(--row) * 9px + 4px);
+  border-top: 2px dashed var(--status-warn);
+}
+
+.dotcolumn-marker-label {
+  position: absolute;
+  right: 0;
+  top: -16px;
+  font-size: var(--font-size-12);
+  color: var(--status-warn);
+  background: var(--surface);
+  padding: 0 var(--sp-1);
+}
+
+.dotcolumn-x {
+  display: flex;
+  gap: var(--sp-1);
+  margin-top: var(--sp-2);
+}
+
+.dotcolumn-x span {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: center;
 }
 
 .manager-screen .panel {

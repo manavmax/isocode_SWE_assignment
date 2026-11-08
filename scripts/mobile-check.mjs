@@ -146,6 +146,101 @@ async function auditScreen(page, screen, deviceName) {
   }, vw);
   for (const w of wide) failures.push(`element wider than viewport: ${w}`);
 
+  // 6. icon buttons render a real inline SVG icon; back buttons keep 16px
+  // from the left edge (prompt 20 item 4)
+  const icons = await page.evaluate(() => {
+    const out = [];
+    for (const btn of document.querySelectorAll('button.icon-button')) {
+      const svg = btn.querySelector('svg');
+      const box = svg ? svg.getBoundingClientRect() : null;
+      out.push({
+        label: btn.getAttribute('aria-label') ?? '',
+        hasSvg: Boolean(svg),
+        w: Math.round(box?.width ?? 0),
+        h: Math.round(box?.height ?? 0),
+        left: btn.getBoundingClientRect().left
+      });
+    }
+    return out;
+  });
+  for (const icon of icons) {
+    if (!icon.hasSvg || icon.w <= 0 || icon.h <= 0) {
+      failures.push(`icon-button "${icon.label}" has no visible inline svg`);
+    }
+    if (/back|वापस/i.test(icon.label) && icon.left < 16) {
+      failures.push(`back button ${icon.left.toFixed(1)}px from left edge < 16px`);
+    }
+  }
+
+  // 7. floating action bar circles: 56px, #2a3038 fill, 24px icon (prompt 20 item 8)
+  const circle = await page.evaluate(() => {
+    const btn = document.querySelector('.sticky-bar .sticky-btn:not(.sticky-btn-accent)');
+    if (!btn) return null;
+    const rect = btn.getBoundingClientRect();
+    const style = getComputedStyle(btn);
+    const svgBox = btn.querySelector('svg')?.getBoundingClientRect();
+    return { w: rect.width, h: rect.height, bg: style.backgroundColor, iconW: svgBox?.width ?? 0 };
+  });
+  if (circle) {
+    if (Math.round(circle.w) !== 56 || Math.round(circle.h) !== 56) {
+      failures.push(`action circle ${Math.round(circle.w)}x${Math.round(circle.h)} != 56x56`);
+    }
+    if (circle.bg !== 'rgb(42, 48, 56)') failures.push(`action circle fill ${circle.bg} != rgb(42, 48, 56)`);
+    if (circle.iconW < 23) failures.push(`action icon ${Math.round(circle.iconW)}px < 24px`);
+  }
+
+  // 8. shell bottom (prompt 20 item 9): page grey to the bottom, nothing
+  // paints below the floating nav, no control covered by the floating
+  // chrome at scroll end (the viewport is scrolled to the end by check 4)
+  const shell = await page.evaluate(() => {
+    const nav = document.querySelector('.bottom-nav');
+    const navRect = nav?.getBoundingClientRect();
+    const band = [];
+    for (const el of document.querySelectorAll('body *')) {
+      const rect = el.getBoundingClientRect();
+      if (rect.height === 0 || getComputedStyle(el).position === 'fixed') continue;
+      if (navRect && rect.top >= navRect.top - 2 && !nav.contains(el) && el !== nav) {
+        band.push(el.tagName.toLowerCase());
+      }
+    }
+    const floats = [...document.querySelectorAll('.bottom-nav, .sticky-bar')].map((el) => el.getBoundingClientRect());
+    const covered = [];
+    for (const el of document.querySelectorAll('main button, main a, main input, main select')) {
+      const rect = el.getBoundingClientRect();
+      if (rect.height === 0 || el.closest('dialog')) continue;
+      for (const fr of floats) {
+        const overlapY = !(rect.bottom <= fr.top || rect.top >= fr.bottom);
+        const overlapX = !(rect.right <= fr.left || rect.left >= fr.right);
+        if (overlapY && overlapX) covered.push(`${el.tagName.toLowerCase()}.${String(el.className).split(' ')[0]}`);
+      }
+    }
+    return {
+      bodyBg: getComputedStyle(document.body).backgroundColor,
+      band: band.slice(0, 4),
+      covered: covered.slice(0, 4)
+    };
+  });
+  if (shell.bodyBg !== 'rgb(238, 240, 243)') failures.push(`body background ${shell.bodyBg} is not the page grey`);
+  for (const b of shell.band) failures.push(`element paints below the floating nav: ${b}`);
+  for (const c of shell.covered) failures.push(`floating chrome covers a control at scroll end: ${c}`);
+
+  // 9. nothing clips inside a card (prompt 20 item 6)
+  const clipped = await page.evaluate(() => {
+    const out = [];
+    const containers = document.querySelectorAll('.card, .tile, .manager-table tr');
+    for (const el of containers) {
+      const check = (node) => {
+        if (node.scrollWidth > node.clientWidth + 1) {
+          out.push(`${String(el.className).split(' ')[0]} > ${node.tagName.toLowerCase()}.${String(node.className).split(' ')[0]} ${node.scrollWidth}>${node.clientWidth}`);
+        }
+      };
+      check(el);
+      for (const child of el.querySelectorAll('*')) check(child);
+    }
+    return out.slice(0, 4);
+  });
+  for (const c of clipped) failures.push(`card content clipped: ${c}`);
+
   const shot = `${OUT}/${deviceName}-${screen}.png`;
   await page.screenshot({ path: shot, fullPage: false });
 
@@ -205,6 +300,32 @@ for (const [deviceName, device] of DEVICE_LIST) {
   await page.waitForURL('**/login', { timeout: 15000 });
   await page.waitForTimeout(300);
   await auditScreen(page, 'login', deviceName);
+
+  await context.close();
+}
+
+// Manager screens (English-only, A67): dashboard, activity (via the tile —
+// resolves the 'first' sentinel), import. Same audit rules apply.
+for (const [deviceName, device] of DEVICE_LIST) {
+  const context = await browser.newContext({ ...device });
+  const page = await context.newPage();
+
+  await gotoLogin(page);
+  await page.fill('#username', 'demo-manager');
+  await page.fill('#pin', '1234');
+  await page.getByRole('button', { name: /Sign in|साइन इन/ }).click();
+  await page.waitForURL('**/dashboard', { timeout: 30000 });
+  await page.waitForSelector('.manager-table', { timeout: 60000 });
+  await page.waitForTimeout(400);
+  await auditScreen(page, 'dashboard', deviceName);
+
+  await page.getByRole('button', { name: 'Activity', exact: true }).click();
+  await page.waitForTimeout(1200);
+  await auditScreen(page, 'activity', deviceName);
+
+  await page.locator('nav.bottom-nav').getByRole('button', { name: 'Import' }).click();
+  await page.waitForTimeout(800);
+  await auditScreen(page, 'import', deviceName);
 
   await context.close();
 }

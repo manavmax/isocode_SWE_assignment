@@ -182,15 +182,17 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
     <>
       <main className="screen detail-screen">
       <div className="topbar" data-section="top-bar">
-        <button type="button" className="topbar-icon" aria-label={tr('back')} onClick={onBack}>
-          ‹
+        <button type="button" className="topbar-icon icon-button" aria-label={tr('back')} onClick={onBack}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M15 5l-7 7 7 7" />
+          </svg>
         </button>
         <span className="topbar-title">{tr('detailTitle')}</span>
-        <button type="button" className="topbar-icon" aria-label="More options">
-          <svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20">
-            <circle cx="12" cy="5" r="1.6" />
-            <circle cx="12" cy="12" r="1.6" />
-            <circle cx="12" cy="19" r="1.6" />
+        <button type="button" className="topbar-icon icon-button" aria-label="More options">
+          <svg viewBox="0 0 24 24" aria-hidden="true" className="icon-fill">
+            <circle cx="12" cy="5" r="1.7" />
+            <circle cx="12" cy="12" r="1.7" />
+            <circle cx="12" cy="19" r="1.7" />
           </svg>
         </button>
       </div>
