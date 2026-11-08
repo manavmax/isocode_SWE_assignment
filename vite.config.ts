@@ -16,7 +16,9 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,woff2}', 'pwa-192.png', 'pwa-512.png'],
         navigateFallback: 'index.html',
-        cleanupOutdatedCaches: true
+        cleanupOutdatedCaches: true,
+        skipWaiting: true,
+        clientsClaim: true
       },
       manifest: {
         name: 'Field Collections',

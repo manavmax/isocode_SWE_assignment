@@ -7,10 +7,22 @@
 
 /* ---------- screens ---------- */
 
+/* Scroll clearance: the floating nav (~72px incl. offset) plus, on detail,
+   the floating action bar (~150px incl. offset) + safe area. */
 .screen {
-  padding: var(--sp-4) var(--sp-4) 120px;
+  padding: var(--sp-4) var(--sp-4) calc(120px + env(safe-area-inset-bottom));
   max-width: 640px;
   margin: 0 auto;
+}
+
+.detail-screen {
+  padding-bottom: calc(200px + env(safe-area-inset-bottom));
+}
+
+/* A modal sheet owns the bottom: hide the floating nav behind it. */
+body:has(dialog.outcome-sheet[open]) .bottom-nav,
+body:has(dialog.blocked-sheet[open]) .bottom-nav {
+  display: none;
 }
 
 /* soft card: white, 20px radius, 16px padding, no hairline rows */
@@ -670,7 +682,7 @@
 /* floating black pill bar (data-float) */
 .sticky-bar {
   position: fixed;
-  bottom: calc(84px + env(safe-area-inset-bottom)); /* above the floating nav */
+  bottom: calc(100px + env(safe-area-inset-bottom)); /* above the 80px floating nav */
   left: var(--sp-3);
   right: var(--sp-3);
   display: grid;
@@ -1151,7 +1163,7 @@
   font-weight: 600;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 1024px) {
   .manager-screen {
     max-width: 960px;
   }

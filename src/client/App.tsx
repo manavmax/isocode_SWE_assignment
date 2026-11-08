@@ -163,7 +163,7 @@ export function App() {
               <Today lang={lang} onOpenLoan={(loanId) => navigate({ name: 'loan', loanId })} />
             )}
           </Suspense>
-          <nav className="bottom-nav" aria-label={t('appName')} data-section="nav">
+          <nav className="bottom-nav" aria-label={t('appName')} data-section="nav" data-float>
             {user?.role === 'branch_manager' ? (
               <>
                 <button type="button" className="nav-item" aria-current={route.name === 'dashboard' ? 'page' : undefined} onClick={() => navigate({ name: 'dashboard' })}>

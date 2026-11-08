@@ -41,6 +41,7 @@ process.on('unhandledRejection', (err) => {
 });
 const browser = await chromium.launch();
 let totalFindings = 0;
+const iPhoneEmulation = { width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 3 };
 
 const AUDIT = () => {
   const overflowX = document.scrollingElement.scrollWidth - document.scrollingElement.clientWidth;
@@ -65,6 +66,8 @@ async function auditFloatOverlap(name, page) {
   for (const [width, height] of [[360, 640], [390, 844]]) {
     await page.setViewportSize({ width, height });
     await page.waitForTimeout(250);
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await page.waitForTimeout(400);
     const result = await page.evaluate(() => {
       const rect = (el) => el.getBoundingClientRect();
       const floats = [...document.querySelectorAll('[data-float], .bottom-nav')].filter((el) => {
@@ -162,7 +165,12 @@ async function auditDetailSheets(page, lang) {
 }
 
 for (const lang of ['hi', 'en']) {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const context = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+    deviceScaleFactor: 3
+  });
   const page = await context.newPage();
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
   await page.evaluate((l) => window.localStorage.setItem('fc.lang', l), lang);
@@ -201,8 +209,8 @@ for (const lang of ['hi', 'en']) {
 
 // Manager screens (prompt 13, A67: English only) — desktop and phone, and
 // the officer activity table. demo-manager is the Indore branch manager.
-for (const [name, viewport] of [['desktop', { width: 1280, height: 800 }], ['phone', { width: 390, height: 844 }]]) {
-  const context = await browser.newContext({ viewport });
+for (const [name, viewport] of [['desktop', { width: 1280, height: 800 }], ['phone', { ...iPhoneEmulation }]]) {
+  const context = await browser.newContext({ viewport: viewport.viewport ?? viewport, isMobile: viewport.isMobile ?? false, hasTouch: viewport.hasTouch ?? false, deviceScaleFactor: viewport.deviceScaleFactor ?? 1 });
   const page = await context.newPage();
   await page.goto(`${BASE}/login`, { waitUntil: 'networkidle' });
   await page.evaluate(() => window.localStorage.setItem('fc.lang', 'en'));

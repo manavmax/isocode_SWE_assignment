@@ -109,6 +109,25 @@ dashboard, never in the repo. `.env.example` mirrors this table.
   broken once the real date passes their deadline); a re-base is the
   intended fix before demonstrating.
 
+## Pre-push checklist (local only)
+
+- `pnpm test` — the whole offline suite.
+- `pnpm lint && pnpm typecheck` — clean.
+- `node scripts/layout-audit.mjs` — 28 screen states, overflow/truncation/
+  small-target checks, the float-overlap rules (floating bar and nav pill
+  never overlap each other or the last card at 360x640 and 390x844), with
+  real device emulation (isMobile + hasTouch, DSF 3).
+- `node scripts/design-audit.mjs` — the design-system rules (type scale,
+  spacing, contrast, gradients on [data-hero] only, shadows on
+  [data-float] only) and the per-screen layout-contract order.
+- `node scripts/mobile-check.mjs` — real device emulation (iPhone 13,
+  Pixel 7, small Android) for Today, loan detail, outcome sheet,
+  promises, me and login: no horizontal scroll, visualViewport scale 1,
+  floating chrome >= 8px from the edges and centred within 2px, no
+  element wider than the viewport, last card reachable below the
+  floating chrome. Screenshots land in docs/screens/mobile/.
+- `pnpm smoke:live https://<url>` — after deploying.
+
 ## Smoke checklist
 
 `pnpm smoke:live https://isocode-swe-assignment.vercel.app` — 19 checks:

@@ -161,7 +161,8 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
   }
 
   return (
-    <main className="screen">
+    <>
+      <main className="screen detail-screen">
       <div className="topbar" data-section="top-bar">
         <button type="button" className="topbar-icon" aria-label={tr('back')} onClick={onBack}>
           ‹
@@ -264,8 +265,11 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
               </li>
             </ul>
           </div>
-
-          <div className="sticky-bar" data-float data-section="actions">
+        </>
+      ) : null}
+    </main>
+    {load === 'ready' && loan ? (
+    <div className="sticky-bar" data-float data-section="actions">
             <div className="sticky-side">
               <button
                 type="button"
@@ -294,8 +298,7 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
             <button type="button" className="sticky-btn sticky-btn-accent" onClick={() => setShowOutcome(true)}>
               {tr('logOutcome')}
             </button>
-          </div>
-        </>
+    </div>
       ) : null}
 
       {showOutcome && loan && (
@@ -332,7 +335,7 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
           />
         </Suspense>
       )}
-    </main>
+    </>
   );
 }
 
