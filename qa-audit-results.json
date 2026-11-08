@@ -1,0 +1,999 @@
+{
+  "findings": [
+    {
+      "id": "QA-01",
+      "severity": "Minor",
+      "screen": "PWA manifest",
+      "devices": "all",
+      "what": "manifest theme_color is the old teal #0f5f5c, not the page grey/brown of the current UI",
+      "evidence": "manifest.theme_color = #0f5f5c",
+      "fix": "update manifest.theme_color to #0e1116 (or the page grey) and regenerate icons"
+    },
+    {
+      "id": "QA-02",
+      "severity": "Minor",
+      "screen": "Login",
+      "devices": "iphone-se",
+      "what": "theme-color meta is the old teal #0f5f5c",
+      "evidence": "<meta name=\"theme-color\" content=\"#0f5f5c\">",
+      "fix": "update to match the current palette"
+    },
+    {
+      "id": "QA-03",
+      "severity": "Minor",
+      "screen": "Login",
+      "devices": "iphone13",
+      "what": "theme-color meta is the old teal #0f5f5c",
+      "evidence": "<meta name=\"theme-color\" content=\"#0f5f5c\">",
+      "fix": "update to match the current palette"
+    },
+    {
+      "id": "QA-04",
+      "severity": "Minor",
+      "screen": "Login",
+      "devices": "pixel7",
+      "what": "theme-color meta is the old teal #0f5f5c",
+      "evidence": "<meta name=\"theme-color\" content=\"#0f5f5c\">",
+      "fix": "update to match the current palette"
+    },
+    {
+      "id": "QA-05",
+      "severity": "Minor",
+      "screen": "Login",
+      "devices": "small-android",
+      "what": "theme-color meta is the old teal #0f5f5c",
+      "evidence": "<meta name=\"theme-color\" content=\"#0f5f5c\">",
+      "fix": "update to match the current palette"
+    },
+    {
+      "id": "QA-06",
+      "severity": "Minor",
+      "screen": "Login",
+      "devices": "desktop",
+      "what": "theme-color meta is the old teal #0f5f5c",
+      "evidence": "<meta name=\"theme-color\" content=\"#0f5f5c\">",
+      "fix": "update to match the current palette"
+    },
+    {
+      "id": "QA-07",
+      "severity": "Minor",
+      "screen": "Login",
+      "devices": "pixel7-landscape",
+      "what": "theme-color meta is the old teal #0f5f5c",
+      "evidence": "<meta name=\"theme-color\" content=\"#0f5f5c\">",
+      "fix": "update to match the current palette"
+    },
+    {
+      "id": "QA-08",
+      "severity": "Minor",
+      "screen": "Dashboard",
+      "devices": "pixel7-landscape",
+      "what": "3 gradient hero tiles render on a landscape phone (915px wide)",
+      "evidence": "[data-hero] count",
+      "fix": ""
+    }
+  ],
+  "results": {
+    "url": "https://isocode-swe-assignment.vercel.app",
+    "devices": {
+      "iphone-se-today": {
+        "vw": 375,
+        "vh": 667,
+        "scrollWidth": 375,
+        "visualScale": 1,
+        "sections": [
+          "top-bar",
+          "heading",
+          "hero",
+          "summary",
+          "segmented",
+          "cards",
+          "nav"
+        ],
+        "floats": [
+          {
+            "name": "bottom-nav",
+            "left": 13,
+            "right": 13,
+            "width": 349,
+            "centreOffset": 0,
+            "pos": "fixed",
+            "hasFloat": true
+          }
+        ],
+        "wide": [],
+        "contrast": [
+          {
+            "sel": ".today-date",
+            "color": "rgba(255, 255, 255, 0.85)",
+            "bg": "gradient",
+            "ratio": 4.86,
+            "size": "13.2px",
+            "weight": "400"
+          },
+          {
+            "sel": ".today-sub",
+            "color": "rgba(255, 255, 255, 0.85)",
+            "bg": "gradient",
+            "ratio": 4.86,
+            "size": "15.4px",
+            "weight": "400"
+          },
+          {
+            "sel": ".score-reason",
+            "color": "rgb(14, 17, 22)",
+            "bg": "rgb(255, 255, 255)",
+            "ratio": 18.91,
+            "size": "15.4px",
+            "weight": "400"
+          },
+          {
+            "sel": ".card-name",
+            "color": "rgb(14, 17, 22)",
+            "bg": "rgb(255, 255, 255)",
+            "ratio": 18.91,
+            "size": "19.8px",
+            "weight": "600"
+          },
+          {
+            "sel": ".card-sub",
+            "color": "rgb(74, 84, 100)",
+            "bg": "rgb(255, 255, 255)",
+            "ratio": 7.65,
+            "size": "14.3px",
+            "weight": "400"
+          }
+        ],
+        "cards": 29
+      },
+      "iphone-se-detail": {
+        "scrollWidth": 375,
+        "floats": [
+          {
+            "name": "sticky-bar",
+            "left": 13,
+            "right": 13,
+            "centreOffset": 0,
+            "bottomGap": 100
+          },
+          {
+            "name": "bottom-nav",
+            "left": 13,
+            "right": 13,
+            "centreOffset": 0,
+            "bottomGap": 13
+          }
+        ],
+        "facts": 11,
+        "why": 3,
+        "history": 3,
+        "stickyInsideScreen": false,
+        "safeArea": "8.8px",
+        "stickyBottom": "100px"
+      },
+      "iphone-se-sheet": {
+        "sheetHeight": 576,
+        "sheetBottom": 667,
+        "saveY": 595,
+        "saveH": 55,
+        "chips": 7,
+        "navUnderSheet": false,
+        "vh": 667
+      },
+      "iphone-se-sheet-keyboard": {
+        "hasInput": false,
+        "before": 667,
+        "after": 667
+      },
+      "iphone13-today": {
+        "vw": 390,
+        "vh": 844,
+        "scrollWidth": 390,
+        "visualScale": 1,
+        "sections": [
+          "top-bar",
+          "heading",
+          "hero",
+          "summary",
+          "segmented",
+          "cards",
+          "nav"
+        ],
+        "floats": [
+          {
+            "name": "bottom-nav",
+            "left": 13,
+            "right": 13,
+            "width": 364,
+            "centreOffset": 0,
+            "pos": "fixed",
+            "hasFloat": true
+          }
+        ],
+        "wide": [],
+        "contrast": [
+          {
+            "sel": ".today-date",
+            "color": "rgba(255, 255, 255, 0.85)",
+            "bg": "gradient",
+            "ratio": 4.86,
+            "size": "13.2px",
+            "weight": "400"
+          },
+          {
+            "sel": ".today-sub",
+            "color": "rgba(255, 255, 255, 0.85)",
+            "bg": "gradient",
+            "ratio": 4.86,
+            "size": "15.4px",
+            "weight": "400"
+          },
+          {
+            "sel": ".score-reason",
+            "color": "rgb(14, 17, 22)",
+            "bg": "rgb(255, 255, 255)",
+            "ratio": 18.91,
+            "size": "15.4px",
+            "weight": "400"
+          },
+          {
+            "sel": ".card-name",
+            "color": "rgb(14, 17, 22)",
+            "bg": "rgb(255, 255, 255)",
+            "ratio": 18.91,
+            "size": "19.8px",
+            "weight": "600"
+          },
+          {
+            "sel": ".card-sub",
+            "color": "rgb(74, 84, 100)",
+            "bg": "rgb(255, 255, 255)",
+            "ratio": 7.65,
+            "size": "14.3px",
+            "weight": "400"
+          }
+        ],
+        "cards": 29
+      },
+      "iphone13-detail": {
+        "scrollWidth": 390,
+        "floats": [
+          {
+            "name": "sticky-bar",
+            "left": 13,
+            "right": 13,
+            "centreOffset": 0,
+            "bottomGap": 100
+          },
+          {
+            "name": "bottom-nav",
+            "left": 13,
+            "right": 13,
+            "centreOffset": 0,
+            "bottomGap": 13
+          }
+        ],
+        "facts": 11,
+        "why": 3,
+        "history": 3,
+        "stickyInsideScreen": false,
+        "safeArea": "8.8px",
+        "stickyBottom": "100px"
+      },
+      "iphone13-sheet": {
+        "sheetHeight": 576,
+        "sheetBottom": 844,
+        "saveY": 772,
+        "saveH": 55,
+        "chips": 7,
+        "navUnderSheet": false,
+        "vh": 844
+      },
+      "iphone13-sheet-keyboard": {
+        "hasInput": false,
+        "before": 844,
+        "after": 844
+      },
+      "pixel7-today": {
+        "vw": 412,
+        "vh": 915,
+        "scrollWidth": 412,
+        "visualScale": 1,
+        "sections": [
+          "top-bar",
+          "heading",
+          "hero",
+          "summary",
+          "segmented",
+          "cards",
+          "nav"
+        ],
+        "floats": [
+          {
+            "name": "bottom-nav",
+            "left": 13,
+            "right": 13,
+            "width": 386,
+            "centreOffset": 0,
+            "pos": "fixed",
+            "hasFloat": true
+          }
+        ],
+        "wide": [],
+        "contrast": [
+          {
+            "sel": ".today-date",
+            "color": "rgba(255, 255, 255, 0.85)",
+            "bg": "gradient",
+            "ratio": 4.86,
+            "size": "13.2px",
+            "weight": "400"
+          },
+          {
+            "sel": ".today-sub",
+            "color": "rgba(255, 255, 255, 0.85)",
+            "bg": "gradient",
+            "ratio": 4.86,
+            "size": "15.4px",
+            "weight": "400"
+          },
+          {
+            "sel": ".score-reason",
+            "color": "rgb(14, 17, 22)",
+            "bg": "rgb(255, 255, 255)",
+            "ratio": 18.91,
+            "size": "15.4px",
+            "weight": "400"
+          },
+          {
+            "sel": ".card-name",
+            "color": "rgb(14, 17, 22)",
+            "bg": "rgb(255, 255, 255)",
+            "ratio": 18.91,
+            "size": "19.8px",
+            "weight": "600"
+          },
+          {
+            "sel": ".card-sub",
+            "color": "rgb(74, 84, 100)",
+            "bg": "rgb(255, 255, 255)",
+            "ratio": 7.65,
+            "size": "14.3px",
+            "weight": "400"
+          }
+        ],
+        "cards": 29
+      },
+      "pixel7-detail": {
+        "scrollWidth": 412,
+        "floats": [
+          {
+            "name": "sticky-bar",
+            "left": 13,
+            "right": 13,
+            "centreOffset": 0,
+            "bottomGap": 100
+          },
+          {
+            "name": "bottom-nav",
+            "left": 13,
+            "right": 13,
+            "centreOffset": 0,
+            "bottomGap": 13
+          }
+        ],
+        "facts": 11,
+        "why": 3,
+        "history": 3,
+        "stickyInsideScreen": false,
+        "safeArea": "8.8px",
+        "stickyBottom": "100px"
+      },
+      "pixel7-sheet": {
+        "sheetHeight": 576,
+        "sheetBottom": 915,
+        "saveY": 843,
+        "saveH": 55,
+        "chips": 7,
+        "navUnderSheet": false,
+        "vh": 915
+      },
+      "pixel7-sheet-keyboard": {
+        "hasInput": false,
+        "before": 915,
+        "after": 915
+      },
+      "small-android-today": {
+        "vw": 360,
+        "vh": 640,
+        "scrollWidth": 360,
+        "visualScale": 1,
+        "sections": [
+          "top-bar",
+          "heading",
+          "hero",
+          "summary",
+          "segmented",
+          "cards",
+          "nav"
+        ],
+        "floats": [
+          {
+            "name": "bottom-nav",
+            "left": 13,
+            "right": 13,
+            "width": 334,
+            "centreOffset": 0,
+            "pos": "fixed",
+            "hasFloat": true
+          }
+        ],
+        "wide": [],
+        "contrast": [
+          {
+            "sel": ".today-date",
+            "color": "rgba(255, 255, 255, 0.85)",
+            "bg": "gradient",
+            "ratio": 4.86,
+            "size": "13.2px",
+            "weight": "400"
+          },
+          {
+            "sel": ".today-sub",
+            "color": "rgba(255, 255, 255, 0.85)",
+            "bg": "gradient",
+            "ratio": 4.86,
+            "size": "15.4px",
+            "weight": "400"
+          },
+          {
+            "sel": ".score-reason",
+            "color": "rgb(14, 17, 22)",
+            "bg": "rgb(255, 255, 255)",
+            "ratio": 18.91,
+            "size": "15.4px",
+            "weight": "400"
+          },
+          {
+            "sel": ".card-name",
+            "color": "rgb(14, 17, 22)",
+            "bg": "rgb(255, 255, 255)",
+            "ratio": 18.91,
+            "size": "19.8px",
+            "weight": "600"
+          },
+          {
+            "sel": ".card-sub",
+            "color": "rgb(74, 84, 100)",
+            "bg": "rgb(255, 255, 255)",
+            "ratio": 7.65,
+            "size": "14.3px",
+            "weight": "400"
+          }
+        ],
+        "cards": 29
+      },
+      "small-android-detail": {
+        "scrollWidth": 360,
+        "floats": [
+          {
+            "name": "sticky-bar",
+            "left": 13,
+            "right": 13,
+            "centreOffset": 0,
+            "bottomGap": 100
+          },
+          {
+            "name": "bottom-nav",
+            "left": 13,
+            "right": 13,
+            "centreOffset": 0,
+            "bottomGap": 13
+          }
+        ],
+        "facts": 11,
+        "why": 3,
+        "history": 3,
+        "stickyInsideScreen": false,
+        "safeArea": "8.8px",
+        "stickyBottom": "100px"
+      },
+      "small-android-sheet": {
+        "sheetHeight": 576,
+        "sheetBottom": 640,
+        "saveY": 568,
+        "saveH": 55,
+        "chips": 7,
+        "navUnderSheet": false,
+        "vh": 640
+      },
+      "small-android-sheet-keyboard": {
+        "hasInput": false,
+        "before": 640,
+        "after": 640
+      },
+      "desktop-today": {
+        "vw": 1280,
+        "vh": 800,
+        "scrollWidth": 1280,
+        "visualScale": 1,
+        "sections": [
+          "top-bar",
+          "heading",
+          "hero",
+          "summary",
+          "segmented",
+          "cards",
+          "nav"
+        ],
+        "floats": [
+          {
+            "name": "bottom-nav",
+            "left": 13,
+            "right": 13,
+            "width": 1254,
+            "centreOffset": 0,
+            "pos": "fixed",
+            "hasFloat": true
+          }
+        ],
+        "wide": [],
+        "contrast": [
+          {
+            "sel": ".today-date",
+            "color": "rgba(255, 255, 255, 0.85)",
+            "bg": "gradient",
+            "ratio": 4.86,
+            "size": "13.2px",
+            "weight": "400"
+          },
+          {
+            "sel": ".today-sub",
+            "color": "rgba(255, 255, 255, 0.85)",
+            "bg": "gradient",
+            "ratio": 4.86,
+            "size": "15.4px",
+            "weight": "400"
+          },
+          {
+            "sel": ".score-reason",
+            "color": "rgb(14, 17, 22)",
+            "bg": "rgb(255, 255, 255)",
+            "ratio": 18.91,
+            "size": "15.4px",
+            "weight": "400"
+          },
+          {
+            "sel": ".card-name",
+            "color": "rgb(14, 17, 22)",
+            "bg": "rgb(255, 255, 255)",
+            "ratio": 18.91,
+            "size": "19.8px",
+            "weight": "600"
+          },
+          {
+            "sel": ".card-sub",
+            "color": "rgb(74, 84, 100)",
+            "bg": "rgb(255, 255, 255)",
+            "ratio": 7.65,
+            "size": "14.3px",
+            "weight": "400"
+          }
+        ],
+        "cards": 29
+      },
+      "desktop-detail": {
+        "scrollWidth": 1280,
+        "floats": [
+          {
+            "name": "sticky-bar",
+            "left": 13,
+            "right": 13,
+            "centreOffset": 0,
+            "bottomGap": 100
+          },
+          {
+            "name": "bottom-nav",
+            "left": 13,
+            "right": 13,
+            "centreOffset": 0,
+            "bottomGap": 13
+          }
+        ],
+        "facts": 11,
+        "why": 3,
+        "history": 3,
+        "stickyInsideScreen": false,
+        "safeArea": "8.8px",
+        "stickyBottom": "100px"
+      },
+      "desktop-sheet": {
+        "sheetHeight": 576,
+        "sheetBottom": 800,
+        "saveY": 728,
+        "saveH": 55,
+        "chips": 7,
+        "navUnderSheet": false,
+        "vh": 800
+      },
+      "desktop-sheet-keyboard": {
+        "hasInput": false,
+        "before": 800,
+        "after": 800
+      },
+      "desktop-dashboard": {
+        "scrollWidth": 1280,
+        "vw": 1280,
+        "tiles": 5,
+        "heroTiles": 3,
+        "officers": 44,
+        "greyed": 4,
+        "seg": [
+          "Overview",
+          "Import",
+          "Activity"
+        ]
+      },
+      "pixel7-landscape-today": {
+        "vw": 915,
+        "vh": 412,
+        "scrollWidth": 915,
+        "visualScale": 1,
+        "sections": [
+          "top-bar",
+          "heading",
+          "hero",
+          "summary",
+          "segmented",
+          "cards",
+          "nav"
+        ],
+        "floats": [
+          {
+            "name": "bottom-nav",
+            "left": 13,
+            "right": 13,
+            "width": 889,
+            "centreOffset": 0,
+            "pos": "fixed",
+            "hasFloat": true
+          }
+        ],
+        "wide": [],
+        "contrast": [
+          {
+            "sel": ".today-date",
+            "color": "rgba(255, 255, 255, 0.85)",
+            "bg": "gradient",
+            "ratio": 4.86,
+            "size": "13.2px",
+            "weight": "400"
+          },
+          {
+            "sel": ".today-sub",
+            "color": "rgba(255, 255, 255, 0.85)",
+            "bg": "gradient",
+            "ratio": 4.86,
+            "size": "15.4px",
+            "weight": "400"
+          },
+          {
+            "sel": ".score-reason",
+            "color": "rgb(14, 17, 22)",
+            "bg": "rgb(255, 255, 255)",
+            "ratio": 18.91,
+            "size": "15.4px",
+            "weight": "400"
+          },
+          {
+            "sel": ".card-name",
+            "color": "rgb(14, 17, 22)",
+            "bg": "rgb(255, 255, 255)",
+            "ratio": 18.91,
+            "size": "19.8px",
+            "weight": "600"
+          },
+          {
+            "sel": ".card-sub",
+            "color": "rgb(74, 84, 100)",
+            "bg": "rgb(255, 255, 255)",
+            "ratio": 7.65,
+            "size": "14.3px",
+            "weight": "400"
+          }
+        ],
+        "cards": 29
+      },
+      "pixel7-landscape-detail": {
+        "scrollWidth": 915,
+        "floats": [
+          {
+            "name": "sticky-bar",
+            "left": 13,
+            "right": 13,
+            "centreOffset": 0,
+            "bottomGap": 100
+          },
+          {
+            "name": "bottom-nav",
+            "left": 13,
+            "right": 13,
+            "centreOffset": 0,
+            "bottomGap": 13
+          }
+        ],
+        "facts": 11,
+        "why": 3,
+        "history": 3,
+        "stickyInsideScreen": false,
+        "safeArea": "8.8px",
+        "stickyBottom": "100px"
+      },
+      "pixel7-landscape-sheet": {
+        "sheetHeight": 576,
+        "sheetBottom": 412,
+        "saveY": 340,
+        "saveH": 55,
+        "chips": 7,
+        "navUnderSheet": false,
+        "vh": 412
+      },
+      "pixel7-landscape-sheet-keyboard": {
+        "hasInput": false,
+        "before": 412,
+        "after": 412
+      },
+      "pixel7-landscape-dashboard": {
+        "scrollWidth": 915,
+        "vw": 915,
+        "tiles": 5,
+        "heroTiles": 3,
+        "officers": 44,
+        "greyed": 4,
+        "seg": [
+          "Overview",
+          "Import",
+          "Activity"
+        ]
+      }
+    },
+    "network": {
+      "iphone-se": {
+        "failed": [],
+        "slow": [],
+        "apiTimings": [
+          {
+            "url": "/api/me/promises",
+            "ms": -1794160183294,
+            "status": null
+          },
+          {
+            "url": "/api/me/assignments",
+            "ms": -1794160183295,
+            "status": null
+          },
+          {
+            "url": "/api/me/promises",
+            "ms": -1794160187876,
+            "status": null
+          }
+        ]
+      },
+      "iphone13": {
+        "failed": [],
+        "slow": [],
+        "apiTimings": [
+          {
+            "url": "/api/me/assignments",
+            "ms": -1794160191727,
+            "status": null
+          },
+          {
+            "url": "/api/me/promises",
+            "ms": -1794160191724,
+            "status": null
+          },
+          {
+            "url": "/api/me/promises",
+            "ms": -1794160196384,
+            "status": null
+          }
+        ]
+      },
+      "pixel7": {
+        "failed": [],
+        "slow": [],
+        "apiTimings": [
+          {
+            "url": "/api/me/assignments",
+            "ms": -1794160200379,
+            "status": null
+          },
+          {
+            "url": "/api/me/promises",
+            "ms": -1794160200377,
+            "status": null
+          },
+          {
+            "url": "/api/me/promises",
+            "ms": -1794160205242,
+            "status": null
+          }
+        ]
+      },
+      "small-android": {
+        "failed": [],
+        "slow": [],
+        "apiTimings": [
+          {
+            "url": "/api/me/assignments",
+            "ms": -1794160208990,
+            "status": null
+          },
+          {
+            "url": "/api/me/promises",
+            "ms": -1794160208711,
+            "status": null
+          },
+          {
+            "url": "/api/me/promises",
+            "ms": -1794160213534,
+            "status": null
+          }
+        ]
+      },
+      "desktop": {
+        "failed": [],
+        "slow": [],
+        "apiTimings": [
+          {
+            "url": "/api/me/assignments",
+            "ms": -1794160217189,
+            "status": null
+          },
+          {
+            "url": "/api/me/promises",
+            "ms": -1794160216940,
+            "status": null
+          },
+          {
+            "url": "/api/me/promises",
+            "ms": -1794160221554,
+            "status": null
+          },
+          {
+            "url": "/api/manager/dashboard",
+            "ms": -1794160222990,
+            "status": null
+          }
+        ]
+      },
+      "pixel7-landscape": {
+        "failed": [],
+        "slow": [],
+        "apiTimings": [
+          {
+            "url": "/api/me/promises",
+            "ms": -1794160229039,
+            "status": null
+          },
+          {
+            "url": "/api/me/assignments",
+            "ms": -1794160228639,
+            "status": null
+          },
+          {
+            "url": "/api/me/promises",
+            "ms": -1794160233717,
+            "status": null
+          },
+          {
+            "url": "/api/manager/dashboard",
+            "ms": -1794160235620,
+            "status": null
+          }
+        ]
+      }
+    },
+    "security": {
+      "headers": {
+        "accept-ranges": "bytes",
+        "access-control-allow-origin": "*",
+        "age": "137",
+        "cache-control": "public, max-age=0, must-revalidate",
+        "content-disposition": "inline",
+        "content-length": "591",
+        "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+        "content-type": "text/html; charset=utf-8",
+        "date": "Sun, 08 Nov 2026 17:49:38 GMT",
+        "etag": "\"19b9d0f943efab9a26b9a7b4285ff396\"",
+        "last-modified": "Sun, 08 Nov 2026 17:47:20 GMT",
+        "permissions-policy": "geolocation=(self), camera=(), microphone=()",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "server": "Vercel",
+        "strict-transport-security": "max-age=31536000; includeSubDomains",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "x-vercel-cache": "HIT",
+        "x-vercel-id": "bom1::xv25z-1794160178165-02834a752807"
+      },
+      "themeColor": "#0f5f5c",
+      "viewport": "width=device-width, initial-scale=1, viewport-fit=cover",
+      "title": "Field Collections",
+      "manifest": {
+        "name": "Field Collections",
+        "theme_color": "#0f5f5c",
+        "background_color": "#f7f8fa",
+        "display": "standalone",
+        "icons": [
+          "192x192 image/png pwa-192.png",
+          "512x512 image/png pwa-512.png"
+        ]
+      },
+      "serviceWorker": {
+        "status": 200,
+        "size": 2235
+      },
+      "loginErrorKnown": {
+        "status": 401,
+        "body": {
+          "error": "wrong username or PIN"
+        }
+      },
+      "loginErrorUnknown": {
+        "status": 401,
+        "body": {
+          "error": "wrong username or PIN"
+        }
+      },
+      "rateLimit": {
+        "attempt": 1,
+        "retryAfter": "778"
+      },
+      "crossOfficerLoan": {
+        "status": 404,
+        "loan": "LN-10871"
+      },
+      "bundleLeaks": []
+    },
+    "console": {
+      "iphone-se": [
+        "error: Failed to load resource: the server responded with a status of 401 ()"
+      ],
+      "iphone13": [
+        "error: Failed to load resource: the server responded with a status of 401 ()"
+      ],
+      "pixel7": [
+        "error: Failed to load resource: the server responded with a status of 401 ()"
+      ],
+      "small-android": [
+        "error: Failed to load resource: the server responded with a status of 401 ()"
+      ],
+      "desktop": [
+        "error: Failed to load resource: the server responded with a status of 401 ()"
+      ],
+      "pixel7-landscape": [
+        "error: Failed to load resource: the server responded with a status of 401 ()"
+      ]
+    },
+    "notes": [
+      {
+        "offline": {
+          "swState1": {
+            "scope": "https://isocode-swe-assignment.vercel.app/",
+            "active": true
+          },
+          "offlineState": {
+            "url": "/loans/LN-11009",
+            "hasContent": true
+          },
+          "queuedOffline": "error: TimeoutError: locator.click: Timeout 8000ms exceeded.\nCall log:\n  - waiting for locator('button.stic",
+          "syncState": {
+            "syncText": false,
+            "pending": null
+          }
+        }
+      }
+    ]
+  }
+}
