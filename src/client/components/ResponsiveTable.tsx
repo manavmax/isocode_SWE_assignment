@@ -31,6 +31,10 @@ export type PhoneCard = {
   name: ReactNode;
   /** The key number — large and right-aligned. */
   keyNum: ReactNode;
+  /** 32/600 key number variant (prompt 21 officer roll %). */
+  keyLarge?: boolean;
+  /** Optional thin dot bar under the top row (prompt 21). */
+  gauge?: ReactNode;
   /** 2-3 small chips for the remaining fields. */
   chips: ReactNode[];
   /** Optional full-width action row (button / link). */
@@ -54,8 +58,9 @@ export function ResponsiveTable({ headers, rows, cards, dataSection }: {
           <div key={card.key} className={`card phone-card${card.greyed ? ' lane-low' : ''}`}>
             <div className="phone-card-top">
               <span className="phone-card-name">{card.name}</span>
-              <span className="phone-card-key num">{card.keyNum}</span>
+              <span className={`phone-card-key num${card.keyLarge ? ' phone-card-key-lg' : ''}`}>{card.keyNum}</span>
             </div>
+            {card.gauge ? <div className="phone-card-gauge">{card.gauge}</div> : null}
             <div className="phone-card-chips">
               {card.chips.map((chip, index) => (
                 <span key={index} className="phone-chip">{chip}</span>

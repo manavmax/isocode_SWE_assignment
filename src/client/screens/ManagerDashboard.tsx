@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { api, type ManagerDashboardDto } from '../api.js';
 import { formatDayMonth, formatMoneyShort } from '../format.js';
 import { ErrorState, SkeletonList } from '../components/States.js';
+import { DotGrid } from '../components/DotGrid.js';
 import { ResponsiveTable } from '../components/ResponsiveTable.js';
 
 /**

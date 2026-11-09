@@ -130,7 +130,9 @@ dashboard, never in the repo. `.env.example` mirrors this table.
 
 ## Smoke checklist
 
-`pnpm smoke:live https://isocode-swe-assignment.vercel.app` — 19 checks:
+The script currently makes 24 assertions on the successful seeded demo path. This includes five separate checks across the HTML shell, JavaScript asset, API health route and service worker headers and cache policy. Conditional failure branches are reported separately when a prerequisite is missing.
+
+`pnpm smoke:live https://isocode-swe-assignment.vercel.app` — 24 success path assertions:
 security headers, health, demo accounts, officer login, promises (three
 sections), assignments scoring (mode + exactly 3 top reasons), officer
 403 on manager endpoints, manager login, dashboard, queue, batches, pin +
@@ -165,3 +167,12 @@ same as-of (same bytes = no-op, different bytes = replace with recompute).
 | `403` on manager endpoints as an officer | by design (SPEC 16) | log in as `demo-manager` |
 | Login says "wrong username or PIN" unexpectedly | `DEMO_MODE` unset on that deployment blocks demo accounts (A31) | set `DEMO_MODE=true` and redeploy |
 | `503 degraded` on everything | `DATABASE_URL` missing/mis-set in the environment | check the dashboard values; `GET /api/health` shows `db: error` |
+
+
+## Latest repository verification
+
+The latest inspected GitHub Actions run is run 32, dated 9 November 2026. It completed successfully on the main branch. The run passed `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm check:api` and Gitleaks. Vitest reported 626 passing tests across 62 test files.
+
+Run details: https://github.com/manavmax/isocode_SWE_assignment/actions/runs/42593911874
+
+The test count is tied to that inspected run and may change as the repository evolves. The GitHub Actions run is the authoritative record for the exact commit tested.
