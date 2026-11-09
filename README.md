@@ -16,21 +16,21 @@ The live environment is a demonstration using synthetic data only. It is not con
 
 The officer starts with a short, prioritised worklist. Each loan shows its DPD bucket, overdue amount, priority band and the most useful reason for its position. The loan detail view explains the top three score contributions and keeps Call, Map and Log outcome actions within reach.
 
-![Officer worklist]
+<img width="1536" height="1024" alt="Field Collections App Showcase" src="https://github.com/user-attachments/assets/91d63bb9-bce9-4460-897a-8fc96ff00643" />
 
-![Loan detail]
 
 ### Outcome capture
 
 Officers can record a call or visit as paid, promise to pay, not reachable, dispute or another supported outcome. Promise details are validated before saving. GPS is captured when available, but a weak signal or unavailable location does not prevent the officer from recording the event.
 
-![Outcome capture]
+<img width="1536" height="1024" alt="Modern Purple Mobile Dashboard Showcase" src="https://github.com/user-attachments/assets/07997a95-dbbc-4f03-8153-2db9bc8550e5" />
 
 ### Manager workspace
 
 Branch managers can import the daily overdue file, inspect assignment results and data quality exceptions, review count and balance based roll rates, monitor broken promises and inspect officer activity.
 
-![Manager dashboard](docs/screens/manager-dashboard-desktop.png)
+<img width="1469" height="835" alt="Screenshot 2026-11-09 at 10 39 06 PM" src="https://github.com/user-attachments/assets/9259a0ba-c7f5-4b79-9ef4-042a274945c8" />
+
 
 ## Try the demonstration
 
