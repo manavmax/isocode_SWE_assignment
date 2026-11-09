@@ -16,7 +16,7 @@ const BASE = process.env.QA_BASE ?? 'https://isocode-swe-assignment.vercel.app';
 const MODE = process.env.OFFLINE_PROBE_MODE ?? 'live'; // 'live' | 'local'
 
 function start(cmd, args, env, waitText) {
-  const child = spawn(cmd, args, { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(cmd, args, { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   let log = '';
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`timeout waiting for ${cmd}: ${log}`)), 30000);
@@ -39,8 +39,12 @@ if (MODE === 'local') {
   vite = await start('pnpm', ['dev'], {}, 'Local:');
 }
 function cleanup() {
-  if (api) try { api.kill('SIGKILL'); } catch {}
-  if (vite) try { vite.kill('SIGKILL'); } catch {}
+  // kill the whole process group: `pnpm dev` wraps vite, and killing pnpm
+  // alone orphans vite on :5173 — a stale server then poisons the next run
+  for (const child of [api, vite]) {
+    if (!child) continue;
+    try { process.kill(-child.pid, 'SIGKILL'); } catch {}
+  }
 }
 process.on('uncaughtException', (err) => { console.error(err); cleanup(); process.exit(1); });
 process.on('unhandledRejection', (err) => { console.error(err); cleanup(); process.exit(1); });

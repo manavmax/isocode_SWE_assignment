@@ -7,7 +7,7 @@ const OUT = 'docs/screens';
 mkdirSync(OUT, { recursive: true });
 
 function start(cmd, args, env, waitText, port) {
-  const child = spawn(cmd, args, { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(cmd, args, { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   let log = '';
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`timeout waiting for ${cmd}: ${log}`)), 30000);
@@ -30,8 +30,11 @@ const vite = await start('pnpm', ['dev'], {}, 'Local:', 5173);
 // Never leave orphan servers behind on a crash (they poison the next run's
 // ports 5173/8787).
 function cleanup() {
-  try { api.kill('SIGKILL'); } catch {}
-  try { vite.kill('SIGKILL'); } catch {}
+  // kill the whole process group: `pnpm dev` wraps vite, and killing pnpm
+  // alone orphans vite on :5173 — a stale server then poisons the next run
+  for (const child of [api, vite]) {
+    try { process.kill(-child.pid, 'SIGKILL'); } catch {}
+  }
 }
 process.on('uncaughtException', (err) => {
   console.error(err);

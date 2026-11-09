@@ -4,7 +4,7 @@ import { chromium } from '@playwright/test';
 const BASE = 'http://localhost:5173';
 
 function start(cmd, args, env, waitText) {
-  const child = spawn(cmd, args, { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(cmd, args, { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   let log = '';
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`timeout waiting for ${cmd}: ${log}`)), 30000);
@@ -26,8 +26,11 @@ const vite = await start('pnpm', ['dev'], {}, 'Local:');
 // Never leave orphan servers behind on a crash (they poison the next run's
 // ports 5173/8787).
 function cleanup() {
-  try { api.kill('SIGKILL'); } catch {}
-  try { vite.kill('SIGKILL'); } catch {}
+  // kill the whole process group: `pnpm dev` wraps vite, and killing pnpm
+  // alone orphans vite on :5173 — a stale server then poisons the next run
+  for (const child of [api, vite]) {
+    try { process.kill(-child.pid, 'SIGKILL'); } catch {}
+  }
 }
 process.on('uncaughtException', (err) => {
   console.error(err);
@@ -66,8 +69,17 @@ async function auditFloatOverlap(name, page) {
   for (const [width, height] of [[360, 640], [390, 844]]) {
     await page.setViewportSize({ width, height });
     await page.waitForTimeout(250);
-    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-    await page.waitForTimeout(400);
+    // Re-scroll while late fetches still grow the page (assignments,
+    // promises): a single scroll can leave the viewport above the real end.
+    for (let settle = 0; settle < 5; settle += 1) {
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      await page.waitForTimeout(400);
+      const atEnd = await page.evaluate(() => {
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        return window.scrollY >= max - 2;
+      });
+      if (atEnd) break;
+    }
     const result = await page.evaluate(() => {
       const rect = (el) => el.getBoundingClientRect();
       const floats = [...document.querySelectorAll('[data-float], .bottom-nav')].filter((el) => {

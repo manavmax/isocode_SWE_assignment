@@ -21,7 +21,7 @@ const OUT = 'docs/screens/mobile';
 mkdirSync(OUT, { recursive: true });
 
 function start(cmd, args, env, waitText) {
-  const child = spawn(cmd, args, { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(cmd, args, { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   let log = '';
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`timeout waiting for ${cmd}: ${log}`)), 30000);
@@ -41,8 +41,11 @@ const api = await start('node', ['--env-file=.env', 'scripts/dev-api.mjs'], {}, 
 const vite = await start('pnpm', ['dev'], {}, 'Local:');
 
 function cleanup() {
-  try { api.kill('SIGKILL'); } catch {}
-  try { vite.kill('SIGKILL'); } catch {}
+  // kill the whole process group: `pnpm dev` wraps vite, and killing pnpm
+  // alone orphans vite on :5173 — a stale server then poisons the next run
+  for (const child of [api, vite]) {
+    try { process.kill(-child.pid, 'SIGKILL'); } catch {}
+  }
 }
 process.on('uncaughtException', (err) => {
   console.error(err);
@@ -105,9 +108,17 @@ async function auditScreen(page, screen, deviceName) {
     if (f.centreOffset > 2) failures.push(`${f.name} off-centre by ${f.centreOffset.toFixed(1)}px`);
   }
 
-  // 4. scroll to the bottom; the last card must clear the floating chrome
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  await page.waitForTimeout(500);
+  // 4. scroll to the bottom; the last card must clear the floating chrome.
+  // Re-scroll while late fetches still grow the page (batches, queue).
+  for (let settle = 0; settle < 5; settle += 1) {
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await page.waitForTimeout(400);
+    const atEnd = await page.evaluate(() => {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      return window.scrollY >= max - 2;
+    });
+    if (atEnd) break;
+  }
   const overlap = await page.evaluate(() => {
     const floats = [...document.querySelectorAll('.bottom-nav, .sticky-bar')].map((el) => el.getBoundingClientRect());
     const sections = [...document.querySelectorAll('[data-section]')].filter(
@@ -191,10 +202,15 @@ async function auditScreen(page, screen, deviceName) {
 
   // 8. shell bottom (prompt 20 item 9): page grey to the bottom, nothing
   // paints below the floating nav, no control covered by the floating
-  // chrome at scroll end (the viewport is scrolled to the end by check 4)
+  // chrome at scroll end (the viewport is scrolled to the end by check 4).
+  // Skipped while a modal sheet owns the bottom: the nav is hidden by
+  // design then (display:none), and a zero rect would flag every element.
   const shell = await page.evaluate(() => {
     const nav = document.querySelector('.bottom-nav');
-    const navRect = nav?.getBoundingClientRect();
+    if (!nav || getComputedStyle(nav).display === 'none') {
+      return { skip: true, bodyBg: getComputedStyle(document.body).backgroundColor, band: [], covered: [] };
+    }
+    const navRect = nav.getBoundingClientRect();
     const band = [];
     for (const el of document.querySelectorAll('body *')) {
       const rect = el.getBoundingClientRect();
@@ -220,9 +236,11 @@ async function auditScreen(page, screen, deviceName) {
       covered: covered.slice(0, 4)
     };
   });
-  if (shell.bodyBg !== 'rgb(238, 240, 243)') failures.push(`body background ${shell.bodyBg} is not the page grey`);
-  for (const b of shell.band) failures.push(`element paints below the floating nav: ${b}`);
-  for (const c of shell.covered) failures.push(`floating chrome covers a control at scroll end: ${c}`);
+  if (!shell.skip) {
+    if (shell.bodyBg !== 'rgb(238, 240, 243)') failures.push(`body background ${shell.bodyBg} is not the page grey`);
+    for (const b of shell.band) failures.push(`element paints below the floating nav: ${b}`);
+    for (const c of shell.covered) failures.push(`floating chrome covers a control at scroll end: ${c}`);
+  }
 
   // 9. nothing clips inside a card (prompt 20 item 6)
   const clipped = await page.evaluate(() => {
@@ -315,7 +333,8 @@ for (const [deviceName, device] of DEVICE_LIST) {
   await page.fill('#pin', '1234');
   await page.getByRole('button', { name: /Sign in|साइन इन/ }).click();
   await page.waitForURL('**/dashboard', { timeout: 30000 });
-  await page.waitForSelector('.manager-table', { timeout: 60000 });
+  // phones render row cards (.phone-cards), desktop keeps tables
+  await page.waitForSelector('.manager-table, .phone-cards', { timeout: 60000 });
   await page.waitForTimeout(400);
   await auditScreen(page, 'dashboard', deviceName);
 
@@ -325,6 +344,17 @@ for (const [deviceName, device] of DEVICE_LIST) {
 
   await page.locator('nav.bottom-nav').getByRole('button', { name: 'Import' }).click();
   await page.waitForTimeout(800);
+  // the batches fetch resolves after the queue: wait until the section
+  // renders real rows (or its empty state), so the page stops growing
+  await page
+    .waitForFunction(
+      () => {
+        const el = document.querySelector('[data-section="batches"]');
+        return Boolean(el && el.querySelector('.phone-cards, .manager-table, .screen-subtitle'));
+      },
+      { timeout: 30000 }
+    )
+    .catch(() => {});
   await auditScreen(page, 'import', deviceName);
 
   await context.close();
