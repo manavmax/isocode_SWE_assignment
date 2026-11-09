@@ -471,6 +471,127 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   }
 }
 
+/* two-option segmented control (language switch, prompt 20 items 12/16) */
+.segment-row.segment-two {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* full-width secondary actions (Sync now, Upload, Log out) */
+.btn-block {
+  width: 100%;
+}
+
+/* Log out: full-width outline button, danger ink, clears the nav (item 12) */
+.logout-btn {
+  margin-top: var(--sp-6);
+  color: var(--status-danger);
+  border-color: var(--status-danger);
+}
+
+/* manager stat cards (prompt 20 item 15): half-width white cards */
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  padding: var(--sp-4);
+}
+
+.stat-card .stat-value {
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.stat-caption {
+  font-size: var(--font-size-12);
+  color: var(--text-secondary);
+}
+
+/* methodology disclosure (prompt 20 item 15): closed by default, 12px body */
+.how-disclosure {
+  margin-top: var(--sp-2);
+}
+
+.how-disclosure summary {
+  font-size: var(--font-size-12);
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  list-style-position: outside;
+}
+
+.how-disclosure .footnote {
+  margin-top: var(--sp-1);
+}
+
+/* import drop zone (prompt 20 item 13) */
+.import-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  flex: 1 1 100%;
+}
+
+.import-label-text {
+  font-size: var(--font-size-12);
+  color: var(--text-secondary);
+}
+
+.dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 96px;
+  border: 2px dashed var(--grey-300);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.dropzone-has-file {
+  border-style: solid;
+}
+
+.dropzone-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.dropzone-hint {
+  font-size: var(--font-size-16);
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.dropzone-file {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.dropzone-name {
+  font-size: var(--font-size-14);
+  font-weight: 600;
+}
+
+.dropzone-size {
+  font-size: var(--font-size-12);
+  color: var(--text-secondary);
+}
+
+
 /* ---------- bottom nav ---------- */
 
 [data-float].bottom-nav {
@@ -648,7 +769,8 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  margin: 0 calc(-1 * var(--sp-4)) var(--sp-4);
+  /* back button keeps 16px from the left edge (prompt 20 item 4) */
+  margin: 0 0 var(--sp-4);
 }
 
 .topbar-title {
@@ -744,11 +866,20 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   counter-reset: reason;
 }
 
+.score-panel {
+  padding: 20px;
+}
+
 .score-reasons li {
   counter-increment: reason;
-  padding: var(--sp-1) 0;
+  padding: 0;
   font-size: var(--font-size-16);
   list-style: none;
+}
+
+/* 12px gap between the numbered reasons (prompt 20 item 7) */
+.score-reasons li + li {
+  margin-top: var(--sp-3);
 }
 
 .score-reasons li::before {
@@ -1066,9 +1197,24 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   padding: var(--sp-4) 0;
 }
 
-.login-lang button[aria-pressed='true'] {
-  font-weight: 600;
-  color: var(--accent);
+/* centered app name + one-line tagline, form in one white card (item 16) */
+.login-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin: var(--sp-4) 0 var(--sp-2);
+}
+
+.login-tagline {
+  font-size: var(--font-size-14);
+  color: var(--text-secondary);
+  margin-top: var(--sp-1);
+}
+
+.login-card {
+  padding: 20px;
+  margin-bottom: var(--sp-4);
 }
 
 .field {
@@ -1372,7 +1518,7 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
 
 .dotcolumn-x span {
   flex: 1;
-  font-size: 11px;
+  font-size: var(--font-size-12);
   color: var(--text-secondary);
   text-align: center;
 }

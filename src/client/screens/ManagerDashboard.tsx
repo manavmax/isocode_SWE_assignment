@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { api, type ManagerDashboardDto } from '../api.js';
 import { formatDayMonth, formatMoneyShort } from '../format.js';
 import { ErrorState, SkeletonList } from '../components/States.js';
@@ -16,6 +16,17 @@ type Load = 'loading' | 'ready' | 'error';
 
 function pct(value: number | null): string {
   return value === null ? '—' : `${(100 * value).toFixed(1)}%`;
+}
+
+/** Collapsed methodology note (prompt 20 item 15): one "How this is
+ *  calculated" disclosure per card, closed by default, 12px body. */
+function HowCalc({ children }: { children: ReactNode }) {
+  return (
+    <details className="how-disclosure">
+      <summary>How this is calculated</summary>
+      <p className="footnote">{children}</p>
+    </details>
+  );
 }
 
 /** Dot-column trend (prompt 20 item 5): the last 12 COMPLETED windows, one
@@ -167,34 +178,38 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
                 <span className="tile-label">{data.openBrokenPromises} open broken</span>
               </div>
             </div>
-            <div className="tile-grid">
-              <div className="tile">
-                <span className="tile-value num">{data.queueCount}</span>
+            <div className="stat-cards">
+              <div className="stat-card">
                 <span className="tile-label">Queued loans (branch)</span>
+                <span className="stat-value num">{data.queueCount}</span>
+                <span className="stat-caption">Loans parked for a data fix — unmapped pincode, or no phone and no address.</span>
+                <HowCalc>Queue = branch loans with status &lsquo;queue&rsquo;: the daily import could not assign them to an officer (unmapped pincode, or no phone AND no address). Synthetic data.</HowCalc>
               </div>
-              <div className="tile">
-                <span className="tile-value num">{data.blockedAttempts30d}</span>
+              <div className="stat-card">
                 <span className="tile-label">Blocked attempts, 30 days</span>
+                <span className="stat-value num">{data.blockedAttempts30d}</span>
+                <span className="stat-caption">Contact attempts outside the 08:00&ndash;19:00 IST window &mdash; recorded, never sent.</span>
+                <HowCalc>Count of BLOCKED contact events on branch loans in the last 30 IST days (SPEC 7: a violation is recorded, never discarded). Synthetic data.</HowCalc>
               </div>
             </div>
             </>
           )}
-          <p className="footnote">
+          <HowCalc>
             {data.tiles
               ? `Counts: ${data.tiles.rolledN} rolled of ${data.tiles.cohortN} cohort loans. Balances: ${formatMoneyShort(data.tiles.rolledAmt)} rolled of ${formatMoneyShort(data.tiles.cohortAmt)}. Wilson 95%: ${data.tiles.wilson ? `${pct(data.tiles.wilson.low)}–${pct(data.tiles.wilson.high)}` : 'n/a'}. ${footnote}`
               : footnote}
-          </p>
+          </HowCalc>
 
           <section className="panel detail-card" data-section="chart">
             <h2 className="panel-title">Roll-rate trend ({data.trendWindowsAvailable} completed windows)</h2>
             <DotColumnChart trend={data.trend} />
-            <p className="footnote">{footnote}</p>
+            <HowCalc>{footnote}</HowCalc>
           </section>
 
           <section className="panel detail-card">
             <h2 className="panel-title">Migration table (latest completed window)</h2>
             <MigrationBars rows={data.migrationTable} />
-            <p className="footnote">Rows: opening DPD bucket at the window start. Shares of the opening cohort: cured (left the book or DPD 0), stayed (same bucket), rolled (next bucket up). Sum to 1 per row. Synthetic data.</p>
+            <HowCalc>Rows: opening DPD bucket at the window start. Shares of the opening cohort: cured (left the book or DPD 0), stayed (same bucket), rolled (next bucket up). Sum to 1 per row. Synthetic data.</HowCalc>
           </section>
 
           <section className="panel detail-card" data-section="tables">
@@ -231,7 +246,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
                 ))}
               </tbody>
             </table>
-            <p className="footnote">Greyed rows have n &lt; 30 (SPEC 13). Kept rate = kept / (kept + broken + broken_part) over the officer's own promises. Workload = currently assigned overdue loans. Synthetic data.</p>
+            <HowCalc>Greyed rows have n &lt; 30 (SPEC 13). Kept rate = kept / (kept + broken + broken_part) over the officer's own promises. Workload = currently assigned overdue loans. Synthetic data.</HowCalc>
           </section>
 
           <section className="panel detail-card">
@@ -268,7 +283,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
                 </tbody>
               </table>
             )}
-            <p className="footnote">Amount = the promised amount (paise to lakh/crore). Age = days since the break was recorded. Pin sends the loan to the top of its officer's Today list. Synthetic data.</p>
+            <HowCalc>Amount = the promised amount (paise to lakh/crore). Age = days since the break was recorded. Pin sends the loan to the top of its officer's Today list. Synthetic data.</HowCalc>
           </section>
 
           <section className="panel detail-card">
@@ -305,7 +320,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
                 </tbody>
               </table>
             )}
-            <p className="footnote">Numerator: branch loans 25–30 DPD with no open promise and no CALL/VISIT/MESSAGE in the last 5 IST days. Denominator: the branch overdue book. Synthetic data.</p>
+            <HowCalc>Numerator: branch loans 25–30 DPD with no open promise and no CALL/VISIT/MESSAGE in the last 5 IST days. Denominator: the branch overdue book. Synthetic data.</HowCalc>
           </section>
 
           <section className="panel detail-card">
@@ -338,7 +353,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
                 </tbody>
               </table>
             )}
-            <p className="footnote">Broken promises 2+ days past their deadline with no officer contact since the break (A62). Read-only here; the escalation ladder lives with the officer. Synthetic data.</p>
+            <HowCalc>Broken promises 2+ days past their deadline with no officer contact since the break (A62). Read-only here; the escalation ladder lives with the officer. Synthetic data.</HowCalc>
           </section>
         </>
       ) : null}

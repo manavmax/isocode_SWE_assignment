@@ -2,6 +2,7 @@ export type Lang = 'hi' | 'en';
 
 const en = {
   appName: 'Field Collections',
+  loginTagline: 'Daily visit lists for field officers, offline-first.',
   navToday: 'Today',
   navMe: 'Me',
   loginTitle: 'Sign in',
@@ -190,6 +191,7 @@ const en = {
 
 const hi: typeof en = {
   appName: 'फील्ड कलेक्शन',
+  loginTagline: 'फ़ील्ड ऑफ़िसरों की रोज़ की विज़िट सूची, ऑफ़लाइन-फ़र्स्ट।',
   navToday: 'आज',
   navMe: 'मेरी जानकारी',
   loginTitle: 'साइन इन करें',

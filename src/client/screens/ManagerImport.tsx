@@ -139,15 +139,31 @@ export function ManagerImport({ onOpenOverview, onOpenActivityRoute }: { onOpenO
       <p className="screen-subtitle">Full list of every loan with DPD &ge; 1 for the date. Re-importing the same file is a no-op; the same date with different bytes replaces it.</p>
 
       <div className="import-form" data-section="upload">
-        <label className="import-label">
-          CSV file
-          <input type="file" accept=".csv,text/csv" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
-        </label>
+        <div className="import-field">
+          <span className="import-label-text">CSV file</span>
+          {/* the real input stays for a11y — visually replaced by the drop zone */}
+          <label className={`dropzone${file ? ' dropzone-has-file' : ''}`}>
+            <input
+              type="file"
+              accept=".csv,text/csv"
+              className="dropzone-input"
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            />
+            {file ? (
+              <span className="dropzone-file">
+                <span className="dropzone-name">{file.name}</span>
+                <span className="dropzone-size num">{file.size >= 1024 * 1024 ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(file.size / 1024))} KB`}</span>
+              </span>
+            ) : (
+              <span className="dropzone-hint">Choose CSV file</span>
+            )}
+          </label>
+        </div>
         <label className="import-label">
           As-of date
           <input type="date" value={asOf} onChange={(event) => setAsOf(event.target.value)} />
         </label>
-        <button type="button" className="btn btn-primary" disabled={uploading} onClick={() => void upload()}>
+        <button type="button" className="btn btn-primary btn-block" disabled={uploading || !file} onClick={() => void upload()}>
           {uploading ? 'Uploading…' : 'Upload'}
         </button>
       </div>

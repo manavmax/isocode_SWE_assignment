@@ -13,6 +13,12 @@ import {
 import { t as translate, type Lang } from '../i18n/dictionary.js';
 import { syncNow } from '../sync/scheduler.js';
 
+function roleLabel(lang: Lang, role: string | undefined): string {
+  if (role === 'branch_manager') return translate(lang, 'roleBranchManager');
+  if (role === 'field_officer') return translate(lang, 'roleFieldOfficer');
+  return role ?? '—';
+}
+
 export function Me({ lang, setLang, user, onLoggedOut }: { lang: Lang; setLang: (lang: Lang) => void; user: ApiUser | null; onLoggedOut: () => void }) {
   const tr = (key: Parameters<typeof translate>[1]) => translate(lang, key);
   const [counts, setCounts] = useState({ pending: 0, failed: 0, synced: 0 });
@@ -86,25 +92,25 @@ export function Me({ lang, setLang, user, onLoggedOut }: { lang: Lang; setLang: 
         <h1 className="screen-title">{tr('meTitle')}</h1>
       </header>
 
-      {/* Sync section (SPEC 2 screen 5) */}
+      {/* Sync section (SPEC 2 screen 5): header on its own line, counts,
+          then the full-width Sync now button below them (prompt 20 item 12) */}
       <section className="sync-section">
-        <div className="sync-header">
-          <span className="section-label" style={{ margin: 0 }}>{tr('syncTitle')}</span>
-          <button
-            type="button"
-            className={`btn btn-secondary sync-now-btn ${syncing ? 'btn-loading' : ''}`}
-            onClick={() => void handleSyncNow()}
-            disabled={syncing}
-          >
-            {syncing ? tr('syncing') : tr('syncNow')}
-          </button>
-        </div>
+        <span className="section-label">{tr('syncTitle')}</span>
 
         <div className="sync-counts">
           <SyncCount label={tr('syncPending')} value={counts.pending} chip="pending" />
           <SyncCount label={tr('syncFailed')} value={counts.failed} chip="failed" />
           <SyncCount label={tr('syncSynced')} value={counts.synced} chip="synced" />
         </div>
+
+        <button
+          type="button"
+          className={`btn btn-secondary sync-now-btn btn-block ${syncing ? 'btn-loading' : ''}`}
+          onClick={() => void handleSyncNow()}
+          disabled={syncing}
+        >
+          {syncing ? tr('syncing') : tr('syncNow')}
+        </button>
 
         {counts.pending > 0 && (
           <p className="sync-note">{tr('syncPendingNote')}</p>
@@ -167,16 +173,16 @@ export function Me({ lang, setLang, user, onLoggedOut }: { lang: Lang; setLang: 
         </div>
         <div className="fact-row">
           <span className="fact-label">{tr('factStatus')}</span>
-          <span className="fact-value">{user ? user.role : '—'}</span>
+          <span className="fact-value">{user ? roleLabel(lang, user.role) : '—'}</span>
         </div>
       </div>
 
       <p className="section-label">{tr('meLanguage')}</p>
-      <div className="login-lang" role="group" aria-label={tr('meLanguage')}>
-        <button type="button" className="btn" aria-pressed={lang === 'hi'} onClick={() => setLang('hi')}>
+      <div className="segment-row segment-two" role="group" aria-label={tr('meLanguage')}>
+        <button type="button" className={`segment ${lang === 'hi' ? 'segment-active' : ''}`} aria-pressed={lang === 'hi'} onClick={() => setLang('hi')}>
           हिंदी
         </button>
-        <button type="button" className="btn" aria-pressed={lang === 'en'} onClick={() => setLang('en')}>
+        <button type="button" className={`segment ${lang === 'en' ? 'segment-active' : ''}`} aria-pressed={lang === 'en'} onClick={() => setLang('en')}>
           English
         </button>
       </div>
@@ -185,7 +191,11 @@ export function Me({ lang, setLang, user, onLoggedOut }: { lang: Lang; setLang: 
         {tr('meOfflineCache')}
       </p>
 
-      <button type="button" className="btn btn-secondary" style={{ color: 'var(--status-danger)', borderColor: 'var(--status-danger)' }} onClick={() => void handleLogout()}>
+      <button
+        type="button"
+        className="btn btn-secondary btn-block logout-btn"
+        onClick={() => void handleLogout()}
+      >
         {tr('meLogout')}
       </button>
     </main>

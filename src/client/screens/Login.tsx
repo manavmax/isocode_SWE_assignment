@@ -40,17 +40,20 @@ export function Login({ lang, setLang, onSignedIn, sessionExpired }: { lang: Lan
 
   return (
     <main className="screen">
-      <h1 className="screen-title">{tr('appName')}</h1>
-      <div className="login-lang" role="group" aria-label={tr('loginLanguageLabel')}>
-        <button type="button" className="btn" aria-pressed={lang === 'hi'} onClick={() => setLang('hi')}>
+      <header className="login-header">
+        <h1 className="screen-title">{tr('appName')}</h1>
+        <p className="login-tagline">{tr('loginTagline')}</p>
+      </header>
+      <div className="login-lang segment-row segment-two" role="group" aria-label={tr('loginLanguageLabel')}>
+        <button type="button" className={`segment ${lang === 'hi' ? 'segment-active' : ''}`} aria-pressed={lang === 'hi'} onClick={() => setLang('hi')}>
           हिंदी
         </button>
-        <button type="button" className="btn" aria-pressed={lang === 'en'} onClick={() => setLang('en')}>
+        <button type="button" className={`segment ${lang === 'en' ? 'segment-active' : ''}`} aria-pressed={lang === 'en'} onClick={() => setLang('en')}>
           English
         </button>
       </div>
       <form
-        className="login-form"
+        className="login-form login-card soft-card"
         onSubmit={(event) => {
           event.preventDefault();
           void submit();

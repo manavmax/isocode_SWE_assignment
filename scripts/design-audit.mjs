@@ -19,7 +19,7 @@ import { chromium } from '@playwright/test';
 const BASE = 'http://localhost:5173';
 
 function start(cmd, args, env, waitText) {
-  const child = spawn(cmd, args, { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(cmd, args, { env: { ...process.env, ...env }, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   let log = '';
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`timeout waiting for ${cmd}: ${log}`)), 30000);
@@ -39,8 +39,11 @@ const api = await start('node', ['--env-file=.env', 'scripts/dev-api.mjs'], {}, 
 const vite = await start('pnpm', ['dev'], {}, 'Local:');
 
 function cleanup() {
-  try { api.kill('SIGKILL'); } catch {}
-  try { vite.kill('SIGKILL'); } catch {}
+  // kill the whole process group: `pnpm dev` wraps vite, and killing pnpm
+  // alone orphans vite on :5173 — a stale server then poisons the next run
+  for (const child of [api, vite]) {
+    try { process.kill(-child.pid, 'SIGKILL'); } catch {}
+  }
 }
 process.on('uncaughtException', (err) => {
   console.error(err);
@@ -68,7 +71,10 @@ async function runAudit(page) {
   return page.evaluate(() => {
     const SIZES = [12, 13, 14, 16, 18, 22, 24, 28, 32, 36];
     const TOLERANCE = 0.6;
-    const SPACING = [0, 4, 8, 12, 16, 24, 32, 48, 56, 88, 96, 120];
+    // Prompt-20 additions: 20px = the why-score card padding (item 7);
+    // 108px = scroll clearance under the floating nav, nav height + 24
+    // (item 9); 196px = detail clearance, nav + floating action bar + 24.
+    const SPACING = [0, 4, 8, 12, 16, 20, 24, 32, 48, 56, 88, 96, 108, 120, 196];
     const WEIGHTS = [400, 600];
     const lang = document.documentElement.lang;
     const onScale = (size) => {
