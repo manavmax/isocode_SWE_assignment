@@ -16,15 +16,15 @@ The live environment is a demonstration using synthetic data only. It is not con
 
 The officer starts with a short, prioritised worklist. Each loan shows its DPD bucket, overdue amount, priority band and the most useful reason for its position. The loan detail view explains the top three score contributions and keeps Call, Map and Log outcome actions within reach.
 
-![Officer worklist](docs/screens/today-en.png)
+![Officer worklist]
 
-![Loan detail](docs/screens/detail-en.png)
+![Loan detail]
 
 ### Outcome capture
 
 Officers can record a call or visit as paid, promise to pay, not reachable, dispute or another supported outcome. Promise details are validated before saving. GPS is captured when available, but a weak signal or unavailable location does not prevent the officer from recording the event.
 
-![Outcome capture](docs/screens/outcome-en.png)
+![Outcome capture]
 
 ### Manager workspace
 
