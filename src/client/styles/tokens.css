@@ -15,21 +15,48 @@
   --accent-strong: #0b4b49;
   --pill-ink: #0e1116;
 
-  /* bucket gradients: 135deg, dark stop -> lighter stop; both stops keep
-     white text >= 4.5:1 (the indigo and coral lighter stops from the
-     direction measured 4.49/4.27 and were darkened to #5568d4/#c93f63) */
-  --dpd-1: #bfe3e0;
-  --dpd-2: #7cc2bd;
-  --dpd-3: #3d908b;
-  --dpd-4: #14504e;
-  --grad-1: linear-gradient(135deg, #3f4bb8, #5568d4);
-  --grad-2: linear-gradient(135deg, #b45309, #c2410c);
-  --grad-3: linear-gradient(135deg, #be3455, #c93f63);
-  --grad-4: linear-gradient(135deg, #9f1239, #be123c);
-  --bucket-1-solid: #3f4bb8;
-  --bucket-2-solid: #b45309;
-  --bucket-3-solid: #be3455;
-  --bucket-4-solid: #9f1239;
+  /* Prompt 21 mesh recipes (CSS only, no images): three layered
+     radial-gradients over a solid base. Every stop keeps white text
+     >= 4.5:1 against the LIGHTEST sampled pixel (the design audit samples
+     a 3x3 grid and takes the worst case; amber's lightest stop measured
+     5.02, indigo's 6.24, coral 5.51, crimson 8.02, positive 5.12). */
+  --mesh-indigo:
+    radial-gradient(120% 90% at 0% 0%, #3b2fb5 0%, transparent 60%),
+    radial-gradient(100% 80% at 100% 15%, #6d3fd9 0%, transparent 55%),
+    radial-gradient(90% 90% at 35% 115%, #2455d6 0%, transparent 60%);
+  --mesh-indigo-base: #3946b8;
+  --mesh-amber:
+    radial-gradient(120% 90% at 0% 0%, #b45309 0%, transparent 60%),
+    radial-gradient(100% 80% at 100% 15%, #c2410c 0%, transparent 55%),
+    radial-gradient(90% 90% at 35% 115%, #be3455 0%, transparent 60%);
+  --mesh-amber-base: #a8430c;
+  --mesh-coral:
+    radial-gradient(120% 90% at 0% 0%, #be3455 0%, transparent 60%),
+    radial-gradient(100% 80% at 100% 15%, #a81d5b 0%, transparent 55%),
+    radial-gradient(90% 90% at 35% 115%, #9f1239 0%, transparent 60%);
+  --mesh-coral-base: #a52449;
+  --mesh-crimson:
+    radial-gradient(120% 90% at 0% 0%, #9f1239 0%, transparent 60%),
+    radial-gradient(100% 80% at 100% 15%, #5b1a4a 0%, transparent 55%),
+    radial-gradient(90% 90% at 35% 115%, #2a1030 0%, transparent 60%);
+  --mesh-crimson-base: #4a1435;
+  --mesh-positive:
+    radial-gradient(120% 90% at 0% 0%, #0f6b4f 0%, transparent 60%),
+    radial-gradient(100% 80% at 100% 15%, #0f5f5c 0%, transparent 55%),
+    radial-gradient(90% 90% at 35% 115%, #2f7d32 0%, transparent 60%);
+  --mesh-positive-base: #146549;
+
+  /* pastel status chips (prompt 21): all pairs >= 4.5:1 */
+  --chip-green-bg: #e7f6ec;
+  --chip-green-ink: #1b6b3a;
+  --chip-red-bg: #fdecec;
+  --chip-red-ink: #a3241b;
+  --chip-amber-bg: #fff4e0;
+  --chip-amber-ink: #8a5300;
+  --chip-blue-bg: #e8eeff;
+  --chip-blue-ink: #2f44b8;
+  --chip-plum-bg: #f9e8f2;
+  --chip-plum-ink: #86194d;
 
   /* status colours, text-only usage */
   --status-ok: #1a6f33;
@@ -67,8 +94,8 @@
   /* the ONLY shadow: floating action bar + bottom sheet (data-float) */
   --shadow-float: 0 8px 24px rgba(14, 17, 22, 0.12);
 
-  /* motion 150-200ms */
-  --motion: 175ms ease-out;
+  /* motion: 150ms press states (prompt 21) */
+  --motion: 150ms ease-out;
 
   /* surfaces: grey page, white cards, ink text */
   --bg: var(--page);

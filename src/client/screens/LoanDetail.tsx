@@ -207,7 +207,7 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
 
       {load === 'ready' && loan ? (
         <>
-          <div className={`detail-hero gradient-b${bucketIndex(loan.bucket)}`} data-hero data-section="hero">
+          <div className={`detail-hero mesh-b${bucketIndex(loan.bucket)}`} data-hero data-section="hero">
             <p className="bucket-name num">{bucketLabel(lang, loan.bucket)}</p>
             <h1 className="card-name">{loan.borrowerName}</h1>
             {loan.businessName ? <p className="business">{loan.businessName}</p> : null}

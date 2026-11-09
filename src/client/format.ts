@@ -87,3 +87,14 @@ export function pluralCopy(
 ): string {
   return translate(lang, n === 1 ? forms.one : forms.other, params ?? { n });
 }
+
+/** A display name from the username (prompt 21 greeting): the only name the
+ *  client has without an API change. "arjun.verma" → "Arjun Verma",
+ *  "demo-officer-1" → "Demo Officer 1". */
+export function displayName(username: string): string {
+  return username
+    .split(/[._\-\s]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}

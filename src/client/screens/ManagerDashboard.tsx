@@ -161,17 +161,17 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
           ) : (
             <>
             <div className="tile-grid" data-section="kpis">
-              <div className="tile gradient-b1" data-hero>
+              <div className="tile mesh-b1" data-hero>
                 <span className="tile-label">Roll B1→B2, count (target 16%)</span>
                 <span className="tile-value num">{pct(data.tiles.rollRateCount)}</span>
                 <span className="tile-label">{data.tiles.loansToSave} loans to save</span>
               </div>
-              <div className="tile gradient-b2" data-hero>
+              <div className="tile mesh-b2" data-hero>
                 <span className="tile-label">Roll B1→B2, balance</span>
                 <span className="tile-value num">{pct(data.tiles.rollRateAmount)}</span>
                 <span className="tile-label">of {formatMoneyShort(data.tiles.cohortAmt)} cohort</span>
               </div>
-              <div className="tile gradient-b4" data-hero>
+              <div className="tile mesh-b4" data-hero>
                 <span className="tile-label">Promises kept</span>
                 <span className="tile-value num">
                   {data.keptRate === null ? '—' : pct(data.keptRate)} <span className="tile-unit">({data.keptMade} settled)</span>

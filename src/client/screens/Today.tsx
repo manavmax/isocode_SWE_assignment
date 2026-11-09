@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { api, type AssignmentCard } from '../api.js';
+import { api, type ApiUser, type AssignmentCard } from '../api.js';
 import { loadAssignments, saveAssignments, savePromises, getOutboxItems } from '../dexie/db.js';
-import { formatMoneyShort, formatDateShort, pluralCopy } from '../format.js';
+import { displayName, formatMoneyShort, formatDateShort, pluralCopy } from '../format.js';
 import { t as translate, type Lang } from '../i18n/dictionary.js';
 import { describeReason } from '../../shared/scoring/phrases.js';
 import { visibleReasons } from '../reasons.js';
 import { EmptyState, ErrorState, OfflineBanner, SkeletonList } from '../components/States.js';
+import { Avatar, bucketTint } from '../components/Avatar.js';
+import { DotGrid } from '../components/DotGrid.js';
 import { useOutboxCounts } from '../sync/useOutboxCounts.js';
 import { useNow } from '../useNow.js';
 import { syncNow } from '../sync/scheduler.js';
@@ -16,8 +18,11 @@ type Load = 'loading' | 'empty' | 'error' | 'ready';
  * layout contract ("today"): top-bar -> heading -> hero -> summary -> segmented ->
  * cards -> nav (floating pill). Each section carries a data-section
  * attribute; layoutContracts.test.ts and the audits assert the order.
+ * Prompt 21: greeting top bar with an initials avatar + sync dot, ONE
+ * indigo mesh hero (44px numeral, dot strip), pastel chips and avatars on
+ * the borrower cards.
  */
-export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: string) => void }) {
+export function Today({ lang, user, onOpenLoan }: { lang: Lang; user?: ApiUser | null; onOpenLoan: (loanId: string) => void }) {
   const [load, setLoad] = useState<Load>('loading');
   const [loans, setLoans] = useState<AssignmentCard[]>([]);
   const [scoringMode, setScoringMode] = useState<'scorecard' | 'fallback'>('fallback');
@@ -114,6 +119,8 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
   const sorted = loans;
   const visitCount = sorted.length;
   const overdueTotal = sorted.reduce((sum, loan) => sum + loan.overdueAmount, 0);
+  // The summary card's mini dots: loans already deep in the book (61+ DPD).
+  const deepOverdue = sorted.filter((loan) => loan.bucket === '61-90' || loan.bucket === '90+').length;
   const dueDates = promisesSections
     ? promisesSections.dueToday.map((card) => card.promisedDate).sort()
     : [];
@@ -129,51 +136,79 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
     return shifted.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'UTC' });
   }
 
+  // The greeting name is derived from the username — the only name the
+  // client holds without an API change (prompt 21).
+  const officerName = user ? displayName(user.username) : '';
+  const hour = new Date().getHours();
+  const greetingKey = hour < 12 ? 'greetingMorning' : hour < 17 ? 'greetingAfternoon' : 'greetingEvening';
+  const greeting = tr(greetingKey, { name: officerName }).replace(/[,\s]+$/, '');
+
   return (
     <main className="screen">
-      <div className="topbar" data-section="top-bar">
-        <span className="topbar-spacer" aria-hidden="true" />
-        <span className="topbar-title">{tr('todayTitle')}</span>
+      <div className="today-topbar" data-section="top-bar">
+        <span className="topbar-greeting">{greeting}</span>
         <button
           type="button"
-          className={`topbar-icon icon-button icon-state-${counts.failed > 0 ? 'fail' : counts.pending > 0 ? 'pending' : 'ok'}`}
+          className="topbar-avatar"
           onClick={() => void syncNow()}
           title={tr('syncNow')}
           aria-live="polite"
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4" />
-          </svg>
+          <Avatar name={officerName || tr('appName')} size={44} tint="neutral" />
+          <span
+            className={`sync-dot sync-dot-${counts.failed > 0 ? 'fail' : counts.pending > 0 ? 'pending' : ''}`}
+            aria-hidden="true"
+          />
         </button>
       </div>
       <header className="screen-header" data-section="heading">
         <h1 className="today-heading num">{todayLabel()}</h1>
       </header>
-      <section className="today-hero gradient-b1" data-hero data-section="hero">
+      <section className="today-hero mesh-indigo" data-hero data-section="hero">
         <p className="today-date">{tr('todayHeroLabel')}</p>
         <p className="today-headline num">
-          {visitCount === 1 ? tr('todayVisitsTodayOne') : tr('todayVisitsToday', { n: visitCount })}
+          {visitCount}
+          <span className="hero-unit">{visitCount === 1 ? tr('heroVisitsUnitOne') : tr('heroVisitsUnit')}</span>
         </p>
         {promisesDue > 0 ? (
           <p className="today-sub num">{pluralCopy(lang, { one: 'promisesDueTodayOne', other: 'promisesDueToday' }, promisesDue)}</p>
         ) : null}
-        <div className="dot-strip" aria-hidden="true">
-          {sorted.map((loan, index) => (
-            <span key={loan.loanId} className={index < doneToday ? 'done' : ''} />
-          ))}
-        </div>
+        <DotGrid
+          className="dotgrid-hero"
+          label={`${visitCount} ${visitCount === 1 ? tr('heroVisitsUnitOne') : tr('heroVisitsUnit')} · ${doneToday} ${tr('heroDone')}`}
+          total={visitCount}
+          filled={doneToday}
+          cols={15}
+        />
       </section>
       <section className="summary-row" data-section="summary">
+        <div className="summary-card">
+          <span className="tile-label">{tr('summaryOverdueTotal')}</span>
+          <span className="summary-value num">
+            {formatMoneyShort(overdueTotal)}
+            <span className="tile-unit"> {tr('unitOverdue')}</span>
+          </span>
+          <DotGrid
+            label={tr('summaryDeepOverdueAria', { n: deepOverdue })}
+            total={6}
+            filled={Math.min(6, deepOverdue)}
+            dot={5}
+            gap={3}
+          />
+        </div>
         <div className="summary-card">
           <span className="tile-label">{tr('summaryPromisesDue')}</span>
           <span className="summary-value num">
             {promisesDue}
             {promisesDue > 0 && soonestDue ? <span className="tile-unit"> · {formatDateShort(soonestDue, nowMs, lang)}</span> : null}
           </span>
-        </div>
-        <div className="summary-card">
-          <span className="tile-label">{tr('summaryOverdueTotal')}</span>
-          <span className="summary-value num">{formatMoneyShort(overdueTotal)}</span>
+          <DotGrid
+            label={pluralCopy(lang, { one: 'promisesDueTodayOne', other: 'promisesDueToday' }, promisesDue)}
+            total={6}
+            filled={Math.min(6, promisesDue)}
+            dot={5}
+            gap={3}
+          />
         </div>
       </section>
       <nav className="segment-row" data-section="segmented" aria-label={tr('todayTitle')}>
@@ -206,31 +241,41 @@ export function Today({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId: s
               <button
               type="button"
               key={loan.loanId}
-              className={`card bucket-${bucketIndex(loan.bucket)}${loan.lowLane ? ' lane-low' : ''}`}
+              className={`card${loan.lowLane ? ' lane-low' : ''}`}
               onClick={() => onOpenLoan(loan.loanId)}
             >
-              <span className="card-name">
-                <span className={`bucket-chip b${bucketIndex(loan.bucket)} num`}>{loan.bucket}</span>
-                {loan.borrowerName}
-              </span>
-              {loan.businessName ? <span className="card-sub">{loan.businessName}</span> : null}
-              <span className="card-row">
-                <span className="card-sub num">
-                  {loan.dpd === 1 ? tr('daysOverdueOne') : tr('daysOverdue', { n: loan.dpd })}
-                  {loan.score !== null ? (
-                    <span className="score-inline">
-                      {' · '}
-                      {translate(lang, loan.band === 'high' ? 'scoreBandHigh' : loan.band === 'medium' ? 'scoreBandMedium' : 'scoreBandLow')}{' '}
-                      <span className="num">{loan.score}</span>
-                    </span>
-                  ) : null}
+              <span className="borrower-main">
+                <Avatar name={loan.borrowerName} size={44} tint={bucketTint(bucketIndex(loan.bucket))} />
+                <span className="borrower-id">
+                  <span className="card-name">{loan.borrowerName}</span>
+                  {loan.businessName ? <span className="card-sub">{loan.businessName}</span> : null}
+                  <span className="borrower-chips">
+                    <span className={`chip-soft chip-soft-${bucketTint(bucketIndex(loan.bucket))} num`}>{loan.bucket}</span>
+                    {loan.score !== null ? (
+                      <span className="chip-soft chip-soft-blue">
+                        {translate(lang, loan.band === 'high' ? 'scoreBandHigh' : loan.band === 'medium' ? 'scoreBandMedium' : 'scoreBandLow')}{' '}
+                        <span className="num">{loan.score}</span>
+                      </span>
+                    ) : null}
+                    {loan.duePromise ? <span className="chip-soft chip-soft-green">{tr('promiseDueLabel')}</span> : null}
+                  </span>
                 </span>
-                <span className="card-amount money num">{formatMoneyShort(loan.overdueAmount)}</span>
+                <span className="borrower-amount">
+                  <span className="card-amount money num">{formatMoneyShort(loan.overdueAmount)}</span>
+                  <span className="card-sub num">{loan.dpd === 1 ? tr('daysOverdueOne') : tr('daysOverdue', { n: loan.dpd })}</span>
+                </span>
               </span>
-              {loan.duePromise ? <span className="chip-soft-green">{tr('promiseDueLabel')}</span> : null}
               {(() => {
                 const reasons = visibleReasons(loan.topReasons);
-                return reasons.length > 0 ? <span className="score-reason">{describeReason(lang, reasons[0]!)}</span> : null;
+                return reasons.length > 0 ? (
+                  <span className="score-reason">
+                    <svg className="reason-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M3 17l6-6 4 4 8-8" />
+                      <path d="M15 7h6v6" />
+                    </svg>
+                    {describeReason(lang, reasons[0]!)}
+                  </span>
+                ) : null;
               })()}
             </button>
             </>

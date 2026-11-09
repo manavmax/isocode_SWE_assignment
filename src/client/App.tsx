@@ -160,7 +160,7 @@ export function App() {
             ) : route.name === 'activity' ? (
               <OfficerActivity officerId={route.officerId} onBack={() => navigate({ name: 'dashboard' })} />
             ) : (
-              <Today lang={lang} onOpenLoan={(loanId) => navigate({ name: 'loan', loanId })} />
+              <Today lang={lang} user={user} onOpenLoan={(loanId) => navigate({ name: 'loan', loanId })} />
             )}
           </Suspense>
           <nav className="bottom-nav" aria-label={t('appName')} data-section="nav" data-float>

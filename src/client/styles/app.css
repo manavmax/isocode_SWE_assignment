@@ -1,8 +1,9 @@
 /**
- * Prompt 15 redesign: calm, minimal, one accent, white space. Hierarchy
- * through type size and weight — not boxes or colour. Hairlines instead of
- * card borders; a 4px spacing scale; two weights (400, 600); every value
- * tokenised.
+ * Prompt 21 soft-card upgrade: light-grey page, large rounded white cards
+ * (radius 24, padding 20), ONE mesh-gradient hero per screen with white
+ * text, large numerals with small units, pastel chips, circular initials
+ * avatars, the black pill for active states, dot-matrix visuals. CSS +
+ * inline SVG only; no new dependencies.
  */
 
 /* ---------- screens ---------- */
@@ -27,18 +28,48 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   display: none;
 }
 
-/* soft card: white, 20px radius, 16px padding, no hairline rows */
+/* soft card: white, 24px radius, 20px padding (prompt 21) */
 .soft-card {
   background: var(--surface);
   border-radius: var(--radius-card);
-  padding: var(--sp-4);
+  padding: 20px;
 }
 
-/* bucket gradients — 135deg, both stops keep white >= 4.5:1 */
-[data-hero].gradient-b1 { background: var(--grad-1); }
-[data-hero].gradient-b2 { background: var(--grad-2); }
-[data-hero].gradient-b3 { background: var(--grad-3); }
-[data-hero].gradient-b4 { background: var(--grad-4); }
+/* mesh gradients (prompt 21): 3-4 layered radial-gradients over a solid
+   base, white text judged by the audit's 3x3 worst-case sample */
+[data-hero].mesh-indigo,
+[data-hero].mesh-b1 {
+  background-color: var(--mesh-indigo-base);
+  background-image: var(--mesh-indigo);
+  color: #ffffff;
+}
+
+[data-hero].mesh-amber,
+[data-hero].mesh-b2 {
+  background-color: var(--mesh-amber-base);
+  background-image: var(--mesh-amber);
+  color: #ffffff;
+}
+
+[data-hero].mesh-coral,
+[data-hero].mesh-b3 {
+  background-color: var(--mesh-coral-base);
+  background-image: var(--mesh-coral);
+  color: #ffffff;
+}
+
+[data-hero].mesh-crimson,
+[data-hero].mesh-b4 {
+  background-color: var(--mesh-crimson-base);
+  background-image: var(--mesh-crimson);
+  color: #ffffff;
+}
+
+[data-hero].mesh-positive {
+  background-color: var(--mesh-positive-base);
+  background-image: var(--mesh-positive);
+  color: #ffffff;
+}
 
 /* the floating chrome: action bar, sheets, bottom nav */
 [data-float] {
@@ -55,6 +86,62 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   border-radius: var(--radius-pill);
   font-weight: 600;
 }
+
+/* ---------- shared soft-card furniture (prompt 21) ---------- */
+
+/* circular initials avatar, tinted by the pastel chip pairs */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 600;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.avatar-tint-blue { background: var(--chip-blue-bg); color: var(--chip-blue-ink); }
+.avatar-tint-amber { background: var(--chip-amber-bg); color: var(--chip-amber-ink); }
+.avatar-tint-red { background: var(--chip-red-bg); color: var(--chip-red-ink); }
+.avatar-tint-plum { background: var(--chip-plum-bg); color: var(--chip-plum-ink); }
+.avatar-tint-neutral { background: var(--grey-100); color: var(--grey-700); }
+
+/* pastel status chips: all pairs >= 4.5:1 (prompt 21) */
+.chip-soft {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-12);
+  font-weight: 600;
+  padding: var(--sp-1) var(--sp-2);
+  white-space: nowrap;
+}
+
+.chip-soft-green { background: var(--chip-green-bg); color: var(--chip-green-ink); }
+.chip-soft-red { background: var(--chip-red-bg); color: var(--chip-red-ink); }
+.chip-soft-amber { background: var(--chip-amber-bg); color: var(--chip-amber-ink); }
+.chip-soft-blue { background: var(--chip-blue-bg); color: var(--chip-blue-ink); }
+.chip-soft-plum { background: var(--chip-plum-bg); color: var(--chip-plum-ink); }
+
+/* the shared dot-matrix colours: quiet on white, inverted on heroes */
+.dotgrid circle {
+  fill: var(--grey-300);
+}
+
+.dotgrid circle.filled {
+  fill: var(--pill-ink);
+}
+
+.dotgrid-hero circle {
+  fill: rgba(255, 255, 255, 0.35);
+}
+
+.dotgrid-hero circle.filled {
+  fill: #ffffff;
+}
+
+.dotgrid-positive circle { fill: var(--chip-green-bg); }
+.dotgrid-positive circle.filled { fill: var(--chip-green-ink); }
 
 
 
@@ -95,20 +182,95 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
 
 /* ---------- Today ---------- */
 
-.today-hero {
-  color: #ffffff;
-  border-radius: var(--radius-card);
-  padding: var(--sp-4);
-  margin-bottom: var(--sp-3);
+/* prompt 21 top bar: greeting left; a round initials avatar right with the
+   small sync-status dot riding its corner (tap = sync now, 48px target) */
+.today-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-2);
 }
 
-.topbar {
-  display: grid;
-  grid-template-columns: 48px 1fr 48px;
+.topbar-greeting {
+  font-size: var(--font-size-16);
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.topbar-avatar {
+  position: relative;
+  width: var(--target-min);
+  height: var(--target-min);
+  padding: 0;
+  border-radius: var(--radius-pill);
+  display: inline-flex;
   align-items: center;
-  /* no negative margin: the back button keeps 16px from the left edge
-     (prompt 20 item 4, asserted in mobile-check) */
-  margin: 0 0 var(--sp-2);
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.topbar-avatar .avatar {
+  width: 44px;
+  height: 44px;
+}
+
+/* the small sync-status dot on the avatar corner (white ring keeps it off
+   the avatar tint) — scoped to the avatar so the promises pill's own dot
+   stays a static inline dot */
+.topbar-avatar .sync-dot {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  box-sizing: content-box;
+  background: var(--chip-green-ink);
+}
+
+.topbar-avatar .sync-dot-pending {
+  background: var(--chip-amber-ink);
+}
+
+.topbar-avatar .sync-dot-fail {
+  background: var(--chip-red-ink);
+}
+
+/* the promises sync pill survives until its own pass; Today no longer
+   uses it */
+.sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  min-height: var(--target-min);
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--radius-pill);
+  background: var(--pill-ink);
+  color: #ffffff;
+  font-size: var(--font-size-12);
+}
+
+.sync-pill .sync-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+.sync-pill .sync-dot-pending {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+/* topbar (loan detail: back, title, overflow) */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  /* back button keeps 16px from the left edge (prompt 20 item 4) */
+  margin: 0 0 var(--sp-4);
 }
 
 .topbar-spacer {
@@ -170,6 +332,48 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   margin: 0 0 var(--sp-3);
 }
 
+/* the ONE hero card: mesh gradient, 20px padding, 24px radius */
+.today-hero {
+  border-radius: var(--radius-card);
+  padding: 20px;
+  margin-bottom: var(--sp-3);
+}
+
+.today-hero .today-date {
+  font-size: var(--font-size-12);
+  color: #ffffff;
+  margin: 0;
+}
+
+/* large numeral 44/600 with the small 14px unit beside it (prompt 21) */
+.today-hero .today-headline {
+  font-size: 44px;
+  font-weight: 600;
+  line-height: 1.1;
+  margin: var(--sp-1) 0 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.today-hero .hero-unit {
+  font-size: var(--font-size-14);
+  font-weight: 400;
+}
+
+.today-hero .today-sub {
+  font-size: var(--font-size-16);
+  font-weight: 600;
+  color: #ffffff;
+  margin: var(--sp-1) 0 0;
+}
+
+.today-hero .dotgrid {
+  margin-top: var(--sp-3);
+}
+
+/* summary row: two half-width cards, tiny label + 28px value + mini dots */
 .summary-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -180,14 +384,16 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
 .summary-card {
   background: var(--surface);
   border-radius: var(--radius-card);
-  padding: var(--sp-4);
+  padding: 20px;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: var(--sp-2);
+  min-width: 0;
 }
 
 .summary-value {
-  font-size: var(--font-size-22);
+  font-size: var(--font-size-28);
   font-weight: 600;
 }
 
@@ -197,83 +403,7 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   color: var(--text-secondary);
 }
 
-.today-hero .today-date {
-  font-size: var(--font-size-12);
-  color: rgba(255, 255, 255, 0.85);
-  margin: 0;
-}
-
-.today-hero .today-headline {
-  font-size: var(--font-size-36);
-  font-weight: 600;
-  margin: var(--sp-1) 0 0;
-}
-
-.today-hero .today-sub {
-  font-size: var(--font-size-14);
-  color: rgba(255, 255, 255, 0.85);
-  margin: 0;
-}
-
-.today-hero-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--sp-2);
-}
-
-/* sync status: a small white pill inside the hero top-right */
-.sync-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  min-height: var(--target-min);
-  padding: var(--sp-1) var(--sp-3);
-  border-radius: var(--radius-pill);
-  background: var(--pill-ink);
-  color: #ffffff;
-  font-size: var(--font-size-12);
-}
-
-.today-hero .sync-pill {
-  background: rgba(255, 255, 255, 0.18);
-}
-
-.sync-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #ffffff;
-}
-
-.sync-dot-pending {
-  background: rgba(255, 255, 255, 0.6);
-}
-
-.sync-dot-fail {
-  background: var(--status-danger);
-}
-
-/* dot-matrix progress strip: one 6px dot per planned visit */
-.dot-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-1);
-  margin-top: var(--sp-3);
-}
-
-.dot-strip span {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.dot-strip span.done {
-  background: #ffffff;
-}
-
-/* borrower cards: white, 20px radius, 12px gaps — no hairline rows */
+/* borrower cards: avatar left, identity middle, amount right */
 .card-list {
   display: flex;
   flex-direction: column;
@@ -285,7 +415,7 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   width: 100%;
   background: var(--surface);
   border-radius: var(--radius-card);
-  padding: var(--sp-4);
+  padding: 20px;
   border: none;
   text-align: left;
   color: var(--text);
@@ -302,6 +432,36 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   /* wrap long names instead of clipping (prompt 20 item 6: nothing inside
      a card may have scrollWidth > clientWidth) */
   overflow-wrap: anywhere;
+}
+
+.borrower-main {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+}
+
+.borrower-id {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-1);
+}
+
+.borrower-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.borrower-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  margin-top: var(--sp-1);
 }
 
 .card-amount {
@@ -326,50 +486,33 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
 }
 
-.score-inline {
-  font-size: var(--font-size-12);
-  color: var(--text-secondary);
+/* inside the avatar+identity column the business line wraps instead of
+   clipping (mobile-check: no scrollWidth > clientWidth inside a card) */
+.borrower-id .card-sub {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
-.score-inline .num {
-  font-weight: 600;
-}
-
+/* one reason line with a small 16px line icon (prompt 21) */
 .score-reason {
   font-size: var(--font-size-14);
   color: var(--text);
-  display: block;
-  margin-top: var(--sp-2);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
 }
 
-/* bucket chip: solid bucket colour, white text */
-.bucket-chip {
-  display: inline-block;
-  border-radius: var(--radius-pill);
-  color: #ffffff;
-  font-size: var(--font-size-12);
-  font-weight: 600;
-  padding: var(--sp-1) var(--sp-2);
-  margin-inline-end: var(--sp-2);
-}
-
-.bucket-chip.b1 { background: var(--bucket-1-solid); }
-.bucket-chip.b2 { background: var(--bucket-2-solid); }
-.bucket-chip.b3 { background: var(--bucket-3-solid); }
-.bucket-chip.b4 { background: var(--bucket-4-solid); }
-
-/* soft-green promise chip */
-.chip-soft-green {
-  display: inline-block;
-  border-radius: var(--radius-pill);
-  background: #dff2e4;
-  color: #1a6f33;
-  font-size: var(--font-size-12);
-  font-weight: 600;
-  padding: var(--sp-1) var(--sp-2);
-  margin-inline-start: var(--sp-2);
+.reason-icon {
+  width: 16px;
+  height: 16px;
+  stroke: var(--grey-500);
+  fill: none;
+  stroke-width: 1.5;
+  flex-shrink: 0;
 }
 
 /* "Manager priority" and similar labels: black pill */
@@ -783,6 +926,25 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   background: var(--grey-100);
   border-radius: 4px;
   margin: var(--sp-2) 0;
+}
+
+/* skeleton shimmer (prompt 21 motion): a quiet background pulse — no
+   gradient sweep (gradients stay on [data-hero]), reduced-motion kills it
+   via the global rule in base.css */
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton-line {
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes shimmer {
+  0%,
+  100% {
+    background-color: var(--grey-100);
+  }
+  50% {
+    background-color: var(--grey-200);
+  }
 }
 
 .skeleton-line.w-30 { width: 30%; }
@@ -1456,7 +1618,7 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
 
 .manager-screen .tile[data-hero] .tile-label {
   font-size: var(--font-size-12);
-  color: rgba(255, 255, 255, 0.85);
+  color: #ffffff;
 }
 
 .manager-screen .tile .tile-label {
@@ -1476,7 +1638,7 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
 .manager-screen .tile-unit {
   font-size: var(--font-size-14);
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.85);
+  color: #ffffff;
 }
 
 /* white cards for tables/lists */
