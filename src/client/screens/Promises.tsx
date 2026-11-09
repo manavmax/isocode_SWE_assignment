@@ -7,6 +7,8 @@ import { formatDayMonth, formatMoneyShort, promiseDueChip } from '../format.js';
 import { useNow } from '../useNow.js';
 import { t as translate, type Lang } from '../i18n/dictionary.js';
 import { EmptyState, ErrorState, OfflineBanner, SkeletonList } from '../components/States.js';
+import { Avatar } from '../components/Avatar.js';
+import { DotGrid } from '../components/DotGrid.js';
 import { startGpsWatch } from '../gps.js';
 import type { GpsState } from '../gps.js';
 import { attemptBorrowerCall } from '../sync/call.js';
@@ -156,10 +158,17 @@ export function Promises({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId
     ? [...sections.upcoming, ...pending.filter((item) => !due.concat(sections.upcoming).some((card) => card.loanId === item.loanId))]
     : pending;
 
+  // The header's dot donut (prompt 21): the officer's own promise mix from
+  // the data this screen already holds — open (due + upcoming, on track)
+  // against broken. The kept rate itself is not in this endpoint, and the
+  // screen adds no API: the donut labels the real counts it shows.
+  const openCount = due.length + upcoming.length;
+  const brokenCount = sections?.brokenNeedingFollowup.length ?? 0;
+
   return (
     <main className="screen">
       <header className="screen-header">
-        <div className="today-header-row">
+        <div className="promises-header">
           <div>
             <h1 className="screen-title">{tr('promisesTitle')}</h1>
             <p className="screen-subtitle">
@@ -167,10 +176,27 @@ export function Promises({ lang, onOpenLoan }: { lang: Lang; onOpenLoan: (loanId
               {fromCache && offline ? ` · ${tr('meOfflineCache')}` : ''}
             </p>
           </div>
-          <button type="button" className="sync-pill" onClick={() => void syncNow()} title={tr('syncNow')}>
-            <span className="sync-dot sync-dot-ok" aria-hidden="true" />
-            {tr('syncNow')}
-          </button>
+          <div className="promises-header-actions">
+            <DotGrid
+              layout="ring"
+              dot={5}
+              gap={4}
+              total={openCount + brokenCount}
+              filled={openCount}
+              label={tr('promiseHealthAria', { n: openCount, m: brokenCount })}
+            />
+            <button
+              type="button"
+              className="icon-round"
+              onClick={() => void syncNow()}
+              aria-label={tr('syncNow')}
+              title={tr('syncNow')}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4" />
+              </svg>
+            </button>
+          </div>
         </div>
       </header>
       {offline ? <OfflineBanner text={tr('offlineBanner')} /> : null}
@@ -307,6 +333,9 @@ function PromiseCardView({
   const tr = (key: Parameters<typeof translate>[1], params?: Record<string, string | number>) => translate(lang, key, params);
   const broken = 'daysPastDue' in card ? card : null;
   const dateLabel = formatDayMonth(card.promisedDate, lang);
+  // Pastel status chip (prompt 21): broken red, part-broken amber, due
+  // today green, future dates blue, unsynced amber.
+  const dueToday = !isPending(card) && card.status === 'open' && promiseDueChip(card.promisedDate, nowMs, lang) === translate(lang, 'promiseStatusDue');
   const chipLabel = isPending(card)
     ? tr('promiseNotSynced')
     : card.status === 'broken'
@@ -314,28 +343,35 @@ function PromiseCardView({
       : card.status === 'broken_part'
         ? tr('promiseStatusBrokenPart')
         : promiseDueChip(card.promisedDate, nowMs, lang);
+  const chipTone = isPending(card)
+    ? 'amber'
+    : card.status === 'broken'
+      ? 'red'
+      : card.status === 'broken_part'
+        ? 'amber'
+        : dueToday
+          ? 'green'
+          : 'blue';
   return (
     <div className="card promise-card">
       <button type="button" className="promise-card-main" onClick={() => onOpenLoan(card.loanId)}>
-        <span className="card-name">
-          {card.borrowerName}
-          {isPending(card) ? <span className="chip chip-warn">{tr('promiseNotSynced')}</span> : null}
-        </span>
-        <span className="card-amount money num">{formatMoneyShort(card.amountPaise)}</span>
-        <span className="card-row">
-          <span className="chip">{chipLabel}</span>
-          {chipLabel !== dateLabel ? <span className="screen-subtitle num">{dateLabel}</span> : null}
+        <span className="promise-card-top">
+          <Avatar name={card.borrowerName} size={44} tint={chipTone === 'red' ? 'red' : chipTone === 'amber' ? 'amber' : 'blue'} />
+          <span className="promise-card-id">
+            <span className="card-name">{card.borrowerName}</span>
+            <span className="card-row">
+              <span className={`chip-soft chip-soft-${chipTone}`}>{chipLabel}</span>
+              {chipLabel !== dateLabel ? <span className="screen-subtitle num">{dateLabel}</span> : null}
+              {broken?.needsManagerAttention ? <span className="chip-soft chip-soft-red">{tr('promiseManagerAttention')}</span> : null}
+            </span>
+          </span>
+          <span className="card-amount money num">{formatMoneyShort(card.amountPaise)}</span>
         </span>
         {broken ? (
           <span className="card-row">
             <span className="screen-subtitle">
               {tr('promiseBrokenFollowup')} · {tr('promiseStuck', { n: broken.daysPastDue })}
             </span>
-          </span>
-        ) : null}
-        {broken?.needsManagerAttention ? (
-          <span className="card-row">
-            <span className="chip chip-warn">{tr('promiseManagerAttention')}</span>
           </span>
         ) : null}
       </button>

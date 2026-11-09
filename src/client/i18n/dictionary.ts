@@ -155,6 +155,7 @@ const en = {
   promiseNotSynced: 'Not synced yet',
   promiseBrokenFollowup: 'Follow up: no contact since the break',
   promisesOfflineCache: 'Promise list cached on this phone; expires after 24 hours.',
+  promiseHealthAria: '{n} promises on track, {m} broken',
   // Priority score (SPEC 8, prompt 12)
   scoreBandHigh: 'High',
   scoreBandMedium: 'Medium',
@@ -344,6 +345,7 @@ const hi: typeof en = {
   promiseNotSynced: 'अभी सिंक नहीं हुआ',
   promiseBrokenFollowup: 'फ़ॉलो-अप: टूटने के बाद कोई संपर्क नहीं',
   promisesOfflineCache: 'वादों की सूची इस फ़ोन पर सेव है; 24 घंटे बाद हट जाएगी।',
+  promiseHealthAria: '{n} वादे ठीक पर, {m} टूटे',
   scoreBandHigh: 'उच्च',
   scoreBandMedium: 'मध्यम',
   scoreBandLow: 'कम',

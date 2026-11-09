@@ -239,29 +239,45 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   background: var(--chip-red-ink);
 }
 
-/* the promises sync pill survives until its own pass; Today no longer
-   uses it */
-.sync-pill {
+/* promises header (prompt 21): title left; dot donut + round sync icon right */
+.promises-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.promises-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-shrink: 0;
+}
+
+/* the kept-rate dot donut: small fixed-size ring */
+.promises-header-actions .dotgrid {
+  width: 64px;
+}
+
+/* small round icon button (48px target) */
+.icon-round {
+  width: var(--target-min);
+  height: var(--target-min);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
   display: inline-flex;
   align-items: center;
-  gap: var(--sp-1);
-  min-height: var(--target-min);
-  padding: var(--sp-1) var(--sp-3);
-  border-radius: var(--radius-pill);
-  background: var(--pill-ink);
-  color: #ffffff;
-  font-size: var(--font-size-12);
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
 }
 
-.sync-pill .sync-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #ffffff;
-}
-
-.sync-pill .sync-dot-pending {
-  background: rgba(255, 255, 255, 0.6);
+.icon-round svg {
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5;
 }
 
 /* topbar (loan detail: back, title, overflow) */
@@ -1495,6 +1511,28 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
+}
+
+/* avatar left, identity middle, amount right (prompt 21) */
+.promise-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+}
+
+.promise-card-id {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-1);
+}
+
+.promise-card-id .card-row {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  margin-top: 0;
 }
 
 .promise-card-main {
