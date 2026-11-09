@@ -299,9 +299,9 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   display: block;
   font-size: var(--font-size-18);
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* wrap long names instead of clipping (prompt 20 item 6: nothing inside
+     a card may have scrollWidth > clientWidth) */
+  overflow-wrap: anywhere;
 }
 
 .card-amount {
@@ -408,66 +408,93 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   opacity: 0.62;
 }
 
-/* ---------- phone: opted-in manager tables become stacked cards (prompt 20 item 6) ---------- */
+/* ---------- phone row cards (prompt 20 item 6): below 640px ResponsiveTable
+   renders NO <table> — each row is a stacked card; desktop keeps tables ---------- */
+.phone-cards {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.phone-card {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.phone-card.lane-low {
+  opacity: 0.62;
+}
+
+.phone-card-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+/* borrower/officer name 16/600; the key number large and right-aligned */
+.phone-card-name {
+  font-size: var(--font-size-16);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.phone-card-key {
+  font-size: var(--font-size-22);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.phone-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.phone-chip {
+  display: inline-flex;
+  align-items: baseline;
+  padding: var(--sp-1) var(--sp-2);
+  background: var(--bg);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-13);
+  color: var(--text-secondary);
+}
+
+.phone-card-action {
+  margin-top: var(--sp-1);
+}
+
+/* import report: key-value grid rendered as a dl — no <table> on phones */
+.report-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr max-content 1fr;
+  gap: var(--sp-2) var(--sp-4);
+  margin: 0 0 var(--sp-4);
+}
+
+.report-grid dt {
+  color: var(--text-secondary);
+}
+
+.report-grid dd {
+  margin: 0;
+  text-align: right;
+}
+
+.report-pair {
+  display: contents;
+}
+
+/* two-column variant (assignment outcomes: one pair per row) */
+.report-grid.report-two {
+  grid-template-columns: max-content 1fr;
+}
+
 @media (max-width: 639.9px) {
-  .manager-table[data-cards] {
-    display: block;
-  }
-
-  .manager-table[data-cards] thead {
-    display: none;
-  }
-
-  .manager-table[data-cards] tbody {
-    display: block;
-  }
-
-  .manager-table[data-cards] tr {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--sp-2);
-    background: var(--surface);
-    border-radius: var(--radius-card);
-    padding: var(--sp-4);
-    margin-bottom: var(--sp-3);
-  }
-
-  .manager-table[data-cards] td {
-    display: inline-flex;
-    align-items: baseline;
-    padding: 3px 10px;
-    background: var(--bg);
-    border-radius: var(--radius-pill);
-    font-size: var(--font-size-13);
-    color: var(--text-secondary);
-  }
-
-  /* borrower/officer name: 16/600, key number large and right-aligned */
-  .manager-table[data-cards] td.cell-name {
-    order: -2;
-    flex: 1 1 auto;
-    padding: 0;
-    background: none;
-    font-size: var(--font-size-16);
-    font-weight: 600;
-    color: var(--text);
-  }
-
-  .manager-table[data-cards] td.cell-key {
-    order: -1;
-    flex: 0 0 auto;
-    padding: 0;
-    background: none;
-    font-size: 22px;
-    font-weight: 600;
-    color: var(--text);
-  }
-
-  .manager-table[data-cards] td.cell-action {
-    width: 100%;
-    background: none;
-    padding: 0;
+  /* one key-value pair per row on phones */
+  .report-grid,
+  .report-grid.report-two {
+    grid-template-columns: 1fr auto;
   }
 }
 
@@ -590,7 +617,6 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   font-size: var(--font-size-12);
   color: var(--text-secondary);
 }
-
 
 /* ---------- bottom nav ---------- */
 

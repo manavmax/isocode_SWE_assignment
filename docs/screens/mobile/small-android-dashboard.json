@@ -1,0 +1,9 @@
+{
+  "device": "small-android",
+  "screen": "dashboard",
+  "viewport": {
+    "vw": 360,
+    "vh": 640
+  },
+  "failures": []
+}

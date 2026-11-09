@@ -15,7 +15,9 @@ const dir = fileURLToPath(new URL('.', import.meta.url));
 
 function sectionsIn(file: string, screen: string): string[] {
   const text = readFileSync(dir + file, 'utf8');
-  return [...text.matchAll(/data-section="([a-z-]+)"/g)]
+  // data-section="x" on DOM elements, dataSection="x" on ResponsiveTable
+  // (prompt 20 item 6: the table-or-cards branch carries the same section)
+  return [...text.matchAll(/data-?s[e]ction="([a-z-]+)"/gi)]
     .map((match) => match[1]!)
     .filter((section) => section !== screen); // a whole-screen marker is not a section
 }

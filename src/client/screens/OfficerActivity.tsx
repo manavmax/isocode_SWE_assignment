@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, type ActivityRowDto } from '../api.js';
 import { formatIstTime } from '../../shared/datetime.js';
 import { ErrorState, OfflineBanner, SkeletonList } from '../components/States.js';
+import { ResponsiveTable } from '../components/ResponsiveTable.js';
 
 /**
  * Manager view of an officer's last 50 contact events (prompt 13 item 4).
@@ -78,39 +79,59 @@ export function OfficerActivity({ officerId, onBack }: { officerId: string; onBa
         rows.length === 0 ? (
           <p className="screen-subtitle">No contact events for this officer yet.</p>
         ) : (
-          <table className="manager-table" data-cards data-section="table">
-            <thead>
-              <tr>
-                <th>Loan</th>
-                <th>When (IST)</th>
-                <th>Kind</th>
-                <th>Outcome</th>
-                <th>Window</th>
-                <th>GPS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.eventId}>
-                  <td className="cell-name num">{row.loanId}</td>
-                  <td className="cell-key num">{formatIstTime(Date.parse(row.attemptedAtIst))}</td>
-                  <td>{row.kind}</td>
-                  <td>{row.outcome ?? '—'}</td>
-                  <td>
-                    {row.complianceStatus === 'VIOLATION_DETECTED' ? (
-                      <span className="chip chip-warn">Violation</span>
-                    ) : (
-                      <span className="chip">{row.withinWindow ? 'In window' : 'Out'}</span>
-                    )}
-                  </td>
-                  <td className="num">
-                    {row.gpsStatus ?? '—'}
-                    {row.accuracyM !== null ? ` ±${row.accuracyM}m` : ''}
-                  </td>
+          <ResponsiveTable
+            dataSection="table"
+            headers={
+              <thead>
+                <tr>
+                  <th>Loan</th>
+                  <th>When (IST)</th>
+                  <th>Kind</th>
+                  <th>Outcome</th>
+                  <th>Window</th>
+                  <th>GPS</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+            }
+            rows={
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.eventId}>
+                    <td className="cell-name num">{row.loanId}</td>
+                    <td className="cell-key num">{formatIstTime(Date.parse(row.attemptedAtIst))}</td>
+                    <td>{row.kind}</td>
+                    <td>{row.outcome ?? '—'}</td>
+                    <td>
+                      {row.complianceStatus === 'VIOLATION_DETECTED' ? (
+                        <span className="chip chip-warn">Violation</span>
+                      ) : (
+                        <span className="chip">{row.withinWindow ? 'In window' : 'Out'}</span>
+                      )}
+                    </td>
+                    <td className="num">
+                      {row.gpsStatus ?? '—'}
+                      {row.accuracyM !== null ? ` ±${row.accuracyM}m` : ''}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            }
+            cards={rows.map((row) => ({
+              key: row.eventId,
+              name: row.loanId,
+              keyNum: formatIstTime(Date.parse(row.attemptedAtIst)),
+              chips: [
+                row.kind,
+                row.outcome ?? '—',
+                `${row.gpsStatus ?? 'gps —'}${row.accuracyM !== null ? ` ±${row.accuracyM}m` : ''}`,
+                row.complianceStatus === 'VIOLATION_DETECTED' ? (
+                  <span key="w" className="chip chip-warn">Violation</span>
+                ) : (
+                  <span key="w" className="chip">{row.withinWindow ? 'In window' : 'Out'}</span>
+                )
+              ]
+            }))}
+          />
         )
       ) : null}
       <p className="footnote">Read-only. Time shown is the skew-corrected attempt instant in IST. Window flag: 08:00–19:00 IST contact rule; a violation is recorded, never discarded (SPEC 7). GPS: device accuracy at the attempt. Synthetic data.</p>

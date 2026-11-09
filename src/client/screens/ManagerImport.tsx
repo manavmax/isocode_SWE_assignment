@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, type BatchRowDto, type ImportReportDto, type QueueLoanDto } from '../api.js';
 import { formatDayMonth, formatMoneyShort } from '../format.js';
 import { ErrorState, OfflineBanner, SkeletonList } from '../components/States.js';
+import { ResponsiveTable } from '../components/ResponsiveTable.js';
 
 /**
  * Manager import screen (SPEC 11, prompt 13 item 5). English only (A67).
@@ -181,30 +182,32 @@ export function ManagerImport({ onOpenOverview, onOpenActivityRoute }: { onOpenO
       {report ? (
         <section className="panel">
           <h2 className="panel-title">Import report {batchId ? `(batch ${batchId.slice(0, 8)})` : ''}</h2>
-          <table className="manager-table">
-            <tbody>
-              <tr><th>Read</th><td className="num">{report.totalRows}</td><th>Imported</th><td className="num">{report.imported}</td></tr>
-              <tr><th>New</th><td className="num">{report.new}</td><th>Updated (aging)</th><td className="num">{report.aging}</td></tr>
-              <tr><th>Part paid</th><td className="num">{report.partPaid}</td><th>Anomalous</th><td className="num">{report.anomalous}</td></tr>
-              <tr><th>Gone (cleared)</th><td className="num">{report.gone}</td><th>Unchanged</th><td className="num">{Math.max(0, report.totalRows - report.new - report.aging - report.partPaid - report.anomalous)}</td></tr>
-              <tr><th>Skipped (DPD 0)</th><td className="num">{report.skipped}</td><th>Dropped</th><td className="num">{report.dropped}</td></tr>
-              <tr><th>Errors</th><td className="num">{report.errors}</td><th>Warnings</th><td className="num">{report.warnings}</td></tr>
-              {report.paymentsInferred !== undefined ? (
-                <tr><th>Payments inferred</th><td className="num">{report.paymentsInferred}</td><th /><td /></tr>
-              ) : null}
-            </tbody>
-          </table>
+          <dl className="report-grid">
+            <div className="report-pair"><dt>Read</dt><dd className="num">{report.totalRows}</dd></div>
+            <div className="report-pair"><dt>Imported</dt><dd className="num">{report.imported}</dd></div>
+            <div className="report-pair"><dt>New</dt><dd className="num">{report.new}</dd></div>
+            <div className="report-pair"><dt>Updated (aging)</dt><dd className="num">{report.aging}</dd></div>
+            <div className="report-pair"><dt>Part paid</dt><dd className="num">{report.partPaid}</dd></div>
+            <div className="report-pair"><dt>Anomalous</dt><dd className="num">{report.anomalous}</dd></div>
+            <div className="report-pair"><dt>Gone (cleared)</dt><dd className="num">{report.gone}</dd></div>
+            <div className="report-pair"><dt>Unchanged</dt><dd className="num">{Math.max(0, report.totalRows - report.new - report.aging - report.partPaid - report.anomalous)}</dd></div>
+            <div className="report-pair"><dt>Skipped (DPD 0)</dt><dd className="num">{report.skipped}</dd></div>
+            <div className="report-pair"><dt>Dropped</dt><dd className="num">{report.dropped}</dd></div>
+            <div className="report-pair"><dt>Errors</dt><dd className="num">{report.errors}</dd></div>
+            <div className="report-pair"><dt>Warnings</dt><dd className="num">{report.warnings}</dd></div>
+            {report.paymentsInferred !== undefined ? (
+              <div className="report-pair"><dt>Payments inferred</dt><dd className="num">{report.paymentsInferred}</dd></div>
+            ) : null}
+          </dl>
           <h3 className="panel-title">Assignment outcomes by reason</h3>
-          <table className="manager-table">
-            <tbody>
-              {Object.entries(report.assignment).map(([reason, count]) => (
-                <tr key={reason}>
-                  <th>{REASON_LABELS[reason] ?? reason}</th>
-                  <td className="num">{count}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <dl className="report-grid report-two">
+            {Object.entries(report.assignment).map(([reason, count]) => (
+              <div key={reason} className="report-pair">
+                <dt>{REASON_LABELS[reason] ?? reason}</dt>
+                <dd className="num">{count}</dd>
+              </div>
+            ))}
+          </dl>
           {batchId ? (
             <p>
               <a className="btn btn-ghost" href={`/api/import/${batchId}/errors.csv`}>Download errors.csv</a>
@@ -219,23 +222,37 @@ export function ManagerImport({ onOpenOverview, onOpenActivityRoute }: { onOpenO
         {queue.length === 0 ? (
           <p className="screen-subtitle">Nothing queued for this branch.</p>
         ) : (
-          <table className="manager-table" data-cards>
-            <thead>
-              <tr><th>Loan</th><th>Borrower</th><th>DPD</th><th>Overdue</th><th>Pincode</th><th>Reason</th></tr>
-            </thead>
-            <tbody>
-              {queue.map((row) => (
-                <tr key={row.loanId}>
-                  <td className="num">{row.loanId}</td>
-                  <td className="cell-name">{row.borrowerName}</td>
-                  <td className="num">{row.dpd}</td>
-                  <td className="cell-key num">{formatMoneyShort(row.overdueAmount)}</td>
-                  <td className="num">{row.pincode ?? '—'}</td>
-                  <td>{row.reason === 'unmapped_pincode' ? 'Unmapped pincode (no territory row)' : 'Data fix: no phone AND no address'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <ResponsiveTable
+            headers={
+              <thead>
+                <tr><th>Loan</th><th>Borrower</th><th>DPD</th><th>Overdue</th><th>Pincode</th><th>Reason</th></tr>
+              </thead>
+            }
+            rows={
+              <tbody>
+                {queue.map((row) => (
+                  <tr key={row.loanId}>
+                    <td className="num">{row.loanId}</td>
+                    <td className="cell-name">{row.borrowerName}</td>
+                    <td className="num">{row.dpd}</td>
+                    <td className="cell-key num">{formatMoneyShort(row.overdueAmount)}</td>
+                    <td className="num">{row.pincode ?? '—'}</td>
+                    <td>{row.reason === 'unmapped_pincode' ? 'Unmapped pincode (no territory row)' : 'Data fix: no phone AND no address'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            }
+            cards={queue.map((row) => ({
+              key: row.loanId,
+              name: row.borrowerName,
+              keyNum: formatMoneyShort(row.overdueAmount),
+              chips: [
+                row.loanId,
+                `DPD ${row.dpd} · ${row.pincode ?? 'pincode —'}`,
+                row.reason === 'unmapped_pincode' ? 'Unmapped pincode' : 'Data fix: no phone AND no address'
+              ]
+            }))}
+          />
         )}
         <p className="footnote">A24: unrouted newly-imported loans queue for the branch manager. Reason is derived from the data: no territory row for the pincode, or the row had no usable phone and no address. Synthetic data.</p>
       </section>
@@ -245,26 +262,39 @@ export function ManagerImport({ onOpenOverview, onOpenActivityRoute }: { onOpenO
         {batches.length === 0 ? (
           <SkeletonList rows={2} />
         ) : (
-          <table className="manager-table" data-cards>
-            <thead>
-              <tr><th>As-of</th><th>File</th><th>Status</th><th>Rows</th><th>Errors</th><th>Warnings</th><th>errors.csv</th></tr>
-            </thead>
-            <tbody>
-              {batches.map((batch) => (
-                <tr key={batch.batchId}>
-                  <td className="num">{formatDayMonth(batch.asOf, 'en')}</td>
-                  <td className="cell-name">{batch.filename}</td>
-                  <td>{batch.status}</td>
-                  <td className="cell-key num">{batch.totalRows}</td>
-                  <td className="num">{batch.errors}</td>
-                  <td className="num">{batch.warnings}</td>
-                  <td className="cell-action">
-                    <a className="btn btn-ghost" href={`/api/import/${batch.batchId}/errors.csv`}>Download</a>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <ResponsiveTable
+            headers={
+              <thead>
+                <tr><th>As-of</th><th>File</th><th>Status</th><th>Rows</th><th>Errors</th><th>Warnings</th><th>errors.csv</th></tr>
+              </thead>
+            }
+            rows={
+              <tbody>
+                {batches.map((batch) => (
+                  <tr key={batch.batchId}>
+                    <td className="num">{formatDayMonth(batch.asOf, 'en')}</td>
+                    <td className="cell-name">{batch.filename}</td>
+                    <td>{batch.status}</td>
+                    <td className="cell-key num">{batch.totalRows}</td>
+                    <td className="num">{batch.errors}</td>
+                    <td className="num">{batch.warnings}</td>
+                    <td className="cell-action">
+                      <a className="btn btn-ghost" href={`/api/import/${batch.batchId}/errors.csv`}>Download</a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            }
+            cards={batches.map((batch) => ({
+              key: batch.batchId,
+              name: batch.filename,
+              keyNum: String(batch.totalRows),
+              chips: [formatDayMonth(batch.asOf, 'en'), batch.status, `errors ${batch.errors} · warnings ${batch.warnings}`],
+              action: (
+                <a className="btn btn-ghost" href={`/api/import/${batch.batchId}/errors.csv`}>Download errors.csv</a>
+              )
+            }))}
+          />
         )}
         <p className="footnote">Immutable batches keyed by (as-of, sha-256). Same bytes = no-op replay; same date with different bytes = replace. Synthetic data.</p>
       </section>
