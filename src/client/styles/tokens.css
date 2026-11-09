@@ -63,7 +63,7 @@
   --status-warn: #8a5300;
   --status-danger: #a52a22;
 
-  /* type scale 12/13/14/16/18/22/24/28/32/36 (SPEC 15 + prompt 15) */
+  /* type scale 12/13/14/16/18/22/24/28/32/36/40/44 (SPEC 15 + prompt 21) */
   --font-size-12: 0.75rem;
   --font-size-13: 0.8125rem;
   --font-size-14: 0.875rem;
@@ -74,6 +74,8 @@
   --font-size-28: 1.75rem;
   --font-size-32: 2rem;
   --font-size-36: 2.25rem;
+  --font-size-40: 2.5rem;
+  --font-size-44: 2.75rem;
 
   /* 4px spacing scale ONLY: 4, 8, 12, 16, 24, 32, 48 */
   --sp-1: 0.25rem;

@@ -347,7 +347,7 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
 
 /* large numeral 44/600 with the small 14px unit beside it (prompt 21) */
 .today-hero .today-headline {
-  font-size: 44px;
+  font-size: var(--font-size-44);
   font-weight: 600;
   line-height: 1.1;
   margin: var(--sp-1) 0 0;
@@ -969,7 +969,7 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
 .detail-hero {
   color: #ffffff;
   border-radius: var(--radius-card);
-  padding: var(--sp-4);
+  padding: 20px;
   margin-bottom: var(--sp-3);
 }
 
@@ -980,25 +980,43 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
 
 .detail-hero .business {
   font-size: var(--font-size-14);
-  color: rgba(255, 255, 255, 0.85);
+  color: #ffffff;
 }
 
+/* large numeral 40/600 (prompt 21) */
 .amount-hero {
-  font-size: var(--font-size-36);
+  font-size: var(--font-size-40);
   font-weight: 600;
+  line-height: 1.1;
   margin: var(--sp-2) 0 0;
 }
 
 .amount-sub {
   font-size: var(--font-size-13);
-  color: rgba(255, 255, 255, 0.85);
+  color: #ffffff;
   margin: var(--sp-1) 0 0;
+}
+
+/* the 4-segment DPD dot scale with the days-overdue line beside it */
+.hero-scale-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-top: var(--sp-2);
+}
+
+.dpd-scale {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-shrink: 0;
 }
 
 .detail-hero .bucket-name {
   font-size: var(--font-size-12);
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
+  color: #ffffff;
   margin: 0;
 }
 
@@ -1063,6 +1081,27 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   padding: 0;
   font-size: var(--font-size-16);
   list-style: none;
+}
+
+/* each reason's contribution bar: 1 to 5 tiny dots (prompt 21) */
+.reason-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.reason-dots {
+  flex-shrink: 0;
+  width: 44px;
+}
+
+.reason-dots .dotgrid circle {
+  fill: var(--chip-amber-bg);
+}
+
+.reason-dots .dotgrid circle.filled {
+  fill: var(--chip-amber-ink);
 }
 
 /* 12px gap between the numbered reasons (prompt 20 item 7) */

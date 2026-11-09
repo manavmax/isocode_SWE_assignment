@@ -23,11 +23,13 @@ export interface DotGridProps {
   gap?: number;
   /** Extra class for colour context (e.g. dotgrid-hero on gradients). */
   className?: string;
+  /** Pure decoration inside a parent that already carries the label. */
+  decorative?: boolean;
 }
 
 const MAX_CIRCLES = 600;
 
-export function DotGrid({ label, total, filled, layout = 'strip', cols, dot = 6, gap = 4, className }: DotGridProps) {
+export function DotGrid({ label, total, filled, layout = 'strip', cols, dot = 6, gap = 4, className, decorative = false }: DotGridProps) {
   const safeTotal = Math.max(0, Math.floor(total));
   const safeFilled = Math.min(Math.max(0, Math.floor(filled)), safeTotal);
 
@@ -84,8 +86,9 @@ export function DotGrid({ label, total, filled, layout = 'strip', cols, dot = 6,
       className={`dotgrid${className ? ` ${className}` : ''}`}
       viewBox={`0 0 ${w} ${h}`}
       style={{ width: '100%', maxWidth: w, height: 'auto', display: 'block' }}
-      role="img"
-      aria-label={label}
+      role={decorative ? undefined : 'img'}
+      aria-label={decorative ? undefined : label}
+      aria-hidden={decorative || undefined}
     >
       {circles.map((c, i) => (
         <circle key={i} cx={c.cx} cy={c.cy} r={c.r} className={c.filled ? 'filled' : undefined} />

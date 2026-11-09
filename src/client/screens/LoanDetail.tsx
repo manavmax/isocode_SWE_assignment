@@ -6,6 +6,7 @@ import { t as translate, type Lang } from '../i18n/dictionary.js';
 import { describeEvidence, describeReason } from '../../shared/scoring/phrases.js';
 import { visibleReasons } from '../reasons.js';
 import { ErrorState, SkeletonList } from '../components/States.js';
+import { DotGrid } from '../components/DotGrid.js';
 import { bucketIndex, bucketLabel } from './Today.js';
 import type { OutcomeValue, KindValue } from '../components/OutcomeSheet.js';
 import { startGpsWatch } from '../gps.js';
@@ -212,9 +213,25 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
             <h1 className="card-name">{loan.borrowerName}</h1>
             {loan.businessName ? <p className="business">{loan.businessName}</p> : null}
             <p className="amount-hero money num">{formatMoneyExact(loan.overdueAmount)}</p>
-            <p className="amount-sub num">
-              {loan.dpd === 1 ? tr('daysOverdueOne') : tr('daysOverdue', { n: loan.dpd })}
-            </p>
+            <div className="hero-scale-row">
+              <span className="dpd-scale" role="img" aria-label={tr('dpdScaleAria', { n: loan.dpd, bucket: bucketLabel(lang, loan.bucket) })}>
+                {[1, 2, 3, 4].map((seg) => (
+                  <span className="reason-dots" key={seg}>
+                    <DotGrid
+                      label=""
+                      decorative
+                      total={4}
+                      filled={seg === bucketIndex(loan.bucket) ? 4 : 0}
+                      cols={4}
+                      className="dotgrid-hero"
+                    />
+                  </span>
+                ))}
+              </span>
+              <span className="amount-sub num">
+                {loan.dpd === 1 ? tr('daysOverdueOne') : tr('daysOverdue', { n: loan.dpd })}
+              </span>
+            </div>
           </div>
 
           <div className="detail-card" data-section="facts">
@@ -242,19 +259,31 @@ export function LoanDetail({ lang, loanId, onBack }: { lang: Lang; loanId: strin
               </p>
               {(() => {
                 const reasons = visibleReasons(loan.topReasons);
-                return reasons.length > 0 ? (
+                if (reasons.length === 0) return null;
+                // Contribution bar: 1-5 dots by each reason's share of the
+                // largest |contribution| among the visible reasons.
+                const maxAbs = Math.max(...reasons.map((r) => Math.abs(r.contribution)), 1e-9);
+                return (
                   <>
                     <p className="score-reasons-title">{tr('scoreReasonsTitle')}</p>
                     <ol className="score-reasons">
-                      {reasons.map((reason) => (
-                        <li key={reason.feature}>
-                          {describeReason(lang, reason)}
-                          <span className="reason-evidence">{describeEvidence(lang, reason)}</span>
-                        </li>
-                      ))}
+                      {reasons.map((reason) => {
+                        const dots = Math.min(5, Math.max(1, Math.round((Math.abs(reason.contribution) / maxAbs) * 5)));
+                        return (
+                          <li key={reason.feature}>
+                            <span className="reason-line">
+                              {describeReason(lang, reason)}
+                              <span className="reason-dots">
+                                <DotGrid label="" decorative total={5} filled={dots} dot={4} gap={3} cols={5} />
+                              </span>
+                            </span>
+                            <span className="reason-evidence">{describeEvidence(lang, reason)}</span>
+                          </li>
+                        );
+                      })}
                     </ol>
                   </>
-                ) : null;
+                );
               })()}
               <p className="score-how">{tr('scoreAdvisoryLine')}</p>
             </div>
