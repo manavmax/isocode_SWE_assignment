@@ -31,6 +31,17 @@ function HowCalc({ children }: { children: ReactNode }) {
   );
 }
 
+/** Dot gauge for a KPI tile (prompt 21): one dot per 5 points against the
+ *  16% target (3.2 dots), bottom-right of the tile. */
+function DotGauge({ rate, label }: { rate: number | null; label: string }) {
+  const filled = rate === null ? 0 : Math.min(12, Math.round((rate * 100) / 5));
+  return (
+    <span className="tile-gauge">
+      <DotGrid label={label} total={12} filled={filled} dot={5} gap={4} cols={12} />
+    </span>
+  );
+}
+
 /** Dot-column trend (prompt 20 item 5): the last 12 COMPLETED windows, one
  *  column per window, filled dots proportional to the roll % (one dot per
  *  5 points), a dashed row at the 16% target labelled on the chart, and
@@ -71,17 +82,23 @@ function DotColumnChart({ trend }: { trend: { t0: string; t1: string; rollRateCo
   );
 }
 
-/** Simple bars: rolled share per opening bucket in the migration table. */
+/** Migration rows as dot strips (prompt 21: dot-matrix visuals instead of
+ *  conventional bars): 10 dots per row, filled = rolled share. */
 function MigrationBars({ rows }: { rows: { openingBucket: string; cohortN: number; rolledShare: number; curedShare: number; stayedShare: number }[] }) {
   return (
     <div className="chart">
       {rows.map((row) => (
         <div key={row.openingBucket} className="migration-row">
           <span className="migration-label num">{row.openingBucket} (n={row.cohortN})</span>
-          <span className="migration-bar">
-            <span className="migration-seg migration-rolled" style={{ width: `${row.rolledShare * 100}%` }} />
-            <span className="migration-seg migration-stayed" style={{ width: `${row.stayedShare * 100}%` }} />
-            <span className="migration-seg migration-cured" style={{ width: `${row.curedShare * 100}%` }} />
+          <span className="migration-dots">
+            <DotGrid
+              label={`Rolled ${(row.rolledShare * 100).toFixed(1)}% of the opening ${row.openingBucket} cohort (n=${row.cohortN})`}
+              total={10}
+              filled={Math.round(row.rolledShare * 10)}
+              dot={6}
+              gap={4}
+              cols={10}
+            />
           </span>
           <span className="num">{(row.rolledShare * 100).toFixed(1)}% rolled</span>
         </div>
@@ -101,6 +118,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
   const [data, setData] = useState<ManagerDashboardDto | null>(null);
   const [pinBusy, setPinBusy] = useState<string | null>(null);
   const [pinDone, setPinDone] = useState<string | null>(null);
+  const [tab, setTab] = useState<'officers' | 'attention'>('officers');
 
   const refresh = useCallback(async (): Promise<void> => {
     const result = await api.managerDashboard();
@@ -145,7 +163,12 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
           </svg>
         </button>
       </div>
-      <h1 className="screen-title">Branch dashboard</h1>
+      <header className="screen-header">
+        <h1 className="screen-title">{data?.branchName ?? 'Dashboard'}</h1>
+        <p className="screen-subtitle num">
+          {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+        </p>
+      </header>
       <nav className="manager-seg" aria-label="Manager sections" data-section="segmented">
         <button type="button" aria-current="page" onClick={() => undefined}>Overview</button>
         <button type="button" onClick={onOpenImport}>Import</button>
@@ -166,11 +189,13 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
                 <span className="tile-label">Roll B1→B2, count (target 16%)</span>
                 <span className="tile-value num">{pct(data.tiles.rollRateCount)}</span>
                 <span className="tile-label">{data.tiles.loansToSave} loans to save</span>
+                <DotGauge rate={data.tiles.rollRateCount} label={`Roll rate ${pct(data.tiles.rollRateCount)} vs the 16% target`} />
               </div>
               <div className="tile mesh-b2" data-hero>
                 <span className="tile-label">Roll B1→B2, balance</span>
                 <span className="tile-value num">{pct(data.tiles.rollRateAmount)}</span>
                 <span className="tile-label">of {formatMoneyShort(data.tiles.cohortAmt)} cohort</span>
+                <DotGauge rate={data.tiles.rollRateAmount} label={`Roll rate by balance ${pct(data.tiles.rollRateAmount)} vs the 16% target`} />
               </div>
               <div className="tile mesh-b4" data-hero>
                 <span className="tile-label">Promises kept</span>
@@ -178,6 +203,7 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
                   {data.keptRate === null ? '—' : pct(data.keptRate)} <span className="tile-unit">({data.keptMade} settled)</span>
                 </span>
                 <span className="tile-label">{data.openBrokenPromises} open broken</span>
+                <DotGauge rate={data.keptRate} label={`Promises kept ${data.keptRate === null ? 'pending' : pct(data.keptRate)} of ${data.keptMade} settled`} />
               </div>
             </div>
             <div className="stat-cards">
@@ -215,207 +241,228 @@ export function ManagerDashboard({ onOpenActivity, onOpenImport, onOpenActivityR
           </section>
 
           <section className="panel detail-card" data-section="tables">
-            <h2 className="panel-title">Officers (roll rate by opening attribution)</h2>
-            <ResponsiveTable
-              headers={
-                <thead>
-                  <tr>
-                    <th>Officer</th>
-                    <th>n</th>
-                    <th>Rolled</th>
-                    <th>Roll %</th>
-                    <th>Wilson 95%</th>
-                    <th>Kept rate</th>
-                    <th>Workload</th>
-                    <th>Activity</th>
-                  </tr>
-                </thead>
-              }
-              rows={
-                <tbody>
-                  {data.officerTable.map((row) => (
-                    <tr key={row.officerId} className={row.greyedOut ? 'greyed' : ''}>
-                      <td className="cell-name">{row.officerName}</td>
-                      <td className="num">{row.cohortN}</td>
-                      <td className="num">{row.rolledN}</td>
-                      <td className="cell-key num">{pct(row.cohortN > 0 ? row.rollRate : null)}</td>
-                      <td className="num">{row.wilson ? `${pct(row.wilson.low)}–${pct(row.wilson.high)}` : '—'}</td>
-                      <td className="num">{row.keptRate === null ? '—' : pct(row.keptRate)}</td>
-                      <td className="num">{row.workload}</td>
-                      <td className="cell-action">
-                        <button type="button" className="btn btn-ghost" onClick={() => onOpenActivity(row.officerId)}>
-                          Last 50 events
+            {/* prompt 21: one card, two tabs */}
+            <div className="manager-tabs" role="tablist" aria-label="Branch detail">
+              <button type="button" role="tab" aria-selected={tab === 'officers'} onClick={() => setTab('officers')}>
+                Officers
+              </button>
+              <button type="button" role="tab" aria-selected={tab === 'attention'} onClick={() => setTab('attention')}>
+                Needs attention
+              </button>
+            </div>
+            {tab === 'officers' ? (
+              <>
+                <h2 className="panel-title">Officers (roll rate by opening attribution)</h2>
+                <ResponsiveTable
+                  headers={
+                    <thead>
+                      <tr>
+                        <th>Officer</th>
+                        <th>n</th>
+                        <th>Rolled</th>
+                        <th>Roll %</th>
+                        <th>Wilson 95%</th>
+                        <th>Kept rate</th>
+                        <th>Workload</th>
+                        <th>Activity</th>
+                      </tr>
+                    </thead>
+                  }
+                  rows={
+                    <tbody>
+                      {data.officerTable.map((row) => (
+                        <tr key={row.officerId} className={row.greyedOut ? 'greyed' : ''}>
+                          <td className="cell-name">{row.officerName}</td>
+                          <td className="num">{row.cohortN}</td>
+                          <td className="num">{row.rolledN}</td>
+                          <td className="cell-key num">{pct(row.cohortN > 0 ? row.rollRate : null)}</td>
+                          <td className="num">{row.wilson ? `${pct(row.wilson.low)}–${pct(row.wilson.high)}` : '—'}</td>
+                          <td className="num">{row.keptRate === null ? '—' : pct(row.keptRate)}</td>
+                          <td className="num">{row.workload}</td>
+                          <td className="cell-action">
+                            <button type="button" className="btn btn-ghost" onClick={() => onOpenActivity(row.officerId)}>
+                              Last 50 events
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  }
+                  cards={data.officerTable.map((row) => ({
+                    key: row.officerId,
+                    name: row.officerName,
+                    keyNum: pct(row.cohortN > 0 ? row.rollRate : null),
+                    keyLarge: true,
+                    greyed: row.greyedOut,
+                    gauge: (
+                      <DotGrid
+                        label={`Roll rate ${pct(row.cohortN > 0 ? row.rollRate : null)} vs the 16% target`}
+                        total={10}
+                        filled={row.cohortN > 0 ? Math.round(row.rollRate * 10) : 0}
+                        dot={4}
+                        gap={3}
+                        cols={10}
+                      />
+                    ),
+                    chips: [
+                      `n=${row.cohortN}`,
+                      `rolled ${row.rolledN}`,
+                      `kept ${row.keptRate === null ? '—' : pct(row.keptRate)}`,
+                      ...(row.greyedOut ? ['Small sample (n<30)'] : [])
+                    ],
+                    action: (
+                      <button type="button" className="btn btn-ghost" onClick={() => onOpenActivity(row.officerId)}>
+                        Last 50 events
+                      </button>
+                    )
+                  }))}
+                />
+                <HowCalc>Greyed rows have n &lt; 30 (SPEC 13). Kept rate = kept / (kept + broken + broken_part) over the officer's own promises. Workload = currently assigned overdue loans. Synthetic data.</HowCalc>
+              </>
+            ) : (
+              <>
+                <h2 className="panel-title">Broken promises (oldest break first)</h2>
+                {data.brokenPromises.length === 0 ? (
+                  <p className="screen-subtitle">None — nothing to escalate.</p>
+                ) : (
+                  <ResponsiveTable
+                    headers={
+                      <thead>
+                        <tr>
+                          <th>Loan</th>
+                          <th>Borrower</th>
+                          <th>Amount</th>
+                          <th>Break age</th>
+                          <th>Officer</th>
+                          <th>Pin to top</th>
+                        </tr>
+                      </thead>
+                    }
+                    rows={
+                      <tbody>
+                        {data.brokenPromises.map((row) => (
+                          <tr key={row.promiseId}>
+                            <td className="num">{row.loanId}</td>
+                            <td className="cell-name">{row.borrowerName}</td>
+                            <td className="cell-key num">{formatMoneyShort(row.amountPaise)}</td>
+                            <td className="num">{row.ageDays} d</td>
+                            <td>{row.officerName ?? '—'}</td>
+                            <td className="cell-action">
+                              <button type="button" className="btn btn-secondary" disabled={pinBusy === row.loanId || row.officerName === null} onClick={() => void pin(row.loanId, row.officerName)}>
+                                {pinBusy === row.loanId ? '…' : pinDone === row.loanId ? 'Pinned' : 'Pin to top'}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    }
+                    cards={data.brokenPromises.map((row) => ({
+                      key: row.promiseId,
+                      name: row.borrowerName,
+                      keyNum: formatMoneyShort(row.amountPaise),
+                      chips: [row.loanId, `broke ${row.ageDays} d ago`, row.officerName ?? '—'],
+                      action: (
+                        <button type="button" className="btn btn-secondary" disabled={pinBusy === row.loanId || row.officerName === null} onClick={() => void pin(row.loanId, row.officerName)}>
+                          {pinBusy === row.loanId ? '…' : pinDone === row.loanId ? 'Pinned' : 'Pin to top'}
                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              }
-              cards={data.officerTable.map((row) => ({
-                key: row.officerId,
-                name: row.officerName,
-                keyNum: pct(row.cohortN > 0 ? row.rollRate : null),
-                greyed: row.greyedOut,
-                chips: [
-                  `n=${row.cohortN} · rolled ${row.rolledN}`,
-                  row.wilson ? `Wilson ${pct(row.wilson.low)}–${pct(row.wilson.high)}` : 'Wilson —',
-                  `kept ${row.keptRate === null ? '—' : pct(row.keptRate)} · load ${row.workload}`
-                ],
-                action: (
-                  <button type="button" className="btn btn-ghost" onClick={() => onOpenActivity(row.officerId)}>
-                    Last 50 events
-                  </button>
-                )
-              }))}
-            />
-            <HowCalc>Greyed rows have n &lt; 30 (SPEC 13). Kept rate = kept / (kept + broken + broken_part) over the officer's own promises. Workload = currently assigned overdue loans. Synthetic data.</HowCalc>
-          </section>
+                      )
+                    }))}
+                  />
+                )}
+                <HowCalc>Amount = the promised amount (paise to lakh/crore). Age = days since the break was recorded. Pin sends the loan to the top of its officer's Today list. Synthetic data.</HowCalc>
 
-          <section className="panel detail-card">
-            <h2 className="panel-title">Broken promises (oldest break first)</h2>
-            {data.brokenPromises.length === 0 ? (
-              <p className="screen-subtitle">None — nothing to escalate.</p>
-            ) : (
-              <ResponsiveTable
-                headers={
-                  <thead>
-                    <tr>
-                      <th>Loan</th>
-                      <th>Borrower</th>
-                      <th>Amount</th>
-                      <th>Break age</th>
-                      <th>Officer</th>
-                      <th>Pin to top</th>
-                    </tr>
-                  </thead>
-                }
-                rows={
-                  <tbody>
-                    {data.brokenPromises.map((row) => (
-                      <tr key={row.promiseId}>
-                        <td className="num">{row.loanId}</td>
-                        <td className="cell-name">{row.borrowerName}</td>
-                        <td className="cell-key num">{formatMoneyShort(row.amountPaise)}</td>
-                        <td className="num">{row.ageDays} d</td>
-                        <td>{row.officerName ?? '—'}</td>
-                        <td className="cell-action">
-                          <button type="button" className="btn btn-secondary" disabled={pinBusy === row.loanId || row.officerName === null} onClick={() => void pin(row.loanId, row.officerName)}>
-                            {pinBusy === row.loanId ? '…' : pinDone === row.loanId ? 'Pinned' : 'Pin to top'}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                }
-                cards={data.brokenPromises.map((row) => ({
-                  key: row.promiseId,
-                  name: row.borrowerName,
-                  keyNum: formatMoneyShort(row.amountPaise),
-                  chips: [row.loanId, `broke ${row.ageDays} d ago`, row.officerName ?? '—'],
-                  action: (
-                    <button type="button" className="btn btn-secondary" disabled={pinBusy === row.loanId || row.officerName === null} onClick={() => void pin(row.loanId, row.officerName)}>
-                      {pinBusy === row.loanId ? '…' : pinDone === row.loanId ? 'Pinned' : 'Pin to top'}
-                    </button>
-                  )
-                }))}
-              />
-            )}
-            <HowCalc>Amount = the promised amount (paise to lakh/crore). Age = days since the break was recorded. Pin sends the loan to the top of its officer's Today list. Synthetic data.</HowCalc>
-          </section>
+                <h2 className="panel-title attention-gap">Exceptions: 25–30 DPD, no promise, no contact in 5 days</h2>
+                {data.exceptions.length === 0 ? (
+                  <p className="screen-subtitle">No exceptions today.</p>
+                ) : (
+                  <ResponsiveTable
+                    headers={
+                      <thead>
+                        <tr>
+                          <th>Loan</th>
+                          <th>Borrower</th>
+                          <th>DPD</th>
+                          <th>Overdue</th>
+                          <th>Officer</th>
+                          <th>Pin to top</th>
+                        </tr>
+                      </thead>
+                    }
+                    rows={
+                      <tbody>
+                        {data.exceptions.map((row) => (
+                          <tr key={row.loanId}>
+                            <td className="num">{row.loanId}</td>
+                            <td className="cell-name">{row.borrowerName}</td>
+                            <td className="num">{row.dpd}</td>
+                            <td className="cell-key num">{formatMoneyShort(row.overdueAmount)}</td>
+                            <td>{row.officerName ?? '—'}</td>
+                            <td className="cell-action">
+                              <button type="button" className="btn btn-secondary" disabled={pinBusy === row.loanId || row.officerName === null} onClick={() => void pin(row.loanId, row.officerName)}>
+                                {pinBusy === row.loanId ? '…' : pinDone === row.loanId ? 'Pinned' : 'Pin to top'}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    }
+                    cards={data.exceptions.map((row) => ({
+                      key: row.loanId,
+                      name: row.borrowerName,
+                      keyNum: formatMoneyShort(row.overdueAmount),
+                      chips: [row.loanId, `DPD ${row.dpd}`, row.officerName ?? '—'],
+                      action: (
+                        <button type="button" className="btn btn-secondary" disabled={pinBusy === row.loanId || row.officerName === null} onClick={() => void pin(row.loanId, row.officerName)}>
+                          {pinBusy === row.loanId ? '…' : pinDone === row.loanId ? 'Pinned' : 'Pin to top'}
+                        </button>
+                      )
+                    }))}
+                  />
+                )}
+                <HowCalc>Numerator: branch loans 25–30 DPD with no open promise and no CALL/VISIT/MESSAGE in the last 5 IST days. Denominator: the branch overdue book. Synthetic data.</HowCalc>
 
-          <section className="panel detail-card">
-            <h2 className="panel-title">Exceptions: 25–30 DPD, no promise, no contact in 5 days</h2>
-            {data.exceptions.length === 0 ? (
-              <p className="screen-subtitle">No exceptions today.</p>
-            ) : (
-              <ResponsiveTable
-                headers={
-                  <thead>
-                    <tr>
-                      <th>Loan</th>
-                      <th>Borrower</th>
-                      <th>DPD</th>
-                      <th>Overdue</th>
-                      <th>Officer</th>
-                      <th>Pin to top</th>
-                    </tr>
-                  </thead>
-                }
-                rows={
-                  <tbody>
-                    {data.exceptions.map((row) => (
-                      <tr key={row.loanId}>
-                        <td className="num">{row.loanId}</td>
-                        <td className="cell-name">{row.borrowerName}</td>
-                        <td className="num">{row.dpd}</td>
-                        <td className="cell-key num">{formatMoneyShort(row.overdueAmount)}</td>
-                        <td>{row.officerName ?? '—'}</td>
-                        <td className="cell-action">
-                          <button type="button" className="btn btn-secondary" disabled={pinBusy === row.loanId || row.officerName === null} onClick={() => void pin(row.loanId, row.officerName)}>
-                            {pinBusy === row.loanId ? '…' : pinDone === row.loanId ? 'Pinned' : 'Pin to top'}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                }
-                cards={data.exceptions.map((row) => ({
-                  key: row.loanId,
-                  name: row.borrowerName,
-                  keyNum: formatMoneyShort(row.overdueAmount),
-                  chips: [row.loanId, `DPD ${row.dpd}`, row.officerName ?? '—'],
-                  action: (
-                    <button type="button" className="btn btn-secondary" disabled={pinBusy === row.loanId || row.officerName === null} onClick={() => void pin(row.loanId, row.officerName)}>
-                      {pinBusy === row.loanId ? '…' : pinDone === row.loanId ? 'Pinned' : 'Pin to top'}
-                    </button>
-                  )
-                }))}
-              />
+                <h2 className="panel-title attention-gap">Stuck promises (nightly list)</h2>
+                {data.stuckPromises.length === 0 ? (
+                  <p className="screen-subtitle">No stuck promises — nothing 2+ days past due without action.</p>
+                ) : (
+                  <ResponsiveTable
+                    headers={
+                      <thead>
+                        <tr>
+                          <th>Loan</th>
+                          <th>Borrower</th>
+                          <th>Amount</th>
+                          <th>Deadline</th>
+                          <th>Days past</th>
+                          <th>Officer</th>
+                        </tr>
+                      </thead>
+                    }
+                    rows={
+                      <tbody>
+                        {data.stuckPromises.map((row) => (
+                          <tr key={row.promiseId}>
+                            <td className="num">{row.loanId}</td>
+                            <td className="cell-name">{row.borrowerName}</td>
+                            <td className="cell-key num">{formatMoneyShort(row.amountPaise)}</td>
+                            <td className="num">{formatDayMonth(row.deadline, 'en')}</td>
+                            <td className="num">{row.daysPastDue}</td>
+                            <td>{row.officerName ?? '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    }
+                    cards={data.stuckPromises.map((row) => ({
+                      key: row.promiseId,
+                      name: row.borrowerName,
+                      keyNum: formatMoneyShort(row.amountPaise),
+                      chips: [row.loanId, formatDayMonth(row.deadline, 'en'), `${row.daysPastDue} d past`, row.officerName ?? '—']
+                    }))}
+                  />
+                )}
+                <HowCalc>Broken promises 2+ days past their deadline with no officer contact since the break (A62). Read-only here; the escalation ladder lives with the officer. Synthetic data.</HowCalc>
+              </>
             )}
-            <HowCalc>Numerator: branch loans 25–30 DPD with no open promise and no CALL/VISIT/MESSAGE in the last 5 IST days. Denominator: the branch overdue book. Synthetic data.</HowCalc>
-          </section>
-
-          <section className="panel detail-card">
-            <h2 className="panel-title">Stuck promises (nightly list)</h2>
-            {data.stuckPromises.length === 0 ? (
-              <p className="screen-subtitle">No stuck promises — nothing 2+ days past due without action.</p>
-            ) : (
-              <ResponsiveTable
-                headers={
-                  <thead>
-                    <tr>
-                      <th>Loan</th>
-                      <th>Borrower</th>
-                      <th>Amount</th>
-                      <th>Deadline</th>
-                      <th>Days past</th>
-                      <th>Officer</th>
-                    </tr>
-                  </thead>
-                }
-                rows={
-                  <tbody>
-                    {data.stuckPromises.map((row) => (
-                      <tr key={row.promiseId}>
-                        <td className="num">{row.loanId}</td>
-                        <td className="cell-name">{row.borrowerName}</td>
-                        <td className="cell-key num">{formatMoneyShort(row.amountPaise)}</td>
-                        <td className="num">{formatDayMonth(row.deadline, 'en')}</td>
-                        <td className="num">{row.daysPastDue}</td>
-                        <td>{row.officerName ?? '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                }
-                cards={data.stuckPromises.map((row) => ({
-                  key: row.promiseId,
-                  name: row.borrowerName,
-                  keyNum: formatMoneyShort(row.amountPaise),
-                  chips: [row.loanId, formatDayMonth(row.deadline, 'en'), `${row.daysPastDue} d past`, row.officerName ?? '—']
-                }))}
-              />
-            )}
-            <HowCalc>Broken promises 2+ days past their deadline with no officer contact since the break (A62). Read-only here; the escalation ladder lives with the officer. Synthetic data.</HowCalc>
           </section>
         </>
       ) : null}

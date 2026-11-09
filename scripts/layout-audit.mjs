@@ -21,7 +21,7 @@ function start(cmd, args, env, waitText) {
 }
 
 const api = await start('node', ['--env-file=.env', 'scripts/dev-api.mjs'], {}, 'dev-api:');
-const vite = await start('pnpm', ['dev'], {}, 'Local:');
+const vite = await start('node', ['node_modules/vite/bin/vite.js'], {}, 'Local:');
 
 // Never leave orphan servers behind on a crash (they poison the next run's
 // ports 5173/8787).

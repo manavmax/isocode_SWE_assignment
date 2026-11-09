@@ -1691,10 +1691,31 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   max-width: 960px;
 }
 
-.manager-screen .tile-grid {
+/* the KPI tiles: a swipeable scroll-snap row on phones (88% width cards
+   with the dot gauge), a grid on desktop */
+.tile-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--sp-3);
+}
+
+@media (max-width: 639.9px) {
+  .tile-grid {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+  }
+
+  .tile-grid .tile {
+    flex: 0 0 88%;
+    scroll-snap-align: center;
+  }
+}
+
+@media (min-width: 1024px) {
+  .manager-screen .tile-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
 /* segmented control with a black active pill */
@@ -1726,18 +1747,78 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   .manager-screen {
     max-width: 960px;
   }
-  .manager-screen .tile-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
 }
 
 .manager-screen .tile {
   color: var(--text);
   border-radius: var(--radius-card);
-  padding: var(--sp-4);
+  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
+}
+
+/* the dot gauge rides the tile's bottom-right (prompt 21) */
+.tile-gauge {
+  align-self: flex-end;
+  margin-top: var(--sp-2);
+  width: 96px;
+}
+
+.tile-gauge .dotgrid circle {
+  fill: rgba(255, 255, 255, 0.35);
+}
+
+.tile-gauge .dotgrid circle.filled {
+  fill: #ffffff;
+}
+
+/* the officer card's thin dot bar */
+.phone-card-gauge {
+  width: 120px;
+}
+
+.phone-card-gauge .dotgrid circle {
+  fill: var(--grey-200);
+}
+
+.phone-card-gauge .dotgrid circle.filled {
+  fill: var(--pill-ink);
+}
+
+/* the 32/600 key number (prompt 21 officer roll %) */
+.phone-card-key-lg {
+  font-size: var(--font-size-32);
+}
+
+/* tabs inside one card (prompt 21): Officers | Needs attention */
+.manager-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-1);
+  background: var(--bg);
+  border-radius: var(--radius-pill);
+  padding: var(--sp-1);
+  margin: 0 0 var(--sp-3);
+}
+
+.manager-tabs button {
+  min-height: var(--target-min);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-14);
+  color: var(--text);
+  padding: 0;
+}
+
+.manager-tabs button[aria-selected='true'] {
+  background: var(--pill-ink);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* the Needs attention tab's stacked panels inside one card */
+.panel-title.attention-gap {
+  margin-top: var(--sp-6);
 }
 
 .manager-screen .tile[data-hero] .tile-label {
@@ -1929,18 +2010,16 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   color: var(--text-secondary);
 }
 
-.migration-bar {
+/* migration rows as dot strips (prompt 21): 10 dots, filled = rolled share */
+.migration-dots {
   flex: 1;
-  display: flex;
-  height: 12px;
-  overflow: hidden;
+  max-width: 160px;
 }
 
-.migration-seg {
-  display: block;
-  height: 100%;
+.migration-dots .dotgrid circle {
+  fill: var(--grey-200);
 }
 
-.migration-rolled { background: var(--accent); }
-.migration-stayed { background: var(--dpd-2); }
-.migration-cured { background: var(--grey-200); }
+.migration-dots .dotgrid circle.filled {
+  fill: var(--accent);
+}

@@ -36,7 +36,7 @@ let api = null;
 let vite = null;
 if (MODE === 'local') {
   api = await start('node', ['--env-file=.env', 'scripts/dev-api.mjs'], {}, 'dev-api:');
-  vite = await start('pnpm', ['dev'], {}, 'Local:');
+  vite = await start('node', ['node_modules/vite/bin/vite.js'], {}, 'Local:');
 }
 function cleanup() {
   // kill the whole process group: `pnpm dev` wraps vite, and killing pnpm
