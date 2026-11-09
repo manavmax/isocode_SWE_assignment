@@ -1433,31 +1433,49 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
   gap: var(--sp-3);
 }
 
-.login-lang {
-  display: flex;
-  gap: var(--sp-2);
-  justify-content: center;
-  padding: var(--sp-4) 0;
-}
-
-/* centered app name + one-line tagline, form in one white card (item 16) */
-.login-header {
+/* full-bleed mesh header panel; the form card overlaps it by 24px */
+.login-hero {
+  margin: calc(-1 * var(--sp-4)) calc(-1 * var(--sp-4)) 0;
+  padding: var(--sp-8) 20px var(--sp-8);
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  margin: var(--sp-4) 0 var(--sp-2);
+}
+
+.login-mark {
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--sp-3);
+}
+
+.login-mark circle {
+  fill: rgba(255, 255, 255, 0.4);
+}
+
+.login-mark circle.filled {
+  fill: #ffffff;
+}
+
+.login-title {
+  font-size: var(--font-size-24);
+  font-weight: 600;
+  color: #ffffff;
 }
 
 .login-tagline {
   font-size: var(--font-size-14);
-  color: var(--text-secondary);
+  color: #ffffff;
   margin-top: var(--sp-1);
+  max-width: 40ch;
 }
 
 .login-card {
   padding: 20px;
   margin-bottom: var(--sp-4);
+  margin-top: calc(-1 * var(--sp-6));
+  position: relative;
 }
 
 .field {
@@ -1560,14 +1578,43 @@ body:has(dialog.blocked-sheet[open]) .bottom-nav {
 
 /* ---------- sync (Me) ---------- */
 
-.sync-section {
-  padding: var(--sp-4) 0;
-  border-top: var(--hairline);
+/* profile + section cards (prompt 21) */
+.me-profile {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
 }
 
-.sync-header {
-  font-size: var(--font-size-16);
+.me-profile-id {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-1);
+}
+
+.me-name {
+  font-size: var(--font-size-18);
   font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.me-username {
+  font-size: var(--font-size-13);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.me-card {
+  margin-bottom: var(--sp-3);
+}
+
+.sync-section {
+  padding: 0;
+}
+
+.me-card .section-label {
   margin: 0 0 var(--sp-2);
 }
 

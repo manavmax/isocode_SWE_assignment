@@ -12,6 +12,8 @@ import {
 } from '../dexie/db.js';
 import { t as translate, type Lang } from '../i18n/dictionary.js';
 import { syncNow } from '../sync/scheduler.js';
+import { Avatar } from '../components/Avatar.js';
+import { displayName } from '../format.js';
 
 function roleLabel(lang: Lang, role: string | undefined): string {
   if (role === 'branch_manager') return translate(lang, 'roleBranchManager');
@@ -92,8 +94,19 @@ export function Me({ lang, setLang, user, onLoggedOut }: { lang: Lang; setLang: 
         <h1 className="screen-title">{tr('meTitle')}</h1>
       </header>
 
-      {/* Sync section (SPEC 2 screen 5): header on its own line, counts,
-          then the full-width Sync now button below them (prompt 20 item 12) */}
+      {/* profile card (prompt 21): initials avatar, name, role chip */}
+      <section className="me-profile soft-card">
+        <Avatar name={displayName(user?.username ?? '')} size={56} tint="blue" />
+        <div className="me-profile-id">
+          <p className="me-name">{displayName(user?.username ?? '')}</p>
+          <p className="me-username">{user ? user.username : '—'}</p>
+          <span className="chip-soft chip-soft-blue">{user ? roleLabel(lang, user.role) : '—'}</span>
+        </div>
+      </section>
+
+      {/* Sync card (SPEC 2 screen 5): header, counts, then the full-width
+          Sync now button below them (prompt 20 item 12) */}
+      <section className="me-card soft-card">
       <section className="sync-section">
         <span className="section-label">{tr('syncTitle')}</span>
 
@@ -164,28 +177,20 @@ export function Me({ lang, setLang, user, onLoggedOut }: { lang: Lang; setLang: 
           <p className="persist-ok">{tr('persistOk')}</p>
         )}
       </section>
+      </section>
 
-      <p className="section-label">{tr('meAccount')}</p>
-      <div className="facts">
-        <div className="fact-row">
-          <span className="fact-label">{tr('loginUsername')}</span>
-          <span className="fact-value">{user ? user.username : '—'}</span>
+      {/* Language card */}
+      <section className="me-card soft-card">
+        <span className="section-label">{tr('meLanguage')}</span>
+        <div className="segment-row segment-two" role="group" aria-label={tr('meLanguage')}>
+          <button type="button" className={`segment ${lang === 'hi' ? 'segment-active' : ''}`} aria-pressed={lang === 'hi'} onClick={() => setLang('hi')}>
+            हिंदी
+          </button>
+          <button type="button" className={`segment ${lang === 'en' ? 'segment-active' : ''}`} aria-pressed={lang === 'en'} onClick={() => setLang('en')}>
+            English
+          </button>
         </div>
-        <div className="fact-row">
-          <span className="fact-label">{tr('factStatus')}</span>
-          <span className="fact-value">{user ? roleLabel(lang, user.role) : '—'}</span>
-        </div>
-      </div>
-
-      <p className="section-label">{tr('meLanguage')}</p>
-      <div className="segment-row segment-two" role="group" aria-label={tr('meLanguage')}>
-        <button type="button" className={`segment ${lang === 'hi' ? 'segment-active' : ''}`} aria-pressed={lang === 'hi'} onClick={() => setLang('hi')}>
-          हिंदी
-        </button>
-        <button type="button" className={`segment ${lang === 'en' ? 'segment-active' : ''}`} aria-pressed={lang === 'en'} onClick={() => setLang('en')}>
-          English
-        </button>
-      </div>
+      </section>
 
       <p className="screen-subtitle" style={{ margin: 'var(--sp-3) 0' }}>
         {tr('meOfflineCache')}

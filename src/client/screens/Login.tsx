@@ -39,18 +39,26 @@ export function Login({ lang, setLang, onSignedIn, sessionExpired }: { lang: Lan
   }
 
   return (
-    <main className="screen">
-      <header className="login-header">
-        <h1 className="screen-title">{tr('appName')}</h1>
+    <main className="screen login-screen">
+      {/* full-width mesh header panel: an original geometric mark (a ring of
+          dots, three filled - the app's dot language) + the app name */}
+      <div className="login-hero mesh-indigo" data-hero>
+        <svg className="login-mark" viewBox="0 0 48 48" aria-hidden="true">
+          {Array.from({ length: 8 }, (_, i) => {
+            const angle = (i / 8) * 2 * Math.PI;
+            return (
+              <circle
+                key={i}
+                cx={24 + 16 * Math.sin(angle)}
+                cy={24 - 16 * Math.cos(angle)}
+                r={4}
+                className={i < 3 ? 'filled' : undefined}
+              />
+            );
+          })}
+        </svg>
+        <h1 className="login-title">{tr('appName')}</h1>
         <p className="login-tagline">{tr('loginTagline')}</p>
-      </header>
-      <div className="login-lang segment-row segment-two" role="group" aria-label={tr('loginLanguageLabel')}>
-        <button type="button" className={`segment ${lang === 'hi' ? 'segment-active' : ''}`} aria-pressed={lang === 'hi'} onClick={() => setLang('hi')}>
-          हिंदी
-        </button>
-        <button type="button" className={`segment ${lang === 'en' ? 'segment-active' : ''}`} aria-pressed={lang === 'en'} onClick={() => setLang('en')}>
-          English
-        </button>
       </div>
       <form
         className="login-form login-card soft-card"
@@ -59,6 +67,14 @@ export function Login({ lang, setLang, onSignedIn, sessionExpired }: { lang: Lan
           void submit();
         }}
       >
+        <div className="login-lang segment-row segment-two" role="group" aria-label={tr('loginLanguageLabel')}>
+          <button type="button" className={`segment ${lang === 'hi' ? 'segment-active' : ''}`} aria-pressed={lang === 'hi'} onClick={() => setLang('hi')}>
+            हिंदी
+          </button>
+          <button type="button" className={`segment ${lang === 'en' ? 'segment-active' : ''}`} aria-pressed={lang === 'en'} onClick={() => setLang('en')}>
+            English
+          </button>
+        </div>
         <div className="field">
           <label className="field-label" htmlFor="username">
             {tr('loginUsername')}
